@@ -7,7 +7,7 @@ namespace Daemon.Monitors
 {
     internal class FocusMonitor
     {
-        private const string ExamWindowTitle = "OEIMS Exam"
+        private const string ExamWindowTitle = "OEIMS Exam";
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
