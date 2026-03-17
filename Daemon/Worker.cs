@@ -1,15 +1,20 @@
+using Daemon.Monitors;
+
 namespace Daemon
 {
     public class Worker(ILogger<Worker> logger) : BackgroundService
     {
+        private readonly FocusMonitor _focusMonitor = new FocusMonitor();
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (logger.IsEnabled(LogLevel.Information))
+                if (!_focusMonitor.IsExamWindowFocused())
                 {
-                    logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+                    logger.LogWarning("Focus lost! Current window: {title}", _focusMonitor.GetForegroundWindowTitle());
                 }
+
                 await Task.Delay(1000, stoppingToken);
             }
         }
