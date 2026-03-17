@@ -8,6 +8,9 @@ namespace Daemon
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            using var clipboardMonitor = new ClipboardMonitor();
+            clipboardMonitor.BlockClipboard();
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 if (!_focusMonitor.IsExamWindowFocused())
