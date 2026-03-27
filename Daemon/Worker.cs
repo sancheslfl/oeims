@@ -12,6 +12,9 @@ namespace Daemon
             using var clipboardMonitor = new ClipboardMonitor();
             clipboardMonitor.BlockClipboard();
 
+            using var processMonitor = new ProcessMonitor();
+            processMonitor.StartWatching();
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 if (!_focusMonitor.IsExamWindowFocused())
@@ -19,11 +22,12 @@ namespace Daemon
                     logger.LogWarning("Focus lost! Current window: {title}", _focusMonitor.GetForegroundWindowTitle());
                 }
 
-                var forbidden = _processMonitor.GetForbiddenProcesses();
-                if (forbidden.Any()) {
-                    logger.LogWarning("Forbidden processes detected: {processes}", string.Join(", ", forbidden));
-                    _processMonitor.KillForbiddenProcesses();
+                var killed = processMonitor.KillForbiddenProcesses();
+                if (killed.Any())
+                {
+                    logger.LogWarning("Forbidden processes killed: {processes}", string.Join(", ", killed));
                 }
+
                 await Task.Delay(1000, stoppingToken);
             }
         }
