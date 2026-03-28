@@ -35,6 +35,12 @@ namespace Daemon.Monitors
             return count > 1;
         }
 
+        public bool HasNoActiveNetworks()
+        {
+            var count = GetActiveInterfaces().Count;
+            return count == 0;
+        }
+
         private string GetCurrentNetworkId()
         {
             var active = NetworkInterface.GetAllNetworkInterfaces()
@@ -54,8 +60,11 @@ namespace Daemon.Monitors
         private HashSet<string> GetActiveInterfaces()
         {
             return NetworkInterface.GetAllNetworkInterfaces()
-                .Where(n => n.OperationalStatus == OperationalStatus.Up &&
-                            n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                .Where(n =>
+                        n.OperationalStatus == OperationalStatus.Up &&
+                        n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                        n.GetIPProperties().GatewayAddresses.Any()
+                )
                 .Select(n => n.Name)
                 .ToHashSet();
         }
