@@ -5,7 +5,6 @@ namespace Daemon
     public class Worker(ILogger<Worker> logger) : BackgroundService
     {
         private readonly FocusMonitor _focusMonitor = new FocusMonitor();
-        private readonly ProcessMonitor _processMonitor = new ProcessMonitor();
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -15,6 +14,13 @@ namespace Daemon
             using var processMonitor = new ProcessMonitor();
             processMonitor.StartWatching();
 
+            using var processBlocker = new ProcessBlocker();
+            var blocked = processBlocker.BlockForbiddenProcesses();
+
+            foreach (var process in blocked)
+            {
+                logger.LogWarning("Blocked process: {process}", process);
+            }
             while (!stoppingToken.IsCancellationRequested)
             {
                 if (!_focusMonitor.IsExamWindowFocused())

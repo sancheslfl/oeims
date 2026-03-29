@@ -23,6 +23,7 @@ namespace Daemon.Monitors
             _watcher.Start();
         }
 
+        // Without filtering this can kill all processes that run after the daemon has started (FALAR COM O PROF)
         private void OnProcessStarted(object sender, EventArrivedEventArgs e)
         {
             var processName = e.NewEvent["ProcessName"]?.ToString()?.Replace(".exe", "").ToLower();
