@@ -13,6 +13,11 @@ namespace Daemon.Monitors
 
         public void InitializeBaseline()
         {
+            /*if (!IsValidNetworkState())
+            {
+                // BlockExam() -> blocking function that quits when network turns valid
+
+            }*/
             _initialNetworkId = GetCurrentNetworkId();
             _initialInterfaces = GetActiveInterfaces();
         }
@@ -39,6 +44,11 @@ namespace Daemon.Monitors
         {
             var count = GetActiveInterfaces().Count;
             return count == 0;
+        }
+
+        public bool IsValidNetworkState()
+        {
+            return !HasNoActiveNetworks() && !HasMultipleActiveNetworks() && !HasMultipleInterfaces();
         }
 
         private string GetCurrentNetworkId()
