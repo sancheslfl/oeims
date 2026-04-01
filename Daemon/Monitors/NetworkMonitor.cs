@@ -1,21 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net.NetworkInformation;
-using System.Runtime.InteropServices;
-using System.Text;
+﻿using System.Net.NetworkInformation;
 
 namespace Daemon.Monitors
 {
+    internal record ActiveInterface(string Id, string Name);
+
     internal class NetworkMonitor
     {
         private string? _initialNetworkId;
-        private HashSet<string> _initialInterfaces = new();
+        private HashSet<ActiveInterface> _initialInterfaces = [];
 
         public void InitializeBaseline()
         {
             _initialNetworkId = GetCurrentNetworkId();
             _initialInterfaces = GetActiveInterfaces();
         }
+
+        private static readonly HashSet<NetworkInterfaceType> AllowedPhysicalTypes =
+        [
+            NetworkInterfaceType.Ethernet,
+            NetworkInterfaceType.GigabitEthernet,
+            NetworkInterfaceType.Wireless80211,
+            NetworkInterfaceType.Wwanpp,
+            NetworkInterfaceType.Wwanpp2,
+            NetworkInterfaceType.Wman
+        ];
 
         public bool HasNetworkChanged()
         {
@@ -35,6 +43,17 @@ namespace Daemon.Monitors
             return count > 1;
         }
 
+        public bool HasNoActiveNetworks()
+        {
+            var count = GetActiveInterfaces().Count;
+            return count == 0;
+        }
+
+        public bool IsValidNetworkState()
+        {
+            return GetActivePhysicalInterfaces().Count == 1;
+        }
+
         private string GetCurrentNetworkId()
         {
             var active = NetworkInterface.GetAllNetworkInterfaces()
@@ -51,12 +70,27 @@ namespace Daemon.Monitors
             }));
         }
 
-        private HashSet<string> GetActiveInterfaces()
+        private static HashSet<ActiveInterface> GetActiveInterfaces()
         {
             return NetworkInterface.GetAllNetworkInterfaces()
-                .Where(n => n.OperationalStatus == OperationalStatus.Up &&
-                            n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-                .Select(n => n.Name)
+                .Where(n =>
+                        n.OperationalStatus == OperationalStatus.Up &&
+                        n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                        n.GetIPProperties().GatewayAddresses.Count != 0
+                )
+                .Select(n => new ActiveInterface(n.Id, n.Name))
+                .ToHashSet();
+        }
+
+        private static HashSet<ActiveInterface> GetActivePhysicalInterfaces()
+        {
+            return NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n =>
+                    n.OperationalStatus == OperationalStatus.Up &&
+                    AllowedPhysicalTypes.Contains(n.NetworkInterfaceType) &&
+                    n.GetIPProperties().GatewayAddresses.Count != 0
+                )
+                .Select( n => new ActiveInterface(n.Id, n.Name))
                 .ToHashSet();
         }
     }
