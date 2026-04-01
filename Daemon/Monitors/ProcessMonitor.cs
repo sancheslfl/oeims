@@ -1,36 +1,61 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
+using System.Management;
 
 namespace Daemon.Monitors
 {
-    internal class ProcessMonitor
+    internal class ProcessMonitor : IDisposable
     {
-        private static readonly string[] ForbiddenProcesses =
-            [
-                "slack"
-            ];
+        private readonly ManagementEventWatcher? _watcher;
+        private readonly string[] _forbiddenProcesses =
+        [
+            "slack"
+        ];
 
-        internal IEnumerable<string> GetForbiddenProcesses()
+        internal ProcessMonitor()
         {
-            return Process.GetProcesses()
-                .Select(p => p.ProcessName.ToLower())
-                .Where(name => ForbiddenProcesses.Contains(name));
+            _watcher = new ManagementEventWatcher(
+            new WqlEventQuery("SELECT * FROM Win32_ProcessStartTrace"));
+            _watcher.EventArrived += OnProcessStarted;
         }
 
-        internal void KillForbiddenProcesses()
+        internal void StartWatching()
         {
-            var forbiddenProcesses = GetForbiddenProcesses();
-            foreach (var process in forbiddenProcesses)
+            _watcher.Start();
+        }
+
+        // Without filtering this can kill all processes that run after the daemon has started (FALAR COM O PROF)
+        private void OnProcessStarted(object sender, EventArrivedEventArgs e)
+        {
+            var processName = e.NewEvent["ProcessName"]?.ToString()?.Replace(".exe", "").ToLower();
+
+            if (processName != null && _forbiddenProcesses.Contains(processName))
             {
-                try
+                var processes = Process.GetProcessesByName(processName);
+                foreach (var process in processes)
                 {
-                    Process.GetProcessesByName(process).FirstOrDefault()?.Kill();
-                }
-                catch (Exception ex)
-                {
-                    // Log the exception or handle it as needed
+                    process.Kill();
                 }
             }
+        }
+
+        internal IEnumerable<string> KillForbiddenProcesses()
+        {
+            var killed = new List<string>();
+            foreach (var process in Process.GetProcesses())
+            {
+                if (_forbiddenProcesses.Contains(process.ProcessName.ToLower()))
+                {
+                    killed.Add(process.ProcessName);
+                    process.Kill();
+                }
+            }
+            return killed;
+        }
+
+        public void Dispose()
+        {
+            _watcher?.Stop();
+            _watcher?.Dispose();
         }
     }
 }
