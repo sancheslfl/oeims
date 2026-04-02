@@ -25,6 +25,35 @@ namespace Daemon.Monitors
             NetworkInterfaceType.Wman
         ];
 
+        public event Action? NetworkStateChanged;
+
+        public void StartMonitoring()
+        {
+            NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
+            NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
+        }
+
+        public void StopMonitoring()
+        {
+            NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
+            NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+        }
+
+        private void OnNetworkAddressChanged(object? sender, EventArgs e)
+        {
+            HandleNetworkChange();
+        }
+
+        private void OnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
+        {
+            HandleNetworkChange();
+        }
+
+        private void HandleNetworkChange()
+        {
+            NetworkStateChanged?.Invoke();
+        }
+
         public bool HasNetworkChanged()
         {
             var current = GetCurrentNetworkId();
