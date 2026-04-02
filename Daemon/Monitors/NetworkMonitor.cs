@@ -4,6 +4,15 @@ namespace Daemon.Monitors
 {
     internal record ActiveInterface(string Id, string Name);
 
+    internal enum NetworkEvent
+    {
+        NetworkChanged,
+        MultipleInterfacesDetected,
+        MultipleActiveNetworksDetected,
+        NoActiveNetworkDetected,
+        InvalidNetworkStateDetected
+    }
+
     internal class NetworkMonitor
     {
         private string? _initialNetworkId;
@@ -25,7 +34,7 @@ namespace Daemon.Monitors
             NetworkInterfaceType.Wman
         ];
 
-        public event Action? NetworkStateChanged;
+        public event Action<NetworkEvent>? NetworkStateChanged;
 
         public void StartMonitoring()
         {
@@ -51,7 +60,17 @@ namespace Daemon.Monitors
 
         private void HandleNetworkChange()
         {
-            NetworkStateChanged?.Invoke();
+            if (HasNetworkChanged())
+                NetworkStateChanged?.Invoke(NetworkEvent.NetworkChanged);
+
+            if (HasMultipleInterfaces())
+                NetworkStateChanged?.Invoke(NetworkEvent.MultipleInterfacesDetected);
+
+            if (HasMultipleActiveNetworks())
+                NetworkStateChanged?.Invoke(NetworkEvent.MultipleActiveNetworksDetected);
+
+            if (HasNoActiveNetworks())
+                NetworkStateChanged?.Invoke(NetworkEvent.NoActiveNetworkDetected);
         }
 
         public bool HasNetworkChanged()

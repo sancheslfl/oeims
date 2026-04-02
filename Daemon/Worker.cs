@@ -8,26 +8,27 @@ namespace Daemon
         private readonly ProcessMonitor _processMonitor = new ProcessMonitor();
         private readonly NetworkMonitor _networkMonitor = new NetworkMonitor();
 
-        private void OnNetworkStateChanged()
+        private void OnNetworkStateChanged(NetworkEvent eventType)
         {
-            if (_networkMonitor.HasNetworkChanged())
+            switch (eventType)
             {
-                logger.LogWarning("Network change detected!");
-            }
+                case NetworkEvent.NetworkChanged:
+                    logger.LogWarning("Network change detected!");
+                    break;
 
-            if (_networkMonitor.HasMultipleInterfaces())
-            {
-                logger.LogWarning("Suspicious interfaces detected!");
-            }
+                case NetworkEvent.MultipleInterfacesDetected:
+                    logger.LogWarning("Suspicious interfaces detected!");
+                    break;
 
-            if (_networkMonitor.HasMultipleActiveNetworks())
-            {
-                logger.LogWarning("Multiple active networks detected!");
-            }
+                case NetworkEvent.MultipleActiveNetworksDetected:
+                    logger.LogWarning("Multiple active networks detected!");
+                    break;
 
-            if (_networkMonitor.HasNoActiveNetworks())
-            {
-                logger.LogWarning("No active network was detected!");
+                case NetworkEvent.NoActiveNetworkDetected:
+                    logger.LogWarning("No active network detected!");
+                    break;
+                default:
+                    break;
             }
         }
 
@@ -47,12 +48,18 @@ namespace Daemon
             _networkMonitor.StartMonitoring();
             _networkMonitor.NetworkStateChanged += OnNetworkStateChanged;
 
-            if (stoppingToken.IsCancellationRequested)
+            try
             {
-                logger.LogInformation("Closing...");
+                await Task.Delay(Timeout.Infinite, stoppingToken);
+            }
+            catch (TaskCanceledException)
+            {
+                // ignore since it occurs when stoppingToken is triggered
+            }
+            finally
+            {
                 _networkMonitor.NetworkStateChanged -= OnNetworkStateChanged;
                 _networkMonitor.StopMonitoring();
-
             }
         }
     }
