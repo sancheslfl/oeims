@@ -7,68 +7,100 @@ namespace Daemon
         private readonly FocusMonitor _focusMonitor = new FocusMonitor();
         private readonly NetworkMonitor _networkMonitor = new NetworkMonitor();
 
+        private readonly TaskCompletionSource _tcs = new TaskCompletionSource();
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             using var clipboardMonitor = new ClipboardMonitor();
             clipboardMonitor.BlockClipboard();
 
-            using var processMonitor = new ProcessMonitor();
-            processMonitor.StartWatching();
+            _networkMonitor.Start();
 
-            using var processBlocker = new ProcessBlocker();
-            var blocked = processBlocker.BlockForbiddenProcesses();
-            foreach (var process in blocked)
+            try
             {
-                logger.LogWarning("Blocked process: {process}", process);
+                await WaitForValidNetwork(stoppingToken);
+
+                _networkMonitor.InitializeBaseline();
+                SubscribeEvents();
+
+                await WaitForShutdown(stoppingToken);
+            }
+            finally
+            {
+                UnsubscribeEvents();
+                _networkMonitor.Stop();
+            }
+        }
+
+        private async Task WaitForValidNetwork(CancellationToken stoppingToken)
+        {
+            if (_networkMonitor.IsValidNetworkState())
+            {
+                logger.LogInformation("Valid network state. Proceeding...");
+                return;
             }
 
-            while (!_networkMonitor.IsValidNetworkState())
+            logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
+
+            _networkMonitor.NetworkChanged += OnNetworkChange;
+
+            try
             {
-                logger.LogWarning("Invalid network state! Student must be connected to a single physical network");
-                logger.LogWarning("Multi int: {b1}\n Multi net: {b2}\n Not active: {b3}\n Change: {b4}",
-                    _networkMonitor.HasMultipleInterfaces(),
-                    _networkMonitor.HasMultipleActiveNetworks(),
-                    _networkMonitor.HasNoActiveNetworks(),
-                    _networkMonitor.HasNetworkChanged());
-                await Task.Delay(5000, CancellationToken.None);
+                await _tcs.Task.WaitAsync(stoppingToken);
             }
-            _networkMonitor.InitializeBaseline();
-
-            while (!stoppingToken.IsCancellationRequested)
+            finally
             {
-                if (!_focusMonitor.IsExamWindowFocused())
-                {
-                    logger.LogWarning("Focus lost! Current window: {title}", _focusMonitor.GetForegroundWindowTitle());
-                }
+                _networkMonitor.NetworkChanged -= OnNetworkChange;
+            }
+        }
 
-                var killed = processMonitor.KillForbiddenProcesses();
-                if (killed.Any())
-                {
-                    logger.LogWarning("Forbidden processes killed: {processes}", string.Join(", ", killed));
-                }
-
-                if (_networkMonitor.HasNetworkChanged())
-                {
+        private void OnNetworkViolationDetected(NetworkEvent eventType)
+        {
+            switch (eventType)
+            {
+                case NetworkEvent.NetworkChanged:
                     logger.LogWarning("Network change detected!");
-                }
+                    break;
 
-                if (_networkMonitor.HasMultipleInterfaces())
-                {
+                case NetworkEvent.MultipleInterfacesDetected:
                     logger.LogWarning("Suspicious interfaces detected!");
-                }
+                    break;
 
-                if (_networkMonitor.HasMultipleActiveNetworks())
-                {
+                case NetworkEvent.MultipleActiveNetworksDetected:
                     logger.LogWarning("Multiple active networks detected!");
-                }
+                    break;
 
-                if (_networkMonitor.HasNoActiveNetworks())
-                {
-                    logger.LogWarning("No active network was detected!");
-                }
-
-                await Task.Delay(1000, stoppingToken);
+                case NetworkEvent.NoActiveNetworkDetected:
+                    logger.LogWarning("No active network detected!");
+                    break;
             }
+        }
+
+        private void OnNetworkChange()
+        {
+            if (!_networkMonitor.IsValidNetworkState())
+            {
+                logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
+                return;
+            }
+
+            logger.LogInformation("Valid network state. Proceeding...");
+            _tcs.TrySetResult();
+        }
+
+        private static async Task WaitForShutdown(CancellationToken stoppingToken)
+        {
+            await Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+
+        private void SubscribeEvents()
+        {
+            _networkMonitor.NetworkViolationDetected += OnNetworkViolationDetected;
+        }
+
+        private void UnsubscribeEvents()
+        {
+            _networkMonitor.NetworkViolationDetected -= OnNetworkViolationDetected;
         }
     }
 }

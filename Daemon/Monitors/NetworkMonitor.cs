@@ -4,6 +4,14 @@ namespace Daemon.Monitors
 {
     internal record ActiveInterface(string Id, string Name);
 
+    internal enum NetworkEvent
+    {
+        NetworkChanged,
+        MultipleInterfacesDetected,
+        MultipleActiveNetworksDetected,
+        NoActiveNetworkDetected,
+    }
+
     internal class NetworkMonitor
     {
         private string? _initialNetworkId;
@@ -24,6 +32,53 @@ namespace Daemon.Monitors
             NetworkInterfaceType.Wwanpp2,
             NetworkInterfaceType.Wman
         ];
+
+        public event Action? NetworkChanged;
+        public event Action<NetworkEvent>? NetworkViolationDetected;
+
+        public void Start()
+        {
+            NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
+            NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
+        }
+
+        public void Stop()
+        {
+            NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
+            NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+        }
+
+        private void OnNetworkAddressChanged(object? sender, EventArgs e)
+        {
+            HandleNetworkChange();
+        }
+
+        private void OnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
+        {
+            HandleNetworkChange();
+        }
+
+        private void HandleNetworkChange()
+        {
+            NetworkChanged?.Invoke();
+            CheckNetworkViolation();
+        }
+
+        private void CheckNetworkViolation()
+        {
+            if (HasNetworkChanged())
+                NetworkViolationDetected?.Invoke(NetworkEvent.NetworkChanged);
+
+            if (HasMultipleInterfaces())
+                NetworkViolationDetected?.Invoke(NetworkEvent.MultipleInterfacesDetected);
+
+            if (HasMultipleActiveNetworks())
+                NetworkViolationDetected?.Invoke(NetworkEvent.MultipleActiveNetworksDetected);
+
+            if (HasNoActiveNetworks())
+                NetworkViolationDetected?.Invoke(NetworkEvent.NoActiveNetworkDetected);
+
+        }
 
         public bool HasNetworkChanged()
         {
