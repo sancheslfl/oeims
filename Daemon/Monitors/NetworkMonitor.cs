@@ -10,7 +10,6 @@ namespace Daemon.Monitors
         MultipleInterfacesDetected,
         MultipleActiveNetworksDetected,
         NoActiveNetworkDetected,
-        InvalidNetworkStateDetected
     }
 
     internal class NetworkMonitor
@@ -34,15 +33,16 @@ namespace Daemon.Monitors
             NetworkInterfaceType.Wman
         ];
 
-        public event Action<NetworkEvent>? NetworkStateChanged;
+        public event Action? NetworkChanged;
+        public event Action<NetworkEvent>? NetworkViolationDetected;
 
-        public void StartMonitoring()
+        public void Start()
         {
             NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
             NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
         }
 
-        public void StopMonitoring()
+        public void Stop()
         {
             NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
             NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
@@ -60,17 +60,24 @@ namespace Daemon.Monitors
 
         private void HandleNetworkChange()
         {
+            NetworkChanged?.Invoke();
+            CheckNetworkViolation();
+        }
+
+        private void CheckNetworkViolation()
+        {
             if (HasNetworkChanged())
-                NetworkStateChanged?.Invoke(NetworkEvent.NetworkChanged);
+                NetworkViolationDetected?.Invoke(NetworkEvent.NetworkChanged);
 
             if (HasMultipleInterfaces())
-                NetworkStateChanged?.Invoke(NetworkEvent.MultipleInterfacesDetected);
+                NetworkViolationDetected?.Invoke(NetworkEvent.MultipleInterfacesDetected);
 
             if (HasMultipleActiveNetworks())
-                NetworkStateChanged?.Invoke(NetworkEvent.MultipleActiveNetworksDetected);
+                NetworkViolationDetected?.Invoke(NetworkEvent.MultipleActiveNetworksDetected);
 
             if (HasNoActiveNetworks())
-                NetworkStateChanged?.Invoke(NetworkEvent.NoActiveNetworkDetected);
+                NetworkViolationDetected?.Invoke(NetworkEvent.NoActiveNetworkDetected);
+
         }
 
         public bool HasNetworkChanged()
