@@ -1,10 +1,10 @@
+using Daemon.Abstractions;
 using Daemon.Monitors;
 
 namespace Daemon
 {
     public class Worker(ILogger<Worker> logger) : BackgroundService
     {
-        private readonly FocusMonitor _focusMonitor = new FocusMonitor();
         private readonly NetworkMonitor _networkMonitor = new NetworkMonitor();
 
         private readonly TaskCompletionSource _tcs = new TaskCompletionSource();
@@ -36,11 +36,11 @@ namespace Daemon
         {
             if (_networkMonitor.IsValidNetworkState())
             {
-                logger.LogInformation("Valid network state. Proceeding...");
+                _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Valid network state. Proceeding...", Severity.Info));
                 return;
             }
 
-            logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
+            _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
 
             _networkMonitor.NetworkChanged += OnNetworkChange;
 
@@ -59,19 +59,19 @@ namespace Daemon
             switch (eventType)
             {
                 case NetworkEvent.NetworkChanged:
-                    logger.LogWarning("Network change detected!");
+                    _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Network change detected!", Severity.Warning));
                     break;
 
                 case NetworkEvent.MultipleInterfacesDetected:
-                    logger.LogWarning("Suspicious interfaces detected!");
+                    _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Suspicious interfaces detected!", Severity.Warning));
                     break;
 
                 case NetworkEvent.MultipleActiveNetworksDetected:
-                    logger.LogWarning("Multiple active networks detected!");
+                    _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Multiple active networks detected!", Severity.Warning));
                     break;
 
                 case NetworkEvent.NoActiveNetworkDetected:
-                    logger.LogWarning("No active network detected!");
+                    _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "No active network detected!", Severity.Warning));
                     break;
             }
         }
@@ -80,11 +80,11 @@ namespace Daemon
         {
             if (!_networkMonitor.IsValidNetworkState())
             {
-                logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
+                _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
                 return;
             }
 
-            logger.LogInformation("Valid network state. Proceeding...");
+            _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Valid network state. Proceeding...", Severity.Info));
             _tcs.TrySetResult();
         }
 
@@ -101,6 +101,27 @@ namespace Daemon
         private void UnsubscribeEvents()
         {
             _networkMonitor.NetworkViolationDetected -= OnNetworkViolationDetected;
+        }
+
+        private Task OnMonitorEvent(MonitorEvent e)
+        {
+            switch (e.Severity)
+            {
+                case Severity.Info:
+                    logger.LogInformation("[{monitor}] {message}", e.MonitorName, e.Message);
+                    break;
+                case Severity.Warning:
+                    logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
+                    break;
+                case Severity.Critical:
+                    logger.LogCritical("[{monitor}] {message}", e.MonitorName, e.Message);
+                    break;
+                default:
+                    logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
+                    break;
+            }
+
+            return Task.CompletedTask;
         }
     }
 }
