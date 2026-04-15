@@ -36,11 +36,11 @@ namespace Daemon
         {
             if (_networkMonitor.IsValidNetworkState())
             {
-                _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Valid network state. Proceeding...", Severity.Info));
+                OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Valid network state. Proceeding...", Severity.Info));
                 return;
             }
 
-            _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
+            OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
 
             _networkMonitor.NetworkChanged += OnNetworkChange;
 
@@ -59,19 +59,19 @@ namespace Daemon
             switch (eventType)
             {
                 case NetworkEvent.NetworkChanged:
-                    _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Network change detected!", Severity.Warning));
+                    OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Network change detected!", Severity.Warning));
                     break;
 
                 case NetworkEvent.MultipleInterfacesDetected:
-                    _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Suspicious interfaces detected!", Severity.Warning));
+                    OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Suspicious interfaces detected!", Severity.Warning));
                     break;
 
                 case NetworkEvent.MultipleActiveNetworksDetected:
-                    _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Multiple active networks detected!", Severity.Warning));
+                    OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Multiple active networks detected!", Severity.Warning));
                     break;
 
                 case NetworkEvent.NoActiveNetworkDetected:
-                    _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "No active network detected!", Severity.Warning));
+                    OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "No active network detected!", Severity.Warning));
                     break;
             }
         }
@@ -80,11 +80,11 @@ namespace Daemon
         {
             if (!_networkMonitor.IsValidNetworkState())
             {
-                _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
+                OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
                 return;
             }
 
-            _ = OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Valid network state. Proceeding...", Severity.Info));
+            OnMonitorEvent(new MonitorEvent(_networkMonitor.Name, "Valid network state. Proceeding...", Severity.Info));
             _tcs.TrySetResult();
         }
 
@@ -103,7 +103,7 @@ namespace Daemon
             _networkMonitor.NetworkViolationDetected -= OnNetworkViolationDetected;
         }
 
-        private Task OnMonitorEvent(MonitorEvent e)
+        private void OnMonitorEvent(MonitorEvent e)
         {
             switch (e.Severity)
             {
@@ -120,8 +120,6 @@ namespace Daemon
                     logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
             }
-
-            return Task.CompletedTask;
         }
     }
 }

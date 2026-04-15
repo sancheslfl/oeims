@@ -116,7 +116,14 @@ namespace Daemon.Monitors
         {
             Start();
 
-            Action<NetworkEvent> onViolation = eventType => _ = HandleViolationEventAsync(eventType, onEvent);
+            Action<NetworkEvent> onViolation = eventType =>
+            {
+                _ = onEvent(CreateMonitorEvent(eventType)).ContinueWith(
+                    static t => _ = t.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
+            };
 
             try
             {
@@ -207,26 +214,21 @@ namespace Daemon.Monitors
             }
         }
 
-        private async Task HandleViolationEventAsync(NetworkEvent eventType, Func<MonitorEvent, Task> onEvent)
+        private MonitorEvent CreateMonitorEvent(NetworkEvent eventType)
         {
-            try
+            return eventType switch
             {
-                var monitorEvent = eventType switch
-                {
-                    NetworkEvent.NetworkChanged => new MonitorEvent(Name, "Network change detected!", Severity.Warning),
-                    NetworkEvent.MultipleInterfacesDetected => new MonitorEvent(Name, "Suspicious interfaces detected!", Severity.Warning),
-                    NetworkEvent.MultipleActiveNetworksDetected => new MonitorEvent(Name, "Multiple active networks detected!", Severity.Warning),
-                    NetworkEvent.NoActiveNetworkDetected => new MonitorEvent(Name, "No active network detected!", Severity.Warning),
-                    _ => new MonitorEvent(Name, $"Unhandled network event: {eventType}", Severity.Warning)
-                };
-
-                await onEvent(monitorEvent);
-            }
-            catch
-            {
-            }
+                NetworkEvent.NetworkChanged => new MonitorEvent(Name, "Network change detected!", Severity.Warning),
+                NetworkEvent.MultipleInterfacesDetected => new MonitorEvent(Name, "Suspicious interfaces detected!", Severity.Warning),
+                NetworkEvent.MultipleActiveNetworksDetected => new MonitorEvent(Name, "Multiple active networks detected!", Severity.Warning),
+                NetworkEvent.NoActiveNetworkDetected => new MonitorEvent(Name, "No active network detected!", Severity.Warning),
+                _ => new MonitorEvent(Name, $"Unhandled network event: {eventType}", Severity.Warning)
+            };
         }
 
-        public void Dispose() { }
+        public void Dispose()
+        {
+            Stop();
+        }
     }
 }
