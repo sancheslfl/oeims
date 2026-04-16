@@ -13,7 +13,7 @@ namespace Daemon.Monitors
         ];
 
         private readonly string[] _scanLocations =
-            [
+        [
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
@@ -29,17 +29,13 @@ namespace Daemon.Monitors
             foreach (var location in _scanLocations)
             {
                 if (!Directory.Exists(location)) continue;
-                Console.WriteLine($"Scanning {location}");
 
                 foreach (var process in _forbiddenProcesses)
                 {
-
                     var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
                     var files = Directory.GetFiles(location, $"{process}.exe", options);
-                    Console.WriteLine($"Found {files.Length} files for {process}");
                     foreach (var file in files)
                     {
-                        Console.WriteLine($"Found: {file}");
                         BlockExecutable(file);
                     }
                 }

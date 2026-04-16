@@ -16,7 +16,7 @@ namespace Daemon.Monitors
 
         public void Apply()
         {
-           _ = OpenClipboard(IntPtr.Zero);
+           OpenClipboard(IntPtr.Zero);
         }
 
         public void Dispose()

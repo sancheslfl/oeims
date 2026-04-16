@@ -21,12 +21,6 @@ namespace Daemon.Monitors
             _watcher.EventArrived += OnProcessStarted;
         }
 
-        private void StartWatching()
-        {
-            _watcher.Start();
-        }
-
-        // Without filtering this can kill all processes that run after the daemon has started (FALAR COM O PROF)
         private void OnProcessStarted(object sender, EventArrivedEventArgs e)
         {
             var processName = e.NewEvent["ProcessName"]?.ToString()?.Replace(".exe", "").ToLower();
@@ -38,6 +32,28 @@ namespace Daemon.Monitors
                 {
                     process.Kill();
                 }
+            }
+        }
+
+        public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
+        {
+            _watcher?.Start();
+
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    var killed = KillForbiddenProcesses();
+                    foreach (var process in killed)
+                    {
+                        await onEvent(new MonitorEvent(Name, $"Forbidden process killed: {process}", Severity.Warning));
+                    }
+                    await Task.Delay(1000, ct);
+                }
+            }
+            finally
+            {
+                _watcher?.Stop();
             }
         }
 
@@ -53,29 +69,6 @@ namespace Daemon.Monitors
                 }
             }
             return killed;
-        }
-
-        public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
-        {
-            StartWatching();
-
-            try
-            {
-                while (!ct.IsCancellationRequested)
-                {
-                    var killed = KillForbiddenProcesses();
-                    foreach (var process in killed)
-                    {
-                        await onEvent(new MonitorEvent(Name, $"Forbidden process killed: {process}", Severity.Warning));
-                    }
-
-                    await Task.Delay(1000, ct);
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                return;
-            }
         }
 
         public void Dispose()
