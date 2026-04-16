@@ -1,9 +1,12 @@
 using Microsoft.Win32;
+using Daemon.Abstractions;
 
 namespace Daemon.Monitors
 {
-    internal class ProcessBlocker: IDisposable
+    internal class ProcessBlocker : IMitigator
     {
+        public string Name => "ProcessBlocker";
+
         private readonly string[] _forbiddenProcesses =
         [
             "slack"
@@ -21,9 +24,8 @@ namespace Daemon.Monitors
 
         private const string RegistryPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\";
 
-        internal IEnumerable<string> BlockForbiddenProcesses()
+        public void Apply()
         {
-            var blocked = new List<string>();
             foreach (var location in _scanLocations)
             {
                 if (!Directory.Exists(location)) continue;
@@ -39,11 +41,9 @@ namespace Daemon.Monitors
                     {
                         Console.WriteLine($"Found: {file}");
                         BlockExecutable(file);
-                        blocked.Add(file);
                     }
                 }
             }
-            return blocked;
         }
 
         private void BlockExecutable(string path)
