@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using System.Management;
+using Daemon.Abstractions;
 
 namespace Daemon.Monitors
 {
-    internal class ProcessMonitor : IDisposable
+    internal class ProcessMonitor : IMonitor
     {
+        public string Name => "ProcessMonitor";
+
         private readonly ManagementEventWatcher? _watcher;
         private readonly string[] _forbiddenProcesses =
         [
@@ -18,7 +21,7 @@ namespace Daemon.Monitors
             _watcher.EventArrived += OnProcessStarted;
         }
 
-        internal void StartWatching()
+        private void StartWatching()
         {
             _watcher.Start();
         }
@@ -38,7 +41,7 @@ namespace Daemon.Monitors
             }
         }
 
-        internal IEnumerable<string> KillForbiddenProcesses()
+        private IEnumerable<string> KillForbiddenProcesses()
         {
             var killed = new List<string>();
             foreach (var process in Process.GetProcesses())
@@ -50,6 +53,29 @@ namespace Daemon.Monitors
                 }
             }
             return killed;
+        }
+
+        public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
+        {
+            StartWatching();
+
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    var killed = KillForbiddenProcesses();
+                    foreach (var process in killed)
+                    {
+                        await onEvent(new MonitorEvent(Name, $"Forbidden process killed: {process}", Severity.Warning));
+                    }
+
+                    await Task.Delay(1000, ct);
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
         }
 
         public void Dispose()

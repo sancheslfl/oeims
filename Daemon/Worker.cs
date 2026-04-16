@@ -1,106 +1,64 @@
+using Daemon.Abstractions;
 using Daemon.Monitors;
 
 namespace Daemon
 {
     public class Worker(ILogger<Worker> logger) : BackgroundService
     {
-        private readonly FocusMonitor _focusMonitor = new FocusMonitor();
-        private readonly NetworkMonitor _networkMonitor = new NetworkMonitor();
+        private readonly List<IMonitor> _monitors =
+        [
+            new FocusMonitor(),
+            new ProcessMonitor(),
+            new NetworkMonitor(),
+        ];
 
-        private readonly TaskCompletionSource _tcs = new TaskCompletionSource();
+        private readonly List<IMitigator> _mitigators =
+        [
+            new ClipboardMonitor(),
+            new ProcessBlocker(),
+        ];
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var clipboardMonitor = new ClipboardMonitor();
-            clipboardMonitor.BlockClipboard();
-
-            _networkMonitor.Start();
-
-            try
+            Task OnEvent(MonitorEvent e)
             {
-                await WaitForValidNetwork(stoppingToken);
+                switch (e.Severity)
+                {
+                    case Severity.Info:
+                        logger.LogInformation("[{monitor}] {message}", e.MonitorName, e.Message);
+                        break;
+                    case Severity.Warning:
+                        logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
+                        break;
+                    case Severity.Critical:
+                        logger.LogCritical("[{monitor}] {message}", e.MonitorName, e.Message);
+                        break;
+                    default:
+                        logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
+                        break;
+                }
 
-                _networkMonitor.InitializeBaseline();
-                SubscribeEvents();
-
-                await WaitForShutdown(stoppingToken);
+                return Task.CompletedTask;
             }
-            finally
+
+            foreach (var mitigator in _mitigators)
             {
-                UnsubscribeEvents();
-                _networkMonitor.Stop();
+                mitigator.Apply();
+                logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
             }
+
+            await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
         }
 
-        private async Task WaitForValidNetwork(CancellationToken stoppingToken)
+        public override void Dispose()
         {
-            if (_networkMonitor.IsValidNetworkState())
-            {
-                logger.LogInformation("Valid network state. Proceeding...");
-                return;
-            }
+            foreach (var mitigator in _mitigators)
+                mitigator.Dispose();
 
-            logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
+            foreach (var monitor in _monitors)
+                monitor.Dispose();
 
-            _networkMonitor.NetworkChanged += OnNetworkChange;
-
-            try
-            {
-                await _tcs.Task.WaitAsync(stoppingToken);
-            }
-            finally
-            {
-                _networkMonitor.NetworkChanged -= OnNetworkChange;
-            }
-        }
-
-        private void OnNetworkViolationDetected(NetworkEvent eventType)
-        {
-            switch (eventType)
-            {
-                case NetworkEvent.NetworkChanged:
-                    logger.LogWarning("Network change detected!");
-                    break;
-
-                case NetworkEvent.MultipleInterfacesDetected:
-                    logger.LogWarning("Suspicious interfaces detected!");
-                    break;
-
-                case NetworkEvent.MultipleActiveNetworksDetected:
-                    logger.LogWarning("Multiple active networks detected!");
-                    break;
-
-                case NetworkEvent.NoActiveNetworkDetected:
-                    logger.LogWarning("No active network detected!");
-                    break;
-            }
-        }
-
-        private void OnNetworkChange()
-        {
-            if (!_networkMonitor.IsValidNetworkState())
-            {
-                logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
-                return;
-            }
-
-            logger.LogInformation("Valid network state. Proceeding...");
-            _tcs.TrySetResult();
-        }
-
-        private static async Task WaitForShutdown(CancellationToken stoppingToken)
-        {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-        }
-
-        private void SubscribeEvents()
-        {
-            _networkMonitor.NetworkViolationDetected += OnNetworkViolationDetected;
-        }
-
-        private void UnsubscribeEvents()
-        {
-            _networkMonitor.NetworkViolationDetected -= OnNetworkViolationDetected;
+            base.Dispose();
         }
     }
 }
