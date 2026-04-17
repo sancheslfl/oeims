@@ -5,12 +5,11 @@ namespace Daemon
 {
     public class Worker(ILogger<Worker> logger) : BackgroundService
     {
-        private readonly NetworkMonitor _networkMonitor = new();
         private readonly List<IMonitor> _monitors =
         [
             new FocusMonitor(),
             new ProcessMonitor(),
-            _networkMonitor,
+            new NetworkMonitor(),
         ];
         private readonly List<IMitigator> _mitigators =
         [
@@ -47,7 +46,8 @@ namespace Daemon
                 logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
             }
 
-            await _networkMonitor.RunPreExamAsync(OnEvent, stoppingToken);
+            var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
+            await networkMonitor.RunPreExamAsync(OnEvent, stoppingToken);
 
             await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
         }
