@@ -15,8 +15,7 @@ namespace Daemon.Monitors
 
     internal class NetworkMonitor : IMonitor
     {
-        public const string MonitorId = nameof(NetworkMonitor);
-        public string Name => MonitorId;
+        public string Name => nameof(NetworkMonitor);
 
         private string? _initialNetworkId;
         private HashSet<ActiveInterface> _initialInterfaces = [];
@@ -120,9 +119,43 @@ namespace Daemon.Monitors
             return GetActivePhysicalInterfaces().Count == 1;
         }
 
-        public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
+        public async Task RunPreExamAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
         {
             Start();
+
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    if (!IsValidNetworkState())
+                    {
+                        await onEvent(new MonitorEvent(Name, "[PreExam] Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
+                        await WaitForValidNetworkAsync(ct);
+                    }
+
+                    InitializeBaseline();
+
+                    if (IsValidNetworkState())
+                    {
+                        await onEvent(new MonitorEvent(Name, "[PreExam] Valid network state and baseline initialized. Proceeding to exam.", Severity.Info));
+                        return;
+                    }
+
+                    await onEvent(new MonitorEvent(Name, "[PreExam] Network state changed while initializing baseline. Waiting...", Severity.Warning));
+                }
+                ct.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                Stop();
+                throw;
+            }
+        }
+
+        public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
+        {
+            if (!_baselineInitialized)
+                throw new InvalidOperationException("Network pre-exam must run before exam monitoring starts.");
 
             Action<NetworkEvent> onViolation = eventType =>
             {
@@ -133,29 +166,12 @@ namespace Daemon.Monitors
                     TaskScheduler.Default);
             };
 
+            NetworkViolationDetected += onViolation;
+
+            await onEvent(new MonitorEvent(Name, "[Exam] Monitoring network changes.", Severity.Info));
+
             try
             {
-                while (true)
-                {
-                    if (!IsValidNetworkState())
-                    {
-                        await onEvent(new MonitorEvent(Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
-                        await WaitForValidNetworkAsync(ct);
-                    }
-
-                    InitializeBaseline();
-
-                    if (IsValidNetworkState())
-                    {
-                        await onEvent(new MonitorEvent(Name, "Valid network state. Proceeding...", Severity.Info, MonitorSignal.NetworkReady));
-                        break;
-                    }
-
-                    await onEvent(new MonitorEvent(Name, "Network state changed while initializing baseline. Waiting...", Severity.Warning));
-                }
-
-                NetworkViolationDetected += onViolation;
-
                 await Task.Delay(Timeout.Infinite, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)

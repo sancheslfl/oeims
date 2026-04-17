@@ -5,13 +5,12 @@ namespace Daemon
 {
     public class Worker(ILogger<Worker> logger) : BackgroundService
     {
-        private readonly object _networkGateLock = new();
-        private bool _networkReady;
+        private readonly NetworkMonitor _networkMonitor = new();
         private readonly List<IMonitor> _monitors =
         [
             new FocusMonitor(),
             new ProcessMonitor(),
-            new NetworkMonitor(),
+            _networkMonitor,
         ];
         private readonly List<IMitigator> _mitigators =
         [
@@ -23,15 +22,6 @@ namespace Daemon
         {
             Task OnEvent(MonitorEvent e)
             {
-                lock (_networkGateLock)
-                {
-                    if (e.Signal == MonitorSignal.NetworkReady)
-                        _networkReady = true;
-
-                    if (!_networkReady && e.MonitorName != NetworkMonitor.MonitorId)
-                        return Task.CompletedTask;
-                }
-
                 switch (e.Severity)
                 {
                     case Severity.Info:
@@ -56,6 +46,8 @@ namespace Daemon
                 mitigator.Apply();
                 logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
             }
+
+            await _networkMonitor.RunPreExamAsync(OnEvent, stoppingToken);
 
             await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
         }
