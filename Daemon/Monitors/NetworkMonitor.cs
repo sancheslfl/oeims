@@ -16,11 +16,13 @@ namespace Daemon.Monitors
     {
         private string? _initialNetworkId;
         private HashSet<ActiveInterface> _initialInterfaces = [];
+        private bool _baselineInitialized;
 
         public void InitializeBaseline()
         {
             _initialNetworkId = GetCurrentNetworkId();
             _initialInterfaces = GetActiveInterfaces();
+            _baselineInitialized = true;
         }
 
         private static readonly HashSet<NetworkInterfaceType> AllowedPhysicalTypes =
@@ -38,6 +40,7 @@ namespace Daemon.Monitors
 
         public void Start()
         {
+            _baselineInitialized = false;
             NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
             NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
         }
@@ -46,6 +49,7 @@ namespace Daemon.Monitors
         {
             NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
             NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+            _baselineInitialized = false;
         }
 
         private void OnNetworkAddressChanged(object? sender, EventArgs e)
@@ -66,6 +70,9 @@ namespace Daemon.Monitors
 
         private void CheckNetworkViolation()
         {
+            if (!_baselineInitialized)
+                return;
+
             if (HasNetworkChanged())
                 NetworkViolationDetected?.Invoke(NetworkEvent.NetworkChanged);
 

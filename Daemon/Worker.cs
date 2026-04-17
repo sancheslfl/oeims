@@ -7,7 +7,7 @@ namespace Daemon
         private readonly FocusMonitor _focusMonitor = new FocusMonitor();
         private readonly NetworkMonitor _networkMonitor = new NetworkMonitor();
 
-        private readonly TaskCompletionSource _tcs = new TaskCompletionSource();
+        private TaskCompletionSource _validNetworkStateReached = CreateTaskCompletionSource();
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -18,9 +18,17 @@ namespace Daemon
 
             try
             {
-                await WaitForValidNetwork(stoppingToken);
+                while (true)
+                {
+                    await WaitForValidNetwork(stoppingToken);
+                    _networkMonitor.InitializeBaseline();
 
-                _networkMonitor.InitializeBaseline();
+                    if (_networkMonitor.IsValidNetworkState())
+                        break;
+
+                    logger.LogWarning("Network state changed while initializing baseline. Waiting...");
+                }
+
                 SubscribeEvents();
 
                 await WaitForShutdown(stoppingToken);
@@ -34,19 +42,28 @@ namespace Daemon
 
         private async Task WaitForValidNetwork(CancellationToken stoppingToken)
         {
-            if (_networkMonitor.IsValidNetworkState())
-            {
-                logger.LogInformation("Valid network state. Proceeding...");
-                return;
-            }
-
-            logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
-
             _networkMonitor.NetworkChanged += OnNetworkChange;
 
             try
             {
-                await _tcs.Task.WaitAsync(stoppingToken);
+                while (true)
+                {
+                    if (_networkMonitor.IsValidNetworkState())
+                    {
+                        logger.LogInformation("Valid network state. Proceeding...");
+                        return;
+                    }
+
+                    logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
+
+                    var waitForValidNetworkTask = _validNetworkStateReached.Task;
+                    await waitForValidNetworkTask.WaitAsync(stoppingToken);
+
+                    if (ReferenceEquals(_validNetworkStateReached.Task, waitForValidNetworkTask))
+                    {
+                        _validNetworkStateReached = CreateTaskCompletionSource();
+                    }
+                }
             }
             finally
             {
@@ -85,7 +102,12 @@ namespace Daemon
             }
 
             logger.LogInformation("Valid network state. Proceeding...");
-            _tcs.TrySetResult();
+            _validNetworkStateReached.TrySetResult();
+        }
+
+        private static TaskCompletionSource CreateTaskCompletionSource()
+        {
+            return new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
         private static async Task WaitForShutdown(CancellationToken stoppingToken)
