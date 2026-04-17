@@ -129,7 +129,7 @@ namespace Daemon.Monitors
                 {
                     if (!IsValidNetworkState())
                     {
-                        await onEvent(new MonitorEvent(Name, "[PreExam] Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
+                        await onEvent(new MonitorEvent(Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
                         await WaitForValidNetworkAsync(ct);
                     }
 
@@ -137,11 +137,11 @@ namespace Daemon.Monitors
 
                     if (IsValidNetworkState())
                     {
-                        await onEvent(new MonitorEvent(Name, "[PreExam] Valid network state and baseline initialized. Proceeding to exam.", Severity.Info));
+                        await onEvent(new MonitorEvent(Name, "Valid network state and baseline initialized. Proceeding to exam.", Severity.Info));
                         return;
                     }
 
-                    await onEvent(new MonitorEvent(Name, "[PreExam] Network state changed while initializing baseline. Waiting...", Severity.Warning));
+                    await onEvent(new MonitorEvent(Name, "Network state changed while initializing baseline. Waiting...", Severity.Warning));
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -154,7 +154,7 @@ namespace Daemon.Monitors
         public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
         {
             if (!_baselineInitialized)
-                throw new InvalidOperationException("Network pre-exam must run before exam monitoring starts.");
+                throw new InvalidOperationException("Pre-exam validation must run before exam monitoring starts.");
 
             Action<NetworkEvent> onViolation = eventType =>
             {
@@ -167,15 +167,13 @@ namespace Daemon.Monitors
 
             NetworkViolationDetected += onViolation;
 
-            await onEvent(new MonitorEvent(Name, "[Exam] Monitoring network changes.", Severity.Info));
-
             try
             {
                 await Task.Delay(Timeout.Infinite, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return;
+                // ignore
             }
             finally
             {
