@@ -1,4 +1,5 @@
-﻿using System.Net.NetworkInformation;
+using System.Net.NetworkInformation;
+using Daemon.Abstractions;
 
 namespace Daemon.Monitors
 {
@@ -12,8 +13,10 @@ namespace Daemon.Monitors
         NoActiveNetworkDetected,
     }
 
-    internal class NetworkMonitor
+    internal class NetworkMonitor : IMonitor
     {
+        public string Name => "NetworkMonitor";
+
         private string? _initialNetworkId;
         private HashSet<ActiveInterface> _initialInterfaces = [];
         private bool _baselineInitialized;
@@ -116,6 +119,55 @@ namespace Daemon.Monitors
             return GetActivePhysicalInterfaces().Count == 1;
         }
 
+        public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
+        {
+            Start();
+
+            Action<NetworkEvent> onViolation = eventType =>
+            {
+                _ = onEvent(CreateMonitorEvent(eventType)).ContinueWith(
+                    static t => _ = t.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
+            };
+
+            try
+            {
+                while (true)
+                {
+                    if (!IsValidNetworkState())
+                    {
+                        await onEvent(new MonitorEvent(Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
+                        await WaitForValidNetworkAsync(ct);
+                    }
+
+                    InitializeBaseline();
+
+                    if (IsValidNetworkState())
+                    {
+                        await onEvent(new MonitorEvent(Name, "Valid network state. Proceeding...", Severity.Info));
+                        break;
+                    }
+
+                    await onEvent(new MonitorEvent(Name, "Network state changed while initializing baseline. Waiting...", Severity.Warning));
+                }
+
+                NetworkViolationDetected += onViolation;
+
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            finally
+            {
+                NetworkViolationDetected -= onViolation;
+                Stop();
+            }
+        }
+
         private string GetCurrentNetworkId()
         {
             var active = NetworkInterface.GetAllNetworkInterfaces()
@@ -154,6 +206,47 @@ namespace Daemon.Monitors
                 )
                 .Select( n => new ActiveInterface(n.Id, n.Name))
                 .ToHashSet();
+        }
+
+        private async Task WaitForValidNetworkAsync(CancellationToken ct)
+        {
+            if (IsValidNetworkState())
+                return;
+
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            void OnChange()
+            {
+                if (IsValidNetworkState())
+                    tcs.TrySetResult();
+            }
+
+            NetworkChanged += OnChange;
+            try
+            {
+                await tcs.Task.WaitAsync(ct);
+            }
+            finally
+            {
+                NetworkChanged -= OnChange;
+            }
+        }
+
+        private MonitorEvent CreateMonitorEvent(NetworkEvent eventType)
+        {
+            return eventType switch
+            {
+                NetworkEvent.NetworkChanged => new MonitorEvent(Name, "Network change detected!", Severity.Warning),
+                NetworkEvent.MultipleInterfacesDetected => new MonitorEvent(Name, "Suspicious interfaces detected!", Severity.Warning),
+                NetworkEvent.MultipleActiveNetworksDetected => new MonitorEvent(Name, "Multiple active networks detected!", Severity.Warning),
+                NetworkEvent.NoActiveNetworkDetected => new MonitorEvent(Name, "No active network detected!", Severity.Warning),
+                _ => new MonitorEvent(Name, $"Unhandled network event: {eventType}", Severity.Warning)
+            };
+        }
+
+        public void Dispose()
+        {
+            Stop();
         }
     }
 }
