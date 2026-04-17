@@ -6,7 +6,7 @@ namespace Daemon.Monitors
 {
     internal class ProcessMonitor : IMonitor
     {
-        public string Name => "ProcessMonitor";
+        public string Name => nameof(ProcessMonitor);
 
         private readonly ManagementEventWatcher? _watcher;
         private readonly string[] _forbiddenProcesses =

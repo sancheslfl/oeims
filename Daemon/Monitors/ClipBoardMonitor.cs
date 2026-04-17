@@ -5,7 +5,7 @@ namespace Daemon.Monitors
 {
     internal class ClipboardMonitor : IMitigator
     {
-        public string Name => "ClipboardMonitor";
+        public string Name => nameof(ClipboardMonitor);
 
         [DllImport("user32.dll")]
         private static extern bool OpenClipboard(IntPtr hWndNewOwner);

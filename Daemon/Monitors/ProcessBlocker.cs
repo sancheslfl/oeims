@@ -5,7 +5,7 @@ namespace Daemon.Monitors
 {
     internal class ProcessBlocker : IMitigator
     {
-        public string Name => "ProcessBlocker";
+        public string Name => nameof(ProcessBlocker);
 
         private readonly string[] _forbiddenProcesses =
         [

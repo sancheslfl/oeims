@@ -112,7 +112,7 @@ namespace Daemon.Monitors
             return GetActivePhysicalInterfaces().Count == 1;
         }
 
-        public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
+        public async Task StartPreExamAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
         {
             Start();
 

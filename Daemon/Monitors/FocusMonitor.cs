@@ -6,7 +6,7 @@ namespace Daemon.Monitors
 {
     internal class FocusMonitor : IMonitor
     {
-        public string Name => "FocusMonitor";
+        public string Name => nameof(FocusMonitor);
 
         private const string ExamWindowTitle = "OEIMS Exam";
         private const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
