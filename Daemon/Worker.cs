@@ -47,7 +47,7 @@ namespace Daemon
             }
 
             var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
-            await networkMonitor.RunPreExamAsync(OnEvent, stoppingToken);
+            await networkMonitor.StartPreExamAsync(OnEvent, stoppingToken);
 
             await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
         }
