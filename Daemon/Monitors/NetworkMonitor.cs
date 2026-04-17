@@ -15,7 +15,8 @@ namespace Daemon.Monitors
 
     internal class NetworkMonitor : IMonitor
     {
-        public string Name => "NetworkMonitor";
+        public const string MonitorId = nameof(NetworkMonitor);
+        public string Name => MonitorId;
 
         private string? _initialNetworkId;
         private HashSet<ActiveInterface> _initialInterfaces = [];
@@ -146,7 +147,7 @@ namespace Daemon.Monitors
 
                     if (IsValidNetworkState())
                     {
-                        await onEvent(new MonitorEvent(Name, "Valid network state. Proceeding...", Severity.Info));
+                        await onEvent(new MonitorEvent(Name, "Valid network state. Proceeding...", Severity.Info, MonitorSignal.NetworkReady));
                         break;
                     }
 

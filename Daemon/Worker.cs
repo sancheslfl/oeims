@@ -3,57 +3,48 @@ using Daemon.Monitors;
 
 namespace Daemon
 {
-    public class Worker : BackgroundService
+    public class Worker(ILogger<Worker> logger) : BackgroundService
     {
-        private readonly ILogger<Worker> _logger;
-        private readonly NetworkMonitor _networkMonitor = new();
-        private int _networkReady;
-
-        private readonly List<IMonitor> _monitors;
+        private readonly object _networkGateLock = new();
+        private bool _networkReady;
+        private readonly List<IMonitor> _monitors =
+        [
+            new FocusMonitor(),
+            new ProcessMonitor(),
+            new NetworkMonitor(),
+        ];
         private readonly List<IMitigator> _mitigators =
         [
             new ClipboardMonitor(),
             new ProcessBlocker(),
         ];
 
-        public Worker(ILogger<Worker> logger)
-        {
-            _logger = logger;
-            _monitors =
-            [
-                new FocusMonitor(),
-                new ProcessMonitor(),
-                _networkMonitor,
-            ];
-        }
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             Task OnEvent(MonitorEvent e)
             {
-                if (e.MonitorName == _networkMonitor.Name &&
-                    e.Severity == Severity.Info &&
-                    e.Message == "Valid network state. Proceeding...")
+                lock (_networkGateLock)
                 {
-                    Interlocked.Exchange(ref _networkReady, 1);
-                }
+                    if (e.Signal == MonitorSignal.NetworkReady)
+                        _networkReady = true;
 
-                if (Volatile.Read(ref _networkReady) == 0 && e.MonitorName != _networkMonitor.Name)
-                    return Task.CompletedTask;
+                    if (!_networkReady && e.MonitorName != NetworkMonitor.MonitorId)
+                        return Task.CompletedTask;
+                }
 
                 switch (e.Severity)
                 {
                     case Severity.Info:
-                        _logger.LogInformation("[{monitor}] {message}", e.MonitorName, e.Message);
+                        logger.LogInformation("[{monitor}] {message}", e.MonitorName, e.Message);
                         break;
                     case Severity.Warning:
-                        _logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
+                        logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
                         break;
                     case Severity.Critical:
-                        _logger.LogCritical("[{monitor}] {message}", e.MonitorName, e.Message);
+                        logger.LogCritical("[{monitor}] {message}", e.MonitorName, e.Message);
                         break;
                     default:
-                        _logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
+                        logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
                         break;
                 }
 
@@ -63,7 +54,7 @@ namespace Daemon
             foreach (var mitigator in _mitigators)
             {
                 mitigator.Apply();
-                _logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
+                logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
             }
 
             await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
