@@ -11,7 +11,6 @@ namespace Daemon
             new ProcessMonitor(),
             new NetworkMonitor(),
         ];
-
         private readonly List<IMitigator> _mitigators =
         [
             new ClipboardMonitor(),
@@ -46,6 +45,9 @@ namespace Daemon
                 mitigator.Apply();
                 logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
             }
+
+            var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
+            await networkMonitor.StartPreExamAsync(OnEvent, stoppingToken);
 
             await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
         }

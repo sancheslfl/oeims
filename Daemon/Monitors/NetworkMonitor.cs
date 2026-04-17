@@ -15,15 +15,17 @@ namespace Daemon.Monitors
 
     internal class NetworkMonitor : IMonitor
     {
-        public string Name => "NetworkMonitor";
+        public string Name => nameof(NetworkMonitor);
 
         private string? _initialNetworkId;
         private HashSet<ActiveInterface> _initialInterfaces = [];
+        private bool _baselineInitialized;
 
         public void InitializeBaseline()
         {
             _initialNetworkId = GetCurrentNetworkId();
             _initialInterfaces = GetActiveInterfaces();
+            _baselineInitialized = true;
         }
 
         private static readonly HashSet<NetworkInterfaceType> AllowedPhysicalTypes =
@@ -41,6 +43,7 @@ namespace Daemon.Monitors
 
         public void Start()
         {
+            _baselineInitialized = false;
             NetworkChange.NetworkAddressChanged += OnNetworkAddressChanged;
             NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
         }
@@ -49,6 +52,7 @@ namespace Daemon.Monitors
         {
             NetworkChange.NetworkAddressChanged -= OnNetworkAddressChanged;
             NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+            _baselineInitialized = false;
         }
 
         private void OnNetworkAddressChanged(object? sender, EventArgs e)
@@ -69,6 +73,9 @@ namespace Daemon.Monitors
 
         private void CheckNetworkViolation()
         {
+            if (!_baselineInitialized)
+                return;
+
             if (HasNetworkChanged())
                 NetworkViolationDetected?.Invoke(NetworkEvent.NetworkChanged);
 
@@ -116,6 +123,39 @@ namespace Daemon.Monitors
         {
             Start();
 
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    if (!IsValidNetworkState())
+                    {
+                        await onEvent(new MonitorEvent(Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
+                        await WaitForValidNetworkAsync(ct);
+                    }
+
+                    InitializeBaseline();
+
+                    if (IsValidNetworkState())
+                    {
+                        await onEvent(new MonitorEvent(Name, "Valid network state and baseline initialized. Proceeding to exam.", Severity.Info));
+                        return;
+                    }
+
+                    await onEvent(new MonitorEvent(Name, "Network state changed while initializing baseline. Waiting...", Severity.Warning));
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                Stop();
+                throw;
+            }
+        }
+
+        public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
+        {
+            if (!_baselineInitialized)
+                throw new InvalidOperationException("Pre-exam validation must run before exam monitoring starts.");
+
             Action<NetworkEvent> onViolation = eventType =>
             {
                 _ = onEvent(CreateMonitorEvent(eventType)).ContinueWith(
@@ -125,23 +165,15 @@ namespace Daemon.Monitors
                     TaskScheduler.Default);
             };
 
+            NetworkViolationDetected += onViolation;
+
             try
             {
-                if (!IsValidNetworkState())
-                {
-                    await onEvent(new MonitorEvent(Name, "Invalid network state. Guarantee only one physical network connected. Waiting...", Severity.Warning));
-                    await WaitForValidNetworkAsync(ct);
-                    await onEvent(new MonitorEvent(Name, "Valid network state. Proceeding...", Severity.Info));
-                }
-
-                InitializeBaseline();
-                NetworkViolationDetected += onViolation;
-
                 await Task.Delay(Timeout.Infinite, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                return;
+                // ignore
             }
             finally
             {
