@@ -143,7 +143,6 @@ namespace Daemon.Monitors
 
                     await onEvent(new MonitorEvent(Name, "[PreExam] Network state changed while initializing baseline. Waiting...", Severity.Warning));
                 }
-                ct.ThrowIfCancellationRequested();
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
