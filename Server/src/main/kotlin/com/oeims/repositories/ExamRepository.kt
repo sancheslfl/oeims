@@ -27,6 +27,12 @@ class ExamRepository : IExamRepository {
             ?.toRecord()
     }
 
+    override fun findByTitle(title: String): List<ExamRecord> = transaction {
+        Exams.selectAll()
+            .where { Exams.title eq title }
+            .map { it.toRecord() }
+    }
+
     override fun findByProfessor(professorId: UUID): List<ExamRecord> = transaction {
         Exams.selectAll()
             .where { Exams.createdBy eq professorId }
