@@ -3,6 +3,8 @@ using Daemon.Monitors;
 
 namespace Daemon
 {
+    // TODO: Resolve hardcoded monitors and mitigators
+    // TODO: Find a solution for BackgroundService
     public class Worker(ILogger<Worker> logger) : BackgroundService
     {
         private readonly List<IMonitor> _monitors =
@@ -13,7 +15,7 @@ namespace Daemon
         ];
         private readonly List<IMitigator> _mitigators =
         [
-            new ClipboardMonitor(),
+            new ClipboardBlocker(),
             new ProcessBlocker(),
         ];
 

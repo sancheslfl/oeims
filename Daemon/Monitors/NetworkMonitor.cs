@@ -17,6 +17,7 @@ namespace Daemon.Monitors
     {
         public string Name => nameof(NetworkMonitor);
 
+        // TODO: Group this together
         private string? _initialNetworkId;
         private HashSet<ActiveInterface> _initialInterfaces = [];
         private bool _baselineInitialized;
@@ -158,7 +159,7 @@ namespace Daemon.Monitors
 
             Action<NetworkEvent> onViolation = eventType =>
             {
-                _ = onEvent(CreateMonitorEvent(eventType)).ContinueWith(
+                _ = onEvent(CreateMonitorEvent(eventType)).ContinueWith(    // TODO: evaluate this
                     static t => _ = t.Exception,
                     CancellationToken.None,
                     TaskContinuationOptions.OnlyOnFaulted,
