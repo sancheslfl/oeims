@@ -12,5 +12,5 @@ interface IParticipantRepository {
     fun create(sessionId: UUID, userId: UUID): ParticipantRecord
     fun updateHeartbeat(id: UUID): Boolean
     fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean
-    fun markTimedOut(threshold: Instant): Int
+    fun markTimedOut(threshold: Instant): List<ParticipantRecord>
 }

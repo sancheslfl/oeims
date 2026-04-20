@@ -2,6 +2,8 @@ package com.oeims.repositories
 
 import com.oeims.models.ConnectionStatus
 import com.oeims.models.Participants
+import com.oeims.models.SessionStatus
+import com.oeims.models.Sessions
 import com.oeims.models.Users
 import com.oeims.repositories.interfaces.IParticipantRepository
 import org.jetbrains.exposed.sql.JoinType
@@ -79,13 +81,30 @@ class ParticipantRepository : IParticipantRepository {
 
     // Called by HeartbeatService: marks participants as TIMED_OUT if their
     // last heartbeat is older than the given threshold.
-    override fun markTimedOut(threshold: Instant): Int = transaction {
-        Participants.update({
-            (Participants.connectionStatus eq ConnectionStatus.CONNECTED) and
-            (Participants.lastHeartbeat lessEq threshold)
-        }) {
-            it[Participants.connectionStatus] = ConnectionStatus.TIMED_OUT
+    // Only checks participants in ACTIVE sessions — no point checking ended sessions.
+    // SELECT candidates first, then bulk UPDATE — both in one transaction.
+    override fun markTimedOut(threshold: Instant): List<ParticipantRecord> = transaction {
+        val candidates = Participants
+            .join(Users, JoinType.INNER, Participants.userId, Users.id)
+            .join(Sessions, JoinType.INNER, Participants.sessionId, Sessions.id)
+            .selectAll()
+            .where {
+                (Participants.connectionStatus eq ConnectionStatus.CONNECTED) and
+                (Participants.lastHeartbeat lessEq threshold) and
+                (Sessions.status eq SessionStatus.ACTIVE)
+            }
+            .map { it.toRecord() }
+
+        if (candidates.isNotEmpty()) {
+            Participants.update({
+                (Participants.connectionStatus eq ConnectionStatus.CONNECTED) and
+                (Participants.lastHeartbeat lessEq threshold)
+            }) {
+                it[Participants.connectionStatus] = ConnectionStatus.TIMED_OUT
+            }
         }
+
+        candidates
     }
 
     private fun ResultRow.toRecord() = ParticipantRecord(
