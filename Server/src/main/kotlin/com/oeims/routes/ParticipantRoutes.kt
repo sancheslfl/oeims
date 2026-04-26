@@ -1,0 +1,19 @@
+package com.oeims.routes
+
+import com.oeims.services.SessionService
+import io.ktor.http.*
+import io.ktor.server.auth.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+
+fun Route.participantRoutes(sessionService: SessionService) {
+    authenticate("auth-student") {
+
+        // POST /participants/{id}/heartbeat
+        post("/participants/{id}/heartbeat") {
+            val participantId = call.uuidParam("id")
+            sessionService.heartbeat(participantId)
+            call.respond(HttpStatusCode.NoContent)
+        }
+    }
+}

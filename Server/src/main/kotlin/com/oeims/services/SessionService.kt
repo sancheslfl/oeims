@@ -85,6 +85,11 @@ class SessionService(
         return participantRepository.findBySession(sessionId).map { it.toResponse() }
     }
 
+    fun heartbeat(participantId: UUID) {
+        if (!participantRepository.updateHeartbeat(participantId))
+            throw NoSuchElementException("Participant not found")
+    }
+
     private fun generateUniqueCode(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         repeat(5) {
