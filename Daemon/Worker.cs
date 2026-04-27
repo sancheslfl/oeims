@@ -4,7 +4,6 @@ using Daemon.Monitors;
 namespace Daemon
 {
     // TODO: Resolve hardcoded monitors and mitigators
-    // TODO: Find a solution for BackgroundService
     public class Worker(ILogger<Worker> logger) : BackgroundService
     {
         private readonly List<IMonitor> _monitors =
