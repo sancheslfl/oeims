@@ -1,9 +1,12 @@
 using System.Runtime.InteropServices;
+using Daemon.Abstractions;
 
-namespace Daemon.Monitors
+namespace Daemon.Mitigators
 {
-    internal class ClipboardMonitor: IDisposable
+    internal class ClipboardBlocker : IMitigator
     {
+        public string Name => nameof(ClipboardBlocker);
+
         [DllImport("user32.dll")]
         private static extern bool OpenClipboard(IntPtr hWndNewOwner);
 
@@ -11,9 +14,9 @@ namespace Daemon.Monitors
         private static extern bool CloseClipboard();
 
 
-        internal void BlockClipboard()
+        public void Apply()
         {
-           _ = OpenClipboard(IntPtr.Zero);
+           OpenClipboard(IntPtr.Zero);
         }
 
         public void Dispose()
