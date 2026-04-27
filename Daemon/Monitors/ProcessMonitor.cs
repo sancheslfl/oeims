@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Management;
 using Daemon.Abstractions;
 
-namespace Daemon.Monitors
+namespace Daemon.Mitigators
 {
     internal enum ProcessEvent
     {

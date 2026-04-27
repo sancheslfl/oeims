@@ -1,5 +1,5 @@
 using Daemon.Abstractions;
-using Daemon.Monitors;
+using Daemon.Mitigators;
 
 namespace Daemon
 {
