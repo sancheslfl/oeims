@@ -1,7 +1,7 @@
 using System.Net.NetworkInformation;
 using Daemon.Abstractions;
 
-namespace Daemon.Mitigators
+namespace Daemon.Monitors
 {
     internal record ActiveInterface(string Id, string Name);
 

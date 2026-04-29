@@ -2,7 +2,7 @@
 using System.Text;
 using Daemon.Abstractions;
 
-namespace Daemon.Mitigators
+namespace Daemon.Monitors
 {
     // TODO: Decouple low level Windows code to a separate layer
     internal class FocusMonitor : IMonitor

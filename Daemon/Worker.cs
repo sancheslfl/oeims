@@ -4,20 +4,12 @@ using Daemon.Mitigators;
 namespace Daemon
 {
     // TODO: Resolve hardcoded monitors and mitigators
-    public class Worker(ILogger<Worker> logger) : BackgroundService
+    public class Worker(
+        IEnumerable<IMonitor> monitors, 
+        IEnumerable<IMitigator> mitigators, 
+        ILogger<Worker> logger
+        ) : BackgroundService
     {
-        private readonly List<IMonitor> _monitors =
-        [
-            new FocusMonitor(),
-            new ProcessMonitor(),
-            new NetworkMonitor(),
-        ];
-        private readonly List<IMitigator> _mitigators =
-        [
-            new ClipboardBlocker(),
-            new ProcessBlocker(),
-        ];
-
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             Task OnEvent(MonitorEvent e)
@@ -41,24 +33,24 @@ namespace Daemon
                 return Task.CompletedTask;
             }
 
-            foreach (var mitigator in _mitigators)
+            foreach (var mitigator in mitigators)
             {
                 mitigator.Apply();
                 logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
             }
 
-            var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
+            var networkMonitor = monitors.OfType<NetworkMonitor>().Single();
             await networkMonitor.StartPreExamAsync(OnEvent, stoppingToken);
 
-            await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
+            await Task.WhenAll(monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
         }
 
         public override void Dispose()
         {
-            foreach (var mitigator in _mitigators)
+            foreach (var mitigator in mitigators)
                 mitigator.Dispose();
 
-            foreach (var monitor in _monitors)
+            foreach (var monitor in monitors)
                 monitor.Dispose();
 
             base.Dispose();
