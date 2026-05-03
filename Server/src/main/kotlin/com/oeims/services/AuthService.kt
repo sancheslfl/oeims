@@ -3,6 +3,9 @@ package com.oeims.services
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.oeims.dto.AuthResponse
+import com.oeims.exceptions.ConflictException
+import com.oeims.exceptions.UnauthorizedException
+import com.oeims.exceptions.ValidationException
 import com.oeims.models.UserRole
 import com.oeims.repositories.interfaces.IUserRepository
 import org.mindrot.jbcrypt.BCrypt
@@ -15,10 +18,10 @@ class AuthService(
 
     fun register(email: String, password: String, role: String): AuthResponse {
         if (userRepository.existsByEmail(email))
-            throw IllegalStateException("Email already registered")
+            throw ConflictException("Email already registered")
 
         val userRole = runCatching { UserRole.valueOf(role.uppercase()) }
-            .getOrElse { throw IllegalArgumentException("Invalid role: $role") }
+            .getOrElse { throw ValidationException("Invalid role: $role") }
 
         val hash = BCrypt.hashpw(password, BCrypt.gensalt())
         val user = userRepository.create(email, userRole, hash)
@@ -33,10 +36,10 @@ class AuthService(
 
     fun login(email: String, password: String): AuthResponse {
         val user = userRepository.findByEmail(email)
-            ?: throw IllegalArgumentException("Invalid credentials")
+            ?: throw UnauthorizedException("Invalid credentials")
 
         if (!BCrypt.checkpw(password, user.passwordHash))
-            throw IllegalArgumentException("Invalid credentials")
+            throw UnauthorizedException("Invalid credentials")
 
         return AuthResponse(
             token  = issueToken(user.id.toString(), user.role.name),

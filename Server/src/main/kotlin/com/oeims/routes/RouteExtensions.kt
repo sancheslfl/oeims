@@ -1,5 +1,6 @@
 package com.oeims.routes
 
+import com.oeims.exceptions.ValidationException
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -16,14 +17,14 @@ fun ApplicationCall.userId(): UUID {
 fun ApplicationCall.uuidParam(name: String): UUID =
     try {
         UUID.fromString(parameters[name])
-    } catch (e: Exception) {
-        throw IllegalArgumentException("Invalid UUID for parameter '$name'")
+    } catch (e: IllegalArgumentException) {
+        throw ValidationException("Invalid UUID for parameter '$name'")
     }
 
 // Overload for parsing a UUID that came from a request body field (not a path param).
 fun ApplicationCall.uuidParam(value: String, fieldName: String): UUID =
     try {
         UUID.fromString(value)
-    } catch (e: Exception) {
-        throw IllegalArgumentException("Invalid UUID for field '$fieldName'")
+    } catch (e: IllegalArgumentException) {
+        throw ValidationException("Invalid UUID for field '$fieldName'")
     }

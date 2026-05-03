@@ -1,6 +1,11 @@
 package com.oeims.plugins
 
 import com.oeims.dto.ErrorResponse
+import com.oeims.exceptions.ConflictException
+import com.oeims.exceptions.ForbiddenException
+import com.oeims.exceptions.NotFoundException
+import com.oeims.exceptions.UnauthorizedException
+import com.oeims.exceptions.ValidationException
 import com.oeims.routes.authRoutes
 import com.oeims.routes.examRoutes
 import com.oeims.routes.participantRoutes
@@ -22,17 +27,21 @@ fun Application.configureRouting(
     eventService: EventService
 ) {
     // ── Global error handling ─────────────────────────────────────────────────
-    // Services throw typed exceptions — map them to HTTP status codes once here
-    // so individual route handlers stay clean.
     install(StatusPages) {
-        exception<IllegalArgumentException> { call, cause ->
+        exception<ValidationException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, ErrorResponse(cause.message ?: "Bad request"))
         }
-        exception<IllegalStateException> { call, cause ->
-            call.respond(HttpStatusCode.Conflict, ErrorResponse(cause.message ?: "Conflict"))
+        exception<UnauthorizedException> { call, cause ->
+            call.respond(HttpStatusCode.Unauthorized, ErrorResponse(cause.message ?: "Unauthorized"))
         }
-        exception<NoSuchElementException> { call, cause ->
+        exception<ForbiddenException> { call, cause ->
+            call.respond(HttpStatusCode.Forbidden, ErrorResponse(cause.message ?: "Forbidden"))
+        }
+        exception<NotFoundException> { call, cause ->
             call.respond(HttpStatusCode.NotFound, ErrorResponse(cause.message ?: "Not found"))
+        }
+        exception<ConflictException> { call, cause ->
+            call.respond(HttpStatusCode.Conflict, ErrorResponse(cause.message ?: "Conflict"))
         }
         exception<Throwable> { call, cause ->
             call.application.log.error("Unhandled exception", cause)

@@ -3,6 +3,9 @@ package com.oeims.services
 import com.oeims.dto.JoinSessionResponse
 import com.oeims.dto.ParticipantResponse
 import com.oeims.dto.SessionResponse
+import com.oeims.exceptions.ConflictException
+import com.oeims.exceptions.ForbiddenException
+import com.oeims.exceptions.NotFoundException
 import com.oeims.models.SessionStatus
 import com.oeims.repositories.ParticipantRecord
 import com.oeims.repositories.SessionRecord
@@ -21,7 +24,7 @@ class SessionService(
 
     fun createSession(professorId: UUID, examId: UUID): SessionResponse {
         examRepository.findById(examId)
-            ?: throw NoSuchElementException("Exam not found")
+            ?: throw NotFoundException("Exam not found")
 
         val code = generateUniqueCode()
         return sessionRepository.create(examId, professorId, code).toResponse()
@@ -29,13 +32,13 @@ class SessionService(
 
     fun startSession(sessionId: UUID, professorId: UUID): SessionResponse {
         val session = sessionRepository.findById(sessionId)
-            ?: throw NoSuchElementException("Session not found")
+            ?: throw NotFoundException("Session not found")
 
         if (session.supervisorId != professorId)
-            throw IllegalStateException("Only the session supervisor can start it")
+            throw ForbiddenException("Only the session supervisor can start it")
 
         if (session.status != SessionStatus.PENDING)
-            throw IllegalStateException("Only a pending session can be started")
+            throw ConflictException("Only a pending session can be started")
 
         sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE)
         return sessionRepository.findById(sessionId)!!.toResponse()
@@ -43,13 +46,13 @@ class SessionService(
 
     fun endSession(sessionId: UUID, professorId: UUID): SessionResponse {
         val session = sessionRepository.findById(sessionId)
-            ?: throw NoSuchElementException("Session not found")
+            ?: throw NotFoundException("Session not found")
 
         if (session.supervisorId != professorId)
-            throw IllegalStateException("Only the session supervisor can end it")
+            throw ForbiddenException("Only the session supervisor can end it")
 
         if (session.status != SessionStatus.ACTIVE)
-            throw IllegalStateException("Only an active session can be ended")
+            throw ConflictException("Only an active session can be ended")
 
         sessionRepository.updateStatus(sessionId, SessionStatus.ENDED)
         return sessionRepository.findById(sessionId)!!.toResponse()
@@ -57,13 +60,13 @@ class SessionService(
 
     fun joinSession(code: String, studentId: UUID): JoinSessionResponse {
         val session = sessionRepository.findByCode(code)
-            ?: throw NoSuchElementException("Session not found")
+            ?: throw NotFoundException("Session not found")
 
         if (session.status == SessionStatus.ENDED)
-            throw IllegalStateException("Session has already ended")
+            throw ConflictException("Session has already ended")
 
         userRepository.findById(studentId)
-            ?: throw NoSuchElementException("User not found")
+            ?: throw NotFoundException("User not found")
 
         // Idempotent — return existing participant if already joined
         val existing = participantRepository.findByUserAndSession(studentId, session.id)
@@ -76,18 +79,18 @@ class SessionService(
 
     fun getSession(sessionId: UUID): SessionResponse =
         sessionRepository.findById(sessionId)?.toResponse()
-            ?: throw NoSuchElementException("Session not found")
+            ?: throw NotFoundException("Session not found")
 
     fun getParticipants(sessionId: UUID): List<ParticipantResponse> {
         sessionRepository.findById(sessionId)
-            ?: throw NoSuchElementException("Session not found")
+            ?: throw NotFoundException("Session not found")
 
         return participantRepository.findBySession(sessionId).map { it.toResponse() }
     }
 
     fun heartbeat(participantId: UUID) {
         if (!participantRepository.updateHeartbeat(participantId))
-            throw NoSuchElementException("Participant not found")
+            throw NotFoundException("Participant not found")
     }
 
     private fun generateUniqueCode(): String {
