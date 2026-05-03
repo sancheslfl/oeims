@@ -6,12 +6,13 @@ import com.oeims.models.SessionStatus
 import com.oeims.models.Sessions
 import com.oeims.models.Users
 import com.oeims.repositories.interfaces.IParticipantRepository
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.util.UUID
@@ -28,7 +29,7 @@ data class ParticipantRecord(
 
 class ParticipantRepository : IParticipantRepository {
 
-    override fun findById(id: UUID): ParticipantRecord? = transaction {
+    override suspend fun findById(id: UUID): ParticipantRecord? = newSuspendedTransaction(Dispatchers.IO) {
         Participants.join(Users, JoinType.INNER, Participants.userId, Users.id)
             .selectAll()
             .where { Participants.id eq id }
@@ -36,14 +37,14 @@ class ParticipantRepository : IParticipantRepository {
             ?.toRecord()
     }
 
-    override fun findBySession(sessionId: UUID): List<ParticipantRecord> = transaction {
+    override suspend fun findBySession(sessionId: UUID): List<ParticipantRecord> = newSuspendedTransaction(Dispatchers.IO) {
         Participants.join(Users, JoinType.INNER, Participants.userId, Users.id)
             .selectAll()
             .where { Participants.sessionId eq sessionId }
             .map { it.toRecord() }
     }
 
-    override fun findByUserAndSession(userId: UUID, sessionId: UUID): ParticipantRecord? = transaction {
+    override suspend fun findByUserAndSession(userId: UUID, sessionId: UUID): ParticipantRecord? = newSuspendedTransaction(Dispatchers.IO) {
         Participants.join(Users, JoinType.INNER, Participants.userId, Users.id)
             .selectAll()
             .where { (Participants.userId eq userId) and (Participants.sessionId eq sessionId) }
@@ -51,7 +52,7 @@ class ParticipantRepository : IParticipantRepository {
             ?.toRecord()
     }
 
-    override fun create(sessionId: UUID, userId: UUID): ParticipantRecord = transaction {
+    override suspend fun create(sessionId: UUID, userId: UUID): ParticipantRecord = newSuspendedTransaction(Dispatchers.IO) {
         val id = UUID.randomUUID()
         val now = Instant.now()
         Participants.insert {
@@ -62,28 +63,28 @@ class ParticipantRepository : IParticipantRepository {
             it[Participants.lastHeartbeat] = null
             it[Participants.joinedAt] = now
         }
-        // Re-fetch with email join
-        findById(id)!!
+        // Re-fetch with email join — runs in the same transaction
+        Participants.join(Users, JoinType.INNER, Participants.userId, Users.id)
+            .selectAll()
+            .where { Participants.id eq id }
+            .single()
+            .toRecord()
     }
 
-    override fun updateHeartbeat(id: UUID): Boolean = transaction {
+    override suspend fun updateHeartbeat(id: UUID): Boolean = newSuspendedTransaction(Dispatchers.IO) {
         Participants.update({ Participants.id eq id }) {
             it[Participants.lastHeartbeat] = Instant.now()
             it[Participants.connectionStatus] = ConnectionStatus.CONNECTED
         } > 0
     }
 
-    override fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean = transaction {
+    override suspend fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean = newSuspendedTransaction(Dispatchers.IO) {
         Participants.update({ Participants.id eq id }) {
             it[Participants.connectionStatus] = status
         } > 0
     }
 
-    // Called by HeartbeatService: marks participants as TIMED_OUT if their
-    // last heartbeat is older than the given threshold.
-    // Only checks participants in ACTIVE sessions — no point checking ended sessions.
-    // SELECT candidates first, then bulk UPDATE — both in one transaction.
-    override fun markTimedOut(threshold: Instant): List<ParticipantRecord> = transaction {
+    override suspend fun markTimedOut(threshold: Instant): List<ParticipantRecord> = newSuspendedTransaction(Dispatchers.IO) {
         val candidates = Participants
             .join(Users, JoinType.INNER, Participants.userId, Users.id)
             .join(Sessions, JoinType.INNER, Participants.sessionId, Sessions.id)

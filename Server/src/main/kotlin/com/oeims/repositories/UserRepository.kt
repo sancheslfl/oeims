@@ -3,10 +3,11 @@ package com.oeims.repositories
 import com.oeims.models.UserRole
 import com.oeims.models.Users
 import com.oeims.repositories.interfaces.IUserRepository
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 import java.util.UUID
 
@@ -20,21 +21,21 @@ data class UserRecord(
 
 class UserRepository : IUserRepository {
 
-    override fun findByEmail(email: String): UserRecord? = transaction {
+    override suspend fun findByEmail(email: String): UserRecord? = newSuspendedTransaction(Dispatchers.IO) {
         Users.selectAll()
             .where { Users.email eq email }
             .singleOrNull()
             ?.toRecord()
     }
 
-    override fun findById(id: UUID): UserRecord? = transaction {
+    override suspend fun findById(id: UUID): UserRecord? = newSuspendedTransaction(Dispatchers.IO) {
         Users.selectAll()
             .where { Users.id eq id }
             .singleOrNull()
             ?.toRecord()
     }
 
-    override fun create(email: String, role: UserRole, passwordHash: String): UserRecord = transaction {
+    override suspend fun create(email: String, role: UserRole, passwordHash: String): UserRecord = newSuspendedTransaction(Dispatchers.IO) {
         val id = UUID.randomUUID()
         val now = Instant.now()
         Users.insert {
@@ -47,10 +48,10 @@ class UserRepository : IUserRepository {
         UserRecord(id, email, role, passwordHash, now)
     }
 
-    override fun existsByEmail(email: String): Boolean = transaction {
+    override suspend fun existsByEmail(email: String): Boolean = newSuspendedTransaction(Dispatchers.IO) {
         Users.selectAll()
             .where { Users.email eq email }
-            .count() > 0
+            .any()
     }
 
     private fun ResultRow.toRecord() = UserRecord(

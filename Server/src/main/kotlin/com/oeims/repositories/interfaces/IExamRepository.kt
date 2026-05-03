@@ -4,9 +4,9 @@ import com.oeims.repositories.ExamRecord
 import java.util.UUID
 
 interface IExamRepository {
-    fun findById(id: UUID): ExamRecord?
-    fun findAll(): List<ExamRecord>
-    fun findByTitle(title: String): List<ExamRecord>
-    fun findByProfessor(professorId: UUID): List<ExamRecord>
-    fun create(createdBy: UUID, title: String, description: String?, durationMins: Int): ExamRecord
+    suspend fun findById(id: UUID): ExamRecord?
+    suspend fun findAll(): List<ExamRecord>
+    suspend fun findByTitle(title: String): List<ExamRecord>
+    suspend fun findByProfessor(professorId: UUID): List<ExamRecord>
+    suspend fun create(createdBy: UUID, title: String, description: String?, durationMins: Int): ExamRecord
 }

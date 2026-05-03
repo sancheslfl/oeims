@@ -11,7 +11,7 @@ class ExamService(
     private val examRepository: IExamRepository
 ) {
 
-    fun createExam(professorId: UUID, title: String, description: String?, durationMins: Int): ExamResponse {
+    suspend fun createExam(professorId: UUID, title: String, description: String?, durationMins: Int): ExamResponse {
         if (title.isBlank())
             throw ValidationException("Exam title cannot be blank")
         if (durationMins <= 0)
@@ -20,26 +20,26 @@ class ExamService(
         return examRepository.create(professorId, title, description, durationMins).toResponse()
     }
 
-    fun getExamsByTitle(title: String): List<ExamResponse> {
+    suspend fun getExamsByTitle(title: String): List<ExamResponse> {
         if (title.isBlank())
             throw ValidationException("Title cannot be blank")
 
         return examRepository.findByTitle(title).map { it.toResponse() }
     }
 
-    fun getAllExams(): List<ExamResponse> =
+    suspend fun getAllExams(): List<ExamResponse> =
         examRepository.findAll().map { it.toResponse() }
 
-    fun getExamById(id: UUID): ExamResponse =
+    suspend fun getExamById(id: UUID): ExamResponse =
         examRepository.findById(id)?.toResponse()
             ?: throw NotFoundException("Exam not found")
 
     private fun ExamRecord.toResponse() = ExamResponse(
-        id          = id.toString(),
-        createdBy   = createdBy.toString(),
-        title       = title,
-        description = description,
+        id           = id.toString(),
+        createdBy    = createdBy.toString(),
+        title        = title,
+        description  = description,
         durationMins = durationMins,
-        createdAt   = createdAt.toString()
+        createdAt    = createdAt.toString()
     )
 }

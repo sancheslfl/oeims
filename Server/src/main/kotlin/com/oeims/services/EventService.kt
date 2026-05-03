@@ -1,6 +1,7 @@
 package com.oeims.services
 
 import com.oeims.dto.EventResponse
+import com.oeims.exceptions.NotFoundException
 import com.oeims.models.Severity
 import com.oeims.repositories.EventRecord
 import com.oeims.repositories.interfaces.IEventRepository
@@ -21,7 +22,7 @@ class EventService(
         severity: Severity
     ): EventResponse {
         val participant = participantRepository.findById(participantId)
-            ?: throw NoSuchElementException("Participant not found")
+            ?: throw NotFoundException("Participant not found")
 
         val record = eventRepository.create(participantId, monitorName, message, severity)
         val response = record.toResponse()
@@ -31,7 +32,7 @@ class EventService(
         return response
     }
 
-    fun getSessionEvents(sessionId: UUID): List<EventResponse> =
+    suspend fun getSessionEvents(sessionId: UUID): List<EventResponse> =
         eventRepository.findBySession(sessionId).map { it.toResponse() }
 
     private fun EventRecord.toResponse() = EventResponse(

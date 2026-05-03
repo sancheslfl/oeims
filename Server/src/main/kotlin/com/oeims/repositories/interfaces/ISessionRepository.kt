@@ -5,9 +5,9 @@ import com.oeims.repositories.SessionRecord
 import java.util.UUID
 
 interface ISessionRepository {
-    fun findById(id: UUID): SessionRecord?
-    fun findByCode(code: String): SessionRecord?
-    fun findBySupervisor(supervisorId: UUID): List<SessionRecord>
-    fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord
-    fun updateStatus(id: UUID, status: SessionStatus): Boolean
+    suspend fun findById(id: UUID): SessionRecord?
+    suspend fun findByCode(code: String): SessionRecord?
+    suspend fun findBySupervisor(supervisorId: UUID): List<SessionRecord>
+    suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord
+    suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean
 }

@@ -1,13 +1,16 @@
 package com.oeims.repositories
 
 import com.oeims.models.Events
+import com.oeims.models.Participants
 import com.oeims.models.Severity
 import com.oeims.repositories.interfaces.IEventRepository
+import kotlinx.coroutines.Dispatchers
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 import java.util.UUID
 
@@ -22,7 +25,7 @@ data class EventRecord(
 
 class EventRepository : IEventRepository {
 
-    override fun create(participantId: UUID, monitorName: String, message: String, severity: Severity): EventRecord = transaction {
+    override suspend fun create(participantId: UUID, monitorName: String, message: String, severity: Severity): EventRecord = newSuspendedTransaction(Dispatchers.IO) {
         val id = UUID.randomUUID()
         val now = Instant.now()
         Events.insert {
@@ -36,7 +39,7 @@ class EventRepository : IEventRepository {
         EventRecord(id, participantId, monitorName, message, severity, now)
     }
 
-    override fun findByParticipant(participantId: UUID): List<EventRecord> = transaction {
+    override suspend fun findByParticipant(participantId: UUID): List<EventRecord> = newSuspendedTransaction(Dispatchers.IO) {
         Events.selectAll()
             .where { Events.participantId eq participantId }
             .orderBy(Events.occurredAt, SortOrder.ASC)
@@ -44,10 +47,10 @@ class EventRepository : IEventRepository {
     }
 
     // Fetch the full event timeline for a session (all participants).
-    override fun findBySession(sessionId: UUID): List<EventRecord> = transaction {
-        (Events innerJoin com.oeims.models.Participants)
+    override suspend fun findBySession(sessionId: UUID): List<EventRecord> = newSuspendedTransaction(Dispatchers.IO) {
+        Events.join(Participants, JoinType.INNER, Events.participantId, Participants.id)
             .selectAll()
-            .where { com.oeims.models.Participants.sessionId eq sessionId }
+            .where { Participants.sessionId eq sessionId }
             .orderBy(Events.occurredAt, SortOrder.ASC)
             .map { it.toRecord() }
     }

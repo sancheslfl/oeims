@@ -3,10 +3,11 @@ package com.oeims.repositories
 import com.oeims.models.SessionStatus
 import com.oeims.models.Sessions
 import com.oeims.repositories.interfaces.ISessionRepository
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.util.UUID
@@ -23,27 +24,27 @@ data class SessionRecord(
 
 class SessionRepository : ISessionRepository {
 
-    override fun findById(id: UUID): SessionRecord? = transaction {
+    override suspend fun findById(id: UUID): SessionRecord? = newSuspendedTransaction(Dispatchers.IO) {
         Sessions.selectAll()
             .where { Sessions.id eq id }
             .singleOrNull()
             ?.toRecord()
     }
 
-    override fun findByCode(code: String): SessionRecord? = transaction {
+    override suspend fun findByCode(code: String): SessionRecord? = newSuspendedTransaction(Dispatchers.IO) {
         Sessions.selectAll()
             .where { Sessions.code eq code }
             .singleOrNull()
             ?.toRecord()
     }
 
-    override fun findBySupervisor(supervisorId: UUID): List<SessionRecord> = transaction {
+    override suspend fun findBySupervisor(supervisorId: UUID): List<SessionRecord> = newSuspendedTransaction(Dispatchers.IO) {
         Sessions.selectAll()
             .where { Sessions.supervisorId eq supervisorId }
             .map { it.toRecord() }
     }
 
-    override fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord = transaction {
+    override suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord = newSuspendedTransaction(Dispatchers.IO) {
         val id = UUID.randomUUID()
         Sessions.insert {
             it[Sessions.id] = id
@@ -57,7 +58,7 @@ class SessionRepository : ISessionRepository {
         SessionRecord(id, examId, supervisorId, code, SessionStatus.PENDING, null, null)
     }
 
-    override fun updateStatus(id: UUID, status: SessionStatus): Boolean = transaction {
+    override suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean = newSuspendedTransaction(Dispatchers.IO) {
         val now = Instant.now()
         Sessions.update({ Sessions.id eq id }) {
             it[Sessions.status] = status

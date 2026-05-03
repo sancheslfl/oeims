@@ -5,8 +5,8 @@ import com.oeims.repositories.UserRecord
 import java.util.UUID
 
 interface IUserRepository {
-    fun findById(id: UUID): UserRecord?
-    fun findByEmail(email: String): UserRecord?
-    fun existsByEmail(email: String): Boolean
-    fun create(email: String, role: UserRole, passwordHash: String): UserRecord
+    suspend fun findById(id: UUID): UserRecord?
+    suspend fun findByEmail(email: String): UserRecord?
+    suspend fun existsByEmail(email: String): Boolean
+    suspend fun create(email: String, role: UserRole, passwordHash: String): UserRecord
 }

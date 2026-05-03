@@ -22,7 +22,7 @@ class SessionService(
     private val userRepository: IUserRepository
 ) {
 
-    fun createSession(professorId: UUID, examId: UUID): SessionResponse {
+    suspend fun createSession(professorId: UUID, examId: UUID): SessionResponse {
         examRepository.findById(examId)
             ?: throw NotFoundException("Exam not found")
 
@@ -30,7 +30,7 @@ class SessionService(
         return sessionRepository.create(examId, professorId, code).toResponse()
     }
 
-    fun startSession(sessionId: UUID, professorId: UUID): SessionResponse {
+    suspend fun startSession(sessionId: UUID, professorId: UUID): SessionResponse {
         val session = sessionRepository.findById(sessionId)
             ?: throw NotFoundException("Session not found")
 
@@ -44,7 +44,7 @@ class SessionService(
         return sessionRepository.findById(sessionId)!!.toResponse()
     }
 
-    fun endSession(sessionId: UUID, professorId: UUID): SessionResponse {
+    suspend fun endSession(sessionId: UUID, professorId: UUID): SessionResponse {
         val session = sessionRepository.findById(sessionId)
             ?: throw NotFoundException("Session not found")
 
@@ -58,7 +58,7 @@ class SessionService(
         return sessionRepository.findById(sessionId)!!.toResponse()
     }
 
-    fun joinSession(code: String, studentId: UUID): JoinSessionResponse {
+    suspend fun joinSession(code: String, studentId: UUID): JoinSessionResponse {
         val session = sessionRepository.findByCode(code)
             ?: throw NotFoundException("Session not found")
 
@@ -77,23 +77,23 @@ class SessionService(
         return buildJoinResponse(participant, session)
     }
 
-    fun getSession(sessionId: UUID): SessionResponse =
+    suspend fun getSession(sessionId: UUID): SessionResponse =
         sessionRepository.findById(sessionId)?.toResponse()
             ?: throw NotFoundException("Session not found")
 
-    fun getParticipants(sessionId: UUID): List<ParticipantResponse> {
+    suspend fun getParticipants(sessionId: UUID): List<ParticipantResponse> {
         sessionRepository.findById(sessionId)
             ?: throw NotFoundException("Session not found")
 
         return participantRepository.findBySession(sessionId).map { it.toResponse() }
     }
 
-    fun heartbeat(participantId: UUID) {
+    suspend fun heartbeat(participantId: UUID) {
         if (!participantRepository.updateHeartbeat(participantId))
             throw NotFoundException("Participant not found")
     }
 
-    private fun generateUniqueCode(): String {
+    private suspend fun generateUniqueCode(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
         repeat(5) {
             val code = (1..6).map { chars.random() }.joinToString("")
@@ -103,9 +103,9 @@ class SessionService(
         throw IllegalStateException("Failed to generate a unique session code after 5 attempts")
     }
 
-    private fun buildJoinResponse(participant: ParticipantRecord, session: SessionRecord): JoinSessionResponse {
+    private suspend fun buildJoinResponse(participant: ParticipantRecord, session: SessionRecord): JoinSessionResponse {
         val exam = examRepository.findById(session.examId)
-            ?: throw NoSuchElementException("Exam not found")
+            ?: throw NotFoundException("Exam not found")
 
         return JoinSessionResponse(
             participantId = participant.id.toString(),

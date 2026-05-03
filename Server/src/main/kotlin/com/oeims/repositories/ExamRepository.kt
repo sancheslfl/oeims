@@ -2,10 +2,11 @@ package com.oeims.repositories
 
 import com.oeims.models.Exams
 import com.oeims.repositories.interfaces.IExamRepository
+import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 import java.util.UUID
 
@@ -20,30 +21,30 @@ data class ExamRecord(
 
 class ExamRepository : IExamRepository {
 
-    override fun findById(id: UUID): ExamRecord? = transaction {
+    override suspend fun findById(id: UUID): ExamRecord? = newSuspendedTransaction(Dispatchers.IO) {
         Exams.selectAll()
             .where { Exams.id eq id }
             .singleOrNull()
             ?.toRecord()
     }
 
-    override fun findByTitle(title: String): List<ExamRecord> = transaction {
+    override suspend fun findByTitle(title: String): List<ExamRecord> = newSuspendedTransaction(Dispatchers.IO) {
         Exams.selectAll()
             .where { Exams.title eq title }
             .map { it.toRecord() }
     }
 
-    override fun findByProfessor(professorId: UUID): List<ExamRecord> = transaction {
+    override suspend fun findByProfessor(professorId: UUID): List<ExamRecord> = newSuspendedTransaction(Dispatchers.IO) {
         Exams.selectAll()
             .where { Exams.createdBy eq professorId }
             .map { it.toRecord() }
     }
 
-    override fun findAll(): List<ExamRecord> = transaction {
+    override suspend fun findAll(): List<ExamRecord> = newSuspendedTransaction(Dispatchers.IO) {
         Exams.selectAll().map { it.toRecord() }
     }
 
-    override fun create(createdBy: UUID, title: String, description: String?, durationMins: Int): ExamRecord = transaction {
+    override suspend fun create(createdBy: UUID, title: String, description: String?, durationMins: Int): ExamRecord = newSuspendedTransaction(Dispatchers.IO) {
         val id = UUID.randomUUID()
         val now = Instant.now()
         Exams.insert {
@@ -58,11 +59,11 @@ class ExamRepository : IExamRepository {
     }
 
     private fun ResultRow.toRecord() = ExamRecord(
-        id          = this[Exams.id].value,
-        createdBy   = this[Exams.createdBy].value,
-        title       = this[Exams.title],
-        description = this[Exams.description],
-        durationMins= this[Exams.durationMins],
-        createdAt   = this[Exams.createdAt]
+        id           = this[Exams.id].value,
+        createdBy    = this[Exams.createdBy].value,
+        title        = this[Exams.title],
+        description  = this[Exams.description],
+        durationMins = this[Exams.durationMins],
+        createdAt    = this[Exams.createdAt]
     )
 }

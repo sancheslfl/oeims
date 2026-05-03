@@ -16,7 +16,7 @@ class AuthService(
     private val jwtConfig: JwtConfig
 ) {
 
-    fun register(email: String, password: String, role: String): AuthResponse {
+    suspend fun register(email: String, password: String, role: String): AuthResponse {
         if (userRepository.existsByEmail(email))
             throw ConflictException("Email already registered")
 
@@ -34,7 +34,7 @@ class AuthService(
         )
     }
 
-    fun login(email: String, password: String): AuthResponse {
+    suspend fun login(email: String, password: String): AuthResponse {
         val user = userRepository.findByEmail(email)
             ?: throw UnauthorizedException("Invalid credentials")
 
