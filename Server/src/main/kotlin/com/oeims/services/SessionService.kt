@@ -88,9 +88,12 @@ class SessionService(
         return participantRepository.findBySession(sessionId).map { it.toResponse() }
     }
 
-    suspend fun heartbeat(participantId: UUID) {
-        if (!participantRepository.updateHeartbeat(participantId))
-            throw NotFoundException("Participant not found")
+    suspend fun heartbeat(participantId: UUID, userId: UUID) {
+        val participant = participantRepository.findById(participantId)
+            ?: throw NotFoundException("Participant not found")
+        if (participant.userId != userId)
+            throw ForbiddenException("You do not own this participant")
+        participantRepository.updateHeartbeat(participantId)
     }
 
     private suspend fun generateUniqueCode(): String {

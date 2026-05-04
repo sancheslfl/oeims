@@ -6,7 +6,7 @@ ktor:
     port: 8080
 
 jwt:
-  secret: "change-me-before-production"
+  secret: "change-me-before-production"   # overridden by JWT_SECRET env var at runtime
   issuer: "oeims"
   audience: "oeims-users"
   realm: "OEIMS"

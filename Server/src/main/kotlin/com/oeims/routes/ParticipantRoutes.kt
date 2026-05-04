@@ -11,8 +11,9 @@ fun Route.participantRoutes(sessionService: SessionService) {
 
         // POST /participants/{id}/heartbeat
         post("/participants/{id}/heartbeat") {
+            val userId        = call.userId()
             val participantId = call.uuidParam("id")
-            sessionService.heartbeat(participantId)
+            sessionService.heartbeat(participantId, userId)
             call.respond(HttpStatusCode.NoContent)
         }
     }

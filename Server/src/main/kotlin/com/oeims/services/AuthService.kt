@@ -16,7 +16,15 @@ class AuthService(
     private val jwtConfig: JwtConfig
 ) {
 
+    companion object {
+        private val EMAIL_REGEX = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+    }
+
     suspend fun register(email: String, password: String, role: String): AuthResponse {
+        if (!EMAIL_REGEX.matches(email))
+            throw ValidationException("Invalid email format")
+        if (password.length < 8)
+            throw ValidationException("Password must be at least 8 characters")
         if (userRepository.existsByEmail(email))
             throw ConflictException("Email already registered")
 

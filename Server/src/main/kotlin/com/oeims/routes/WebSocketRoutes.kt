@@ -23,10 +23,14 @@ fun Route.webSocketRoutes(
     // ── Daemon channel ────────────────────────────────────────────────────────
     authenticate("auth-student") {
         webSocket("/ws/daemon/{participantId}") {
-            val participantId = call.uuidParam("participantId")
+            val authenticatedUserId = call.userId()
+            val participantId       = call.uuidParam("participantId")
 
             val participant = participantRepository.findById(participantId)
                 ?: return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Participant not found"))
+
+            if (participant.userId != authenticatedUserId)
+                return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Forbidden"))
 
             participantRepository.updateConnectionStatus(participantId, ConnectionStatus.CONNECTED)
 
