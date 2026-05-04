@@ -1,5 +1,5 @@
 using System.Net.NetworkInformation;
-using Daemon.Abstractions;
+using Daemon.Domain;
 
 namespace Daemon.Monitors
 {

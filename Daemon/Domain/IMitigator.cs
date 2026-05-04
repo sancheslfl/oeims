@@ -1,4 +1,4 @@
-namespace Daemon.Abstractions
+namespace Daemon.Domain
 {
     public interface IMitigator : IDisposable
     {

@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using Daemon.Abstractions;
+using Daemon.Domain;
 
 namespace Daemon.Mitigators
 {
