@@ -3,7 +3,7 @@ using Daemon.Platform.Windows.Native;
 
 namespace Daemon.Platform.Windows;
 
-internal sealed class WindowsActiveWindowSource : IActiveWindowSource
+internal sealed class WinActiveWindowSource : IActiveWindowSource
 {
     private IntPtr _foregroundHook = IntPtr.Zero;
     private IntPtr _nameChangeHook = IntPtr.Zero;
@@ -38,7 +38,7 @@ internal sealed class WindowsActiveWindowSource : IActiveWindowSource
             }
         });
 
-        thread.Name = nameof(WindowsActiveWindowSource);
+        thread.Name = nameof(WinActiveWindowSource);
         thread.IsBackground = true;
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

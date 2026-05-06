@@ -9,7 +9,7 @@ internal static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddMonitors(this IServiceCollection services)
     {
-        services.AddSingleton<IActiveWindowSource, WindowsActiveWindowSource>();
+        services.AddSingleton<IActiveWindowSource, WinActiveWindowSource>();
         services.AddSingleton<IMonitor, FocusMonitor>();
         services.AddSingleton<IMonitor, ProcessMonitor>();
         services.AddSingleton<IMonitor, NetworkMonitor>();
