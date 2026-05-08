@@ -1,0 +1,20 @@
+ktor:
+  application:
+    modules:
+      - com.oeims.ApplicationKt.module
+  deployment:
+    port: 8080
+
+jwt:
+  secret: "change-me-before-production"   # overridden by JWT_SECRET env var at runtime
+  issuer: "oeims"
+  audience: "oeims-users"
+  realm: "OEIMS"
+  expiration-ms: 86400000 # 24 hours
+
+database:
+  path: "./oeims.db"
+
+heartbeat:
+  interval-ms: 15000   # how often daemon sends heartbeat
+  timeout-ms: 30000    # how long before a participant is marked timed out
