@@ -1,8 +1,9 @@
-package com.oeims.routes
+package com.oeims.http
 
-import com.oeims.dto.DaemonEventMessage
-import com.oeims.dto.toDomainSeverity
+import com.oeims.models.dto.DaemonEventMessage
+import com.oeims.models.dto.toDomainSeverity
 import com.oeims.models.ConnectionStatus
+import com.oeims.models.ids.toParticipantId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.services.EventService
 import com.oeims.websocket.ConnectionRegistry
@@ -40,7 +41,7 @@ fun Route.webSocketRoutes(
                         try {
                             val msg = Json.decodeFromString<DaemonEventMessage>(frame.readText())
                             eventService.handleEvent(
-                                participantId = participant.id,
+                                participantId = participant.id.toParticipantId(),
                                 monitorName   = msg.monitorName,
                                 message       = msg.message,
                                 severity      = msg.severity.toDomainSeverity()
@@ -50,8 +51,8 @@ fun Route.webSocketRoutes(
                         }
                     }
                 }
-            } catch (e: ClosedReceiveChannelException) {
-                application.log.debug("Daemon disconnected: $participantId — ${closeReason.await()}")
+            } catch (_: ClosedReceiveChannelException) {
+                application.log.debug("Daemon disconnected: {} — {}", participantId, closeReason.await())
             } catch (e: Throwable) {
                 application.log.warn("Daemon WebSocket error for $participantId", e)
             } finally {
@@ -71,7 +72,7 @@ fun Route.webSocketRoutes(
             }
 
             runCatching {
-                for (frame in incoming) { /* server → client only; ignore any client frames */ }
+                for (frame in incoming) { /* server -> client only; ignore any client frames */ }
             }.onFailure { e ->
                 if (e !is ClosedReceiveChannelException)
                     application.log.warn("Console WebSocket error for session $sessionId", e)

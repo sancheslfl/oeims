@@ -1,7 +1,7 @@
 package com.oeims.websocket
 
-import com.oeims.dto.EventResponse
-import com.oeims.dto.ParticipantStatusUpdate
+import com.oeims.models.dto.EventResponse
+import com.oeims.models.dto.ParticipantStatusUpdate
 import java.util.UUID
 
 interface IConnectionRegistry {

@@ -1,5 +1,7 @@
-package com.oeims.routes
+package com.oeims.http
 
+import com.oeims.models.ids.toParticipantId
+import com.oeims.models.ids.toUserId
 import com.oeims.services.SessionService
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -13,7 +15,7 @@ fun Route.participantRoutes(sessionService: SessionService) {
         post("/participants/{id}/heartbeat") {
             val userId        = call.userId()
             val participantId = call.uuidParam("id")
-            sessionService.heartbeat(participantId, userId)
+            sessionService.heartbeat(participantId.toParticipantId(), userId.toUserId())
             call.respond(HttpStatusCode.NoContent)
         }
     }

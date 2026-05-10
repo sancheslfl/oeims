@@ -1,37 +1,37 @@
 package com.oeims.services
 
-import com.oeims.dto.ExamResponse
+import com.oeims.models.dto.ExamResponse
 import com.oeims.exceptions.NotFoundException
 import com.oeims.exceptions.ValidationException
+import com.oeims.models.ids.ExamId
+import com.oeims.models.ExamTitle
+import com.oeims.models.ids.ProfessorId
 import com.oeims.repositories.ExamRecord
 import com.oeims.repositories.interfaces.IExamRepository
-import java.util.UUID
 
 class ExamService(
     private val examRepository: IExamRepository
 ) {
 
-    suspend fun createExam(professorId: UUID, title: String, description: String?, durationMins: Int): ExamResponse {
-        if (title.isBlank())
-            throw ValidationException("Exam title cannot be blank")
+    // TODO: Maybe use Instant for time related params
+    suspend fun createExam(professorId: ProfessorId, title: ExamTitle, description: String?, durationMins: Int): ExamResponse {
         if (durationMins <= 0)
             throw ValidationException("Duration must be greater than 0")
 
-        return examRepository.create(professorId, title, description, durationMins).toResponse()
+        return examRepository
+            .create(professorId.value, title.value, description, durationMins)
+            .toResponse()
     }
 
-    suspend fun getExamsByTitle(title: String): List<ExamResponse> {
-        if (title.isBlank())
-            throw ValidationException("Title cannot be blank")
-
-        return examRepository.findByTitle(title).map { it.toResponse() }
+    suspend fun getExamsByTitle(title: ExamTitle): List<ExamResponse> {
+        return examRepository.findByTitle(title.value).map { it.toResponse() }
     }
 
     suspend fun getAllExams(): List<ExamResponse> =
         examRepository.findAll().map { it.toResponse() }
 
-    suspend fun getExamById(id: UUID): ExamResponse =
-        examRepository.findById(id)?.toResponse()
+    suspend fun getExamById(id: ExamId): ExamResponse =
+        examRepository.findById(id.value)?.toResponse()
             ?: throw NotFoundException("Exam not found")
 
     private fun ExamRecord.toResponse() = ExamResponse(

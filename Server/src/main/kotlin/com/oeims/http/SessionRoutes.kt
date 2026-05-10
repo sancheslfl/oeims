@@ -1,7 +1,13 @@
-package com.oeims.routes
+package com.oeims.http
 
-import com.oeims.dto.CreateSessionRequest
-import com.oeims.dto.JoinSessionRequest
+import com.oeims.models.dto.CreateSessionRequest
+import com.oeims.models.dto.JoinSessionRequest
+import com.oeims.models.ids.toExamId
+import com.oeims.models.ids.toProfessorId
+import com.oeims.models.ids.toSessionId
+import com.oeims.models.ids.toStudentId
+import com.oeims.models.ids.toUserId
+import com.oeims.models.toSessionCode
 import com.oeims.services.EventService
 import com.oeims.services.SessionService
 import io.ktor.http.*
@@ -21,7 +27,7 @@ fun Route.sessionRoutes(sessionService: SessionService, eventService: EventServi
             val professorId = call.userId()
             val req = call.receive<CreateSessionRequest>()
             val examId = call.uuidParam(req.examId, "examId")
-            val response = sessionService.createSession(professorId, examId)
+            val response = sessionService.createSession(professorId.toProfessorId(), examId.toExamId())
             call.respond(HttpStatusCode.Created, response)
         }
 
@@ -30,7 +36,7 @@ fun Route.sessionRoutes(sessionService: SessionService, eventService: EventServi
             // GET /sessions/{id}
             get {
                 val sessionId = call.uuidParam("id")
-                val response = sessionService.getSession(sessionId)
+                val response = sessionService.getSession(sessionId.toSessionId())
                 call.respond(HttpStatusCode.OK, response)
             }
 
@@ -38,7 +44,7 @@ fun Route.sessionRoutes(sessionService: SessionService, eventService: EventServi
             post("/start") {
                 val professorId = call.userId()
                 val sessionId = call.uuidParam("id")
-                val response = sessionService.startSession(sessionId, professorId)
+                val response = sessionService.startSession(sessionId.toSessionId(), professorId.toProfessorId())
                 call.respond(HttpStatusCode.OK, response)
             }
 
@@ -46,21 +52,21 @@ fun Route.sessionRoutes(sessionService: SessionService, eventService: EventServi
             post("/end") {
                 val professorId = call.userId()
                 val sessionId = call.uuidParam("id")
-                val response = sessionService.endSession(sessionId, professorId)
+                val response = sessionService.endSession(sessionId.toSessionId(), professorId.toProfessorId())
                 call.respond(HttpStatusCode.OK, response)
             }
 
             // GET /sessions/{id}/participants
             get("/participants") {
                 val sessionId = call.uuidParam("id")
-                val response = sessionService.getParticipants(sessionId)
+                val response = sessionService.getParticipants(sessionId.toSessionId())
                 call.respond(HttpStatusCode.OK, response)
             }
 
             // GET /sessions/{id}/events
             get("/events") {
                 val sessionId = call.uuidParam("id")
-                val response = eventService.getSessionEvents(sessionId)
+                val response = eventService.getSessionEvents(sessionId.toSessionId())
                 call.respond(HttpStatusCode.OK, response)
             }
         }
@@ -74,7 +80,7 @@ fun Route.sessionRoutes(sessionService: SessionService, eventService: EventServi
         post("/sessions/join") {
             val studentId = call.userId()
             val req = call.receive<JoinSessionRequest>()
-            val response = sessionService.joinSession(req.code, studentId)
+            val response = sessionService.joinSession(req.code.toSessionCode(), studentId.toStudentId())
             call.respond(HttpStatusCode.OK, response)
         }
     }

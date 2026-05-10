@@ -1,7 +1,9 @@
-package com.oeims.routes
+package com.oeims.http
 
-import com.oeims.dto.LoginRequest
-import com.oeims.dto.RegisterRequest
+import com.oeims.models.dto.LoginRequest
+import com.oeims.models.dto.RegisterRequest
+import com.oeims.models.toEmail
+import com.oeims.models.toPassword
 import com.oeims.services.AuthService
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -13,13 +15,13 @@ fun Route.authRoutes(authService: AuthService) {
 
         post("/register") {
             val req = call.receive<RegisterRequest>()
-            val response = authService.register(req.email, req.password, req.role)
+            val response = authService.register(req.email.toEmail(), req.password.toPassword(), req.role)
             call.respond(HttpStatusCode.Created, response)
         }
 
         post("/login") {
             val req = call.receive<LoginRequest>()
-            val response = authService.login(req.email, req.password)
+            val response = authService.login(req.email.toEmail(), req.password.toPassword())
             call.respond(HttpStatusCode.OK, response)
         }
     }

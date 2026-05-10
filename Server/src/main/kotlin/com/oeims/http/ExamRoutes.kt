@@ -1,6 +1,9 @@
-package com.oeims.routes
+package com.oeims.http
 
-import com.oeims.dto.CreateExamRequest
+import com.oeims.models.dto.CreateExamRequest
+import com.oeims.models.ids.toExamId
+import com.oeims.models.ids.toProfessorId
+import com.oeims.models.toExamTitle
 import com.oeims.services.ExamService
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -16,14 +19,19 @@ fun Route.examRoutes(examService: ExamService) {
             post {
                 val professorId = call.userId()
                 val req = call.receive<CreateExamRequest>()
-                val response = examService.createExam(professorId, req.title, req.description, req.durationMins)
+                val response = examService.createExam(
+                    professorId.toProfessorId(),
+                    req.title.toExamTitle(),
+                    req.description,
+                    req.durationMins
+                )
                 call.respond(HttpStatusCode.Created, response)
             }
 
             // GET /exams?title=... — filter by title, or return all
             get {
                 val title = call.request.queryParameters["title"]
-                val response = if (title != null) examService.getExamsByTitle(title)
+                val response = if (title != null) examService.getExamsByTitle(title.toExamTitle())
                                else examService.getAllExams()
                 call.respond(HttpStatusCode.OK, response)
             }
@@ -31,7 +39,7 @@ fun Route.examRoutes(examService: ExamService) {
             // GET /exams/{id}
             get("/{id}") {
                 val id = call.uuidParam("id")
-                val response = examService.getExamById(id)
+                val response = examService.getExamById(id.toExamId())
                 call.respond(HttpStatusCode.OK, response)
             }
         }

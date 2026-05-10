@@ -1,4 +1,4 @@
-package com.oeims.dto
+package com.oeims.models.dto
 
 import kotlinx.serialization.Serializable
 

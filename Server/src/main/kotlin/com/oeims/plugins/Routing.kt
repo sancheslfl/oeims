@@ -1,15 +1,15 @@
 package com.oeims.plugins
 
-import com.oeims.dto.ErrorResponse
+import com.oeims.models.dto.ErrorResponse
 import com.oeims.exceptions.ConflictException
 import com.oeims.exceptions.ForbiddenException
 import com.oeims.exceptions.NotFoundException
 import com.oeims.exceptions.UnauthorizedException
 import com.oeims.exceptions.ValidationException
-import com.oeims.routes.authRoutes
-import com.oeims.routes.examRoutes
-import com.oeims.routes.participantRoutes
-import com.oeims.routes.sessionRoutes
+import com.oeims.http.authRoutes
+import com.oeims.http.examRoutes
+import com.oeims.http.participantRoutes
+import com.oeims.http.sessionRoutes
 import com.oeims.services.AuthService
 import com.oeims.services.EventService
 import com.oeims.services.ExamService

@@ -1,4 +1,4 @@
-package com.oeims.routes
+package com.oeims.http
 
 import com.oeims.exceptions.ValidationException
 import io.ktor.server.application.*
