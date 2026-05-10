@@ -1,0 +1,273 @@
+package com.oeims.routes
+
+import com.oeims.dto.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.websocket.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.server.testing.*
+import io.ktor.websocket.*
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+
+/**
+ * WebSocket-layer tests for the two channels:
+ *
+ *   /ws/daemon/{participantId}   — student daemon sends monitoring events
+ *   /ws/console/{sessionId}      — professor receives live event broadcasts
+ *
+ * ## The end-to-end broadcast test
+ *
+ * The console test coordinates two concurrent WebSocket connections:
+ * 1. A professor connects and waits for frames via [launch].
+ * 2. A [delay] gives the server-side `flow.collect` coroutine time to subscribe
+ *    to the [kotlinx.coroutines.flow.SharedFlow] before anything is emitted.
+ * 3. The daemon then sends an event, which is persisted and broadcast.
+ * 4. The professor's connection receives the broadcast frame.
+ *
+ * The 100 ms delay is the standard synchronisation point for SharedFlow tests:
+ * the flow has no replay, so the subscriber must exist before the first emit.
+ */
+class WebSocketRoutesTest : BaseRouteTest() {
+
+    // ── Clients ───────────────────────────────────────────────────────────────
+
+    /** Client with WebSocket support only — used for frame-level tests. */
+    private fun ApplicationTestBuilder.wsClient() = createClient {
+        install(WebSockets)
+    }
+
+    // ── Setup ─────────────────────────────────────────────────────────────────
+
+    private data class Ctx(
+        val profToken:     String,
+        val studentToken:  String,
+        val sessionId:     String,
+        val participantId: String
+    )
+
+    /**
+     * Registers a professor and a student, creates an exam + session, and has the
+     * student join, returning all tokens and IDs needed by the tests.
+     */
+    private suspend fun ApplicationTestBuilder.setup(): Ctx {
+        val http = jsonClient()
+
+        val prof = http.post("/auth/register") {
+            contentType(ContentType.Application.Json)
+            setBody(RegisterRequest("prof@isel.pt", "password123", "PROFESSOR"))
+        }.body<AuthResponse>()
+
+        val student = http.post("/auth/register") {
+            contentType(ContentType.Application.Json)
+            setBody(RegisterRequest("student@isel.pt", "password123", "STUDENT"))
+        }.body<AuthResponse>()
+
+        val exam = http.post("/exams") {
+            bearerAuth(prof.token)
+            contentType(ContentType.Application.Json)
+            setBody(CreateExamRequest("Test Exam", null, 60))
+        }.body<ExamResponse>()
+
+        val session = http.post("/sessions") {
+            bearerAuth(prof.token)
+            contentType(ContentType.Application.Json)
+            setBody(CreateSessionRequest(exam.id))
+        }.body<SessionResponse>()
+
+        val join = http.post("/sessions/join") {
+            bearerAuth(student.token)
+            contentType(ContentType.Application.Json)
+            setBody(JoinSessionRequest(session.code))
+        }.body<JoinSessionResponse>()
+
+        return Ctx(prof.token, student.token, session.id, join.participantId)
+    }
+
+    // ── Daemon channel ────────────────────────────────────────────────────────
+
+    @Test
+    fun `valid daemon frame is persisted and returned by the events endpoint`() = routeTest {
+        val ctx  = setup()
+        val http = jsonClient()
+
+        wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
+            bearerAuth(ctx.studentToken)
+        }) {
+            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "Window lost focus", "Warning")))
+            delay(50)   // let the server process the frame before we close
+            close(CloseReason(CloseReason.Codes.NORMAL, "done"))
+        }
+
+        val events = http.get("/sessions/${ctx.sessionId}/events") {
+            bearerAuth(ctx.profToken)
+        }.body<List<EventResponse>>()
+
+        assertEquals(1, events.size)
+        assertEquals("FocusMonitor", events[0].monitorName)
+        assertEquals("Window lost focus", events[0].message)
+        assertEquals("WARNING", events[0].severity)
+    }
+
+    @Test
+    fun `malformed daemon frame is silently dropped and connection stays open`() = routeTest {
+        val ctx  = setup()
+        val http = jsonClient()
+
+        wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
+            bearerAuth(ctx.studentToken)
+        }) {
+            send("this is not valid json {{{")
+            delay(50)
+            // Send a valid frame afterwards — connection must still be alive
+            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "valid msg", "Info")))
+            delay(50)
+            close(CloseReason(CloseReason.Codes.NORMAL, "done"))
+        }
+
+        val events = http.get("/sessions/${ctx.sessionId}/events") {
+            bearerAuth(ctx.profToken)
+        }.body<List<EventResponse>>()
+
+        // Only the valid frame produced an event; the malformed one was silently dropped
+        assertEquals(1, events.size)
+        assertEquals("INFO", events[0].severity)
+    }
+
+    @Test
+    fun `daemon frame with unknown severity is dropped and connection stays open`() = routeTest {
+        val ctx  = setup()
+        val http = jsonClient()
+
+        wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
+            bearerAuth(ctx.studentToken)
+        }) {
+            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "msg", "NotARealSeverity")))
+            delay(50)
+            // Valid frame after the bad one — connection must still be alive
+            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "valid msg", "Critical")))
+            delay(50)
+            close(CloseReason(CloseReason.Codes.NORMAL, "done"))
+        }
+
+        val events = http.get("/sessions/${ctx.sessionId}/events") {
+            bearerAuth(ctx.profToken)
+        }.body<List<EventResponse>>()
+
+        assertEquals(1, events.size)
+        assertEquals("CRITICAL", events[0].severity)
+    }
+
+    @Test
+    fun `multiple valid daemon frames all produce persisted events`() = routeTest {
+        val ctx  = setup()
+        val http = jsonClient()
+
+        wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
+            bearerAuth(ctx.studentToken)
+        }) {
+            send(Json.encodeToString(DaemonEventMessage("FocusMonitor",     "lost focus",       "Info")))
+            send(Json.encodeToString(DaemonEventMessage("ClipboardMonitor", "clipboard access", "Warning")))
+            send(Json.encodeToString(DaemonEventMessage("ProcessMonitor",   "unknown process",  "Critical")))
+            delay(50)
+            close(CloseReason(CloseReason.Codes.NORMAL, "done"))
+        }
+
+        val events = http.get("/sessions/${ctx.sessionId}/events") {
+            bearerAuth(ctx.profToken)
+        }.body<List<EventResponse>>()
+
+        assertEquals(3, events.size)
+    }
+
+    @Test
+    fun `daemon connection is closed with VIOLATED_POLICY when a different student connects`() = routeTest {
+        val ctx = setup()
+
+        // Register a second student who does NOT own this participant
+        val other = jsonClient().post("/auth/register") {
+            contentType(ContentType.Application.Json)
+            setBody(RegisterRequest("other@isel.pt", "password123", "STUDENT"))
+        }.body<AuthResponse>()
+
+        var receivedCloseReason: CloseReason? = null
+
+        wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
+            bearerAuth(other.token)
+        }) {
+            // Server closes the connection immediately; await the close reason
+            receivedCloseReason = closeReason.await()
+        }
+
+        assertEquals(CloseReason.Codes.VIOLATED_POLICY, receivedCloseReason?.knownReason)
+    }
+
+    @Test
+    fun `daemon connection is closed with VIOLATED_POLICY when participant does not exist`() = routeTest {
+        val ctx = setup()
+        val nonExistentId = "00000000-0000-0000-0000-000000000000"
+        var receivedCloseReason: CloseReason? = null
+
+        wsClient().webSocket("/ws/daemon/$nonExistentId", {
+            bearerAuth(ctx.studentToken)
+        }) {
+            receivedCloseReason = closeReason.await()
+        }
+
+        assertEquals(CloseReason.Codes.VIOLATED_POLICY, receivedCloseReason?.knownReason)
+    }
+
+    // ── Console channel + end-to-end broadcast ────────────────────────────────
+
+    @Test
+    fun `event sent by daemon arrives as a frame on the connected professor console`() = routeTest {
+        val ctx      = setup()
+        val wsClient = wsClient()
+        var receivedText: String? = null
+
+        // coroutineScope provides the CoroutineScope that launch requires,
+        // and suspends until every child coroutine inside it completes.
+        coroutineScope {
+
+            // 1. Professor opens the console and waits for the first incoming frame.
+            launch {
+                wsClient.webSocket("/ws/console/${ctx.sessionId}", {
+                    bearerAuth(ctx.profToken)
+                }) {
+                    val frame = incoming.receive()
+                    if (frame is Frame.Text) receivedText = frame.readText()
+                    close(CloseReason(CloseReason.Codes.NORMAL, "done"))
+                }
+            }
+
+            // 2. Wait for the server-side `flow.collect` coroutine to subscribe.
+            //    SharedFlow has no replay — the subscriber must exist before emit().
+            delay(100)
+
+            // 3. Daemon sends an event; EventService persists it and broadcasts to the flow.
+            wsClient.webSocket("/ws/daemon/${ctx.participantId}", {
+                bearerAuth(ctx.studentToken)
+            }) {
+                send(Json.encodeToString(DaemonEventMessage("ClipboardMonitor", "clipboard access", "Critical")))
+                delay(50)
+                close(CloseReason(CloseReason.Codes.NORMAL, "done"))
+            }
+
+            // coroutineScope waits here for the professor's launch block to finish
+            // before returning — no explicit join() needed.
+        }
+
+        // 4. The frame the professor received must be the serialised EventResponse.
+        assertNotNull(receivedText, "Professor console received no frame")
+        val event = Json.decodeFromString<EventResponse>(receivedText!!)
+        assertEquals("ClipboardMonitor", event.monitorName)
+        assertEquals("clipboard access", event.message)
+        assertEquals("CRITICAL", event.severity)
+    }
+}
