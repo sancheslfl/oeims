@@ -10,6 +10,8 @@ import com.oeims.repositories.ParticipantRecord
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.websocket.IConnectionRegistry
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -67,6 +69,10 @@ class EventServiceTest {
     private inner class FakeConnectionRegistry : IConnectionRegistry {
         val broadcastedEvents        = mutableListOf<Pair<UUID, EventResponse>>()
         val broadcastedStatusUpdates = mutableListOf<Pair<UUID, ParticipantStatusUpdate>>()
+
+        // Not exercised by service-level tests; return an inert flow to satisfy the interface.
+        override fun flowForSession(sessionId: UUID): SharedFlow<String> =
+            MutableSharedFlow()
 
         override suspend fun broadcastEventToSession(sessionId: UUID, event: EventResponse) {
             broadcastedEvents.add(sessionId to event)
