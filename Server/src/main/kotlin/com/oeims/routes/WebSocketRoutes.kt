@@ -5,7 +5,7 @@ import com.oeims.dto.toDomainSeverity
 import com.oeims.models.ConnectionStatus
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.services.EventService
-import com.oeims.websocket.ConnectionRegistry
+import com.oeims.websocket.IConnectionRegistry
 import io.ktor.server.application.log
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -18,7 +18,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 fun Route.webSocketRoutes(
-    connectionRegistry: ConnectionRegistry,
+    connectionRegistry: IConnectionRegistry,
     eventService: EventService,
     participantRepository: IParticipantRepository
 ) {
