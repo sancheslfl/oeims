@@ -40,8 +40,9 @@ fun Application.module() {
 
     // ── WebSockets ────────────────────────────────────────────────────────────
     install(WebSockets) {
-        pingPeriod = 30.seconds
-        timeout = 60.seconds
+        pingPeriod   = 30.seconds
+        timeout      = 60.seconds
+        maxFrameSize = 64 * 1024L  // 64 KB
     }
 
     // ── Database ──────────────────────────────────────────────────────────────
