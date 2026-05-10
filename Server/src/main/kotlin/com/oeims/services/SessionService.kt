@@ -13,6 +13,7 @@ import com.oeims.repositories.interfaces.IExamRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.repositories.interfaces.IUserRepository
+import java.time.Instant
 import java.util.UUID
 
 class SessionService(
@@ -41,7 +42,7 @@ class SessionService(
             throw ConflictException("Only a pending session can be started")
 
         sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE)
-        return sessionRepository.findById(sessionId)!!.toResponse()
+        return session.copy(status = SessionStatus.ACTIVE, startedAt = Instant.now()).toResponse()
     }
 
     suspend fun endSession(sessionId: UUID, professorId: UUID): SessionResponse {
@@ -55,7 +56,7 @@ class SessionService(
             throw ConflictException("Only an active session can be ended")
 
         sessionRepository.updateStatus(sessionId, SessionStatus.ENDED)
-        return sessionRepository.findById(sessionId)!!.toResponse()
+        return session.copy(status = SessionStatus.ENDED, endedAt = Instant.now()).toResponse()
     }
 
     suspend fun joinSession(code: String, studentId: UUID): JoinSessionResponse {
