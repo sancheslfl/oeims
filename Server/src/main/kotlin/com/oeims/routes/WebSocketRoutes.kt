@@ -5,18 +5,20 @@ import com.oeims.dto.toDomainSeverity
 import com.oeims.models.ConnectionStatus
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.services.EventService
-import com.oeims.websocket.ConnectionRegistry
+import com.oeims.websocket.IConnectionRegistry
 import io.ktor.server.application.log
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 fun Route.webSocketRoutes(
-    connectionRegistry: ConnectionRegistry,
+    connectionRegistry: IConnectionRegistry,
     eventService: EventService,
     participantRepository: IParticipantRepository
 ) {
@@ -38,15 +40,20 @@ fun Route.webSocketRoutes(
                 for (frame in incoming) {
                     if (frame is Frame.Text) {
                         try {
-                            val msg = Json.decodeFromString<DaemonEventMessage>(frame.readText())
-                            eventService.handleEvent(
-                                participantId = participant.id,
-                                monitorName   = msg.monitorName,
-                                message       = msg.message,
-                                severity      = msg.severity.toDomainSeverity()
-                            )
-                        } catch (_: Exception) {
-                            // Malformed frame — ignore and keep connection alive
+                            val msg      = Json.decodeFromString<DaemonEventMessage>(frame.readText())
+                            val severity = msg.severity.toDomainSeverity()
+                            if (severity == null) {
+                                application.log.warn("Daemon sent unknown severity '${msg.severity}' for participant $participantId — frame dropped")
+                            } else {
+                                eventService.handleEvent(
+                                    participantId = participant.id,
+                                    monitorName   = msg.monitorName,
+                                    message       = msg.message,
+                                    severity      = severity
+                                )
+                            }
+                        } catch (e: SerializationException) {
+                            application.log.debug("Daemon sent malformed frame for $participantId — ignored: ${e.message}")
                         }
                     }
                 }
@@ -73,8 +80,10 @@ fun Route.webSocketRoutes(
             runCatching {
                 for (frame in incoming) { /* server → client only; ignore any client frames */ }
             }.onFailure { e ->
-                if (e !is ClosedReceiveChannelException)
-                    application.log.warn("Console WebSocket error for session $sessionId", e)
+                when (e) {
+                    is CancellationException -> throw e
+                    !is ClosedReceiveChannelException -> application.log.warn("Console WebSocket error for session $sessionId", e)
+                }
             }.also {
                 job.cancel()
             }

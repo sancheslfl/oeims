@@ -31,6 +31,8 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
     implementation("io.ktor:ktor-server-call-logging:$ktor_version")
+    implementation("io.ktor:ktor-server-call-id:$ktor_version")
+    implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
     implementation("io.ktor:ktor-server-status-pages:$ktor_version")
 
     // Exposed ORM
@@ -52,11 +54,13 @@ dependencies {
 
     // Testing
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
+    testImplementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
+    testImplementation("io.ktor:ktor-client-websockets:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:$kotlin_version")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
 
-    tasks.test {
-        useJUnitPlatform()
-    }
+tasks.test {
+    useJUnitPlatform()
 }

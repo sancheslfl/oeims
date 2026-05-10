@@ -14,7 +14,7 @@ class ConnectionRegistry : IConnectionRegistry {
 
     private val sessionFlows = ConcurrentHashMap<UUID, MutableSharedFlow<String>>()
 
-    fun flowForSession(sessionId: UUID): SharedFlow<String> =
+    override fun flowForSession(sessionId: UUID): SharedFlow<String> =
         sessionFlows.getOrPut(sessionId) {
             MutableSharedFlow(extraBufferCapacity = 64)
         }.asSharedFlow()
