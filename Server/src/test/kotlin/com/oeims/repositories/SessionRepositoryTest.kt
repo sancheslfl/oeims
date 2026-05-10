@@ -5,6 +5,7 @@ import com.oeims.models.SessionStatus
 import com.oeims.models.Sessions
 import com.oeims.models.UserRole
 import com.oeims.models.Users
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -28,7 +29,7 @@ class SessionRepositoryTest {
     private var keepAlive: java.sql.Connection? = null
 
     @BeforeEach
-    fun setup() {
+    fun setup() = runBlocking {
         keepAlive = DriverManager.getConnection("jdbc:sqlite:file:testdb?mode=memory&cache=shared")
         Database.connect(
             url = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
@@ -56,7 +57,7 @@ class SessionRepositoryTest {
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns session with PENDING status`() {
+    fun `create returns session with PENDING status`() = runBlocking {
         val session = sessionRepository.create(examId, professorId, "ABC123")
 
         assertEquals(SessionStatus.PENDING, session.status)
@@ -69,7 +70,7 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun `create assigns unique ids`() {
+    fun `create assigns unique ids`() = runBlocking {
         val s1 = sessionRepository.create(examId, professorId, "AAA111")
         val s2 = sessionRepository.create(examId, professorId, "BBB222")
 
@@ -79,7 +80,7 @@ class SessionRepositoryTest {
     // ── findById ──────────────────────────────────────────────────────────────
 
     @Test
-    fun `findById returns session when id exists`() {
+    fun `findById returns session when id exists`() = runBlocking {
         val created = sessionRepository.create(examId, professorId, "XYZ789")
 
         val result = sessionRepository.findById(created.id)
@@ -90,7 +91,7 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun `findById returns null when id does not exist`() {
+    fun `findById returns null when id does not exist`() = runBlocking {
         val result = sessionRepository.findById(UUID.randomUUID())
 
         assertNull(result)
@@ -99,7 +100,7 @@ class SessionRepositoryTest {
     // ── findByCode ────────────────────────────────────────────────────────────
 
     @Test
-    fun `findByCode returns session when code exists`() {
+    fun `findByCode returns session when code exists`() = runBlocking {
         sessionRepository.create(examId, professorId, "CODE01")
 
         val result = sessionRepository.findByCode("CODE01")
@@ -109,7 +110,7 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun `findByCode returns null when code does not exist`() {
+    fun `findByCode returns null when code does not exist`() = runBlocking {
         val result = sessionRepository.findByCode("ZZZZZZ")
 
         assertNull(result)
@@ -118,7 +119,7 @@ class SessionRepositoryTest {
     // ── findBySupervisor ──────────────────────────────────────────────────────
 
     @Test
-    fun `findBySupervisor returns only sessions belonging to that professor`() {
+    fun `findBySupervisor returns only sessions belonging to that professor`() = runBlocking {
         sessionRepository.create(examId, professorId,      "AAA001")
         sessionRepository.create(examId, professorId,      "BBB002")
         sessionRepository.create(examId, otherProfessorId, "CCC003")
@@ -130,7 +131,7 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun `findBySupervisor returns empty list when professor has no sessions`() {
+    fun `findBySupervisor returns empty list when professor has no sessions`() = runBlocking {
         val results = sessionRepository.findBySupervisor(professorId)
 
         assertTrue(results.isEmpty())
@@ -139,7 +140,7 @@ class SessionRepositoryTest {
     // ── updateStatus ──────────────────────────────────────────────────────────
 
     @Test
-    fun `updateStatus PENDING to ACTIVE sets startedAt and returns true`() {
+    fun `updateStatus PENDING to ACTIVE sets startedAt and returns true`() = runBlocking {
         val session = sessionRepository.create(examId, professorId, "ACT001")
 
         val updated = sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
@@ -152,7 +153,7 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun `updateStatus ACTIVE to ENDED sets endedAt and returns true`() {
+    fun `updateStatus ACTIVE to ENDED sets endedAt and returns true`() = runBlocking {
         val session = sessionRepository.create(examId, professorId, "END001")
         sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
 
@@ -165,7 +166,7 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun `updateStatus returns false when session does not exist`() {
+    fun `updateStatus returns false when session does not exist`() = runBlocking {
         val updated = sessionRepository.updateStatus(UUID.randomUUID(), SessionStatus.ACTIVE)
 
         assertFalse(updated)

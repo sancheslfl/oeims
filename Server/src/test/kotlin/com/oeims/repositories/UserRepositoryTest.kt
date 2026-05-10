@@ -2,6 +2,7 @@ package com.oeims.repositories
 
 import com.oeims.models.UserRole
 import com.oeims.models.Users
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -24,7 +25,6 @@ class UserRepositoryTest {
 
     @BeforeEach
     fun setup() {
-        // Pin the named in-memory database so it survives Exposed closing idle pool connections.
         keepAlive = DriverManager.getConnection("jdbc:sqlite:file:testdb?mode=memory&cache=shared")
         Database.connect(
             url = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
@@ -44,7 +44,7 @@ class UserRepositoryTest {
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns record with correct fields`() {
+    fun `create returns record with correct fields`() = runBlocking {
         val user = repository.create("student@alunos.isel.pt", UserRole.STUDENT, "hashedpassword")
 
         assertEquals("student@alunos.isel.pt", user.email)
@@ -55,7 +55,7 @@ class UserRepositoryTest {
     }
 
     @Test
-    fun `create assigns a unique id to each user`() {
+    fun `create assigns a unique id to each user`() = runBlocking {
         val user1 = repository.create("student1@alunos.isel.pt", UserRole.STUDENT, "hash1")
         val user2 = repository.create("student2@alunos.isel.pt", UserRole.STUDENT, "hash2")
 
@@ -65,7 +65,7 @@ class UserRepositoryTest {
     // ── findByEmail ───────────────────────────────────────────────────────────
 
     @Test
-    fun `findByEmail returns user when email exists`() {
+    fun `findByEmail returns user when email exists`() = runBlocking {
         repository.create("professor@isel.pt", UserRole.PROFESSOR, "hash")
 
         val result = repository.findByEmail("professor@isel.pt")
@@ -76,14 +76,14 @@ class UserRepositoryTest {
     }
 
     @Test
-    fun `findByEmail returns null when email does not exist`() {
+    fun `findByEmail returns null when email does not exist`() = runBlocking {
         val result = repository.findByEmail("nobody@isel.pt")
 
         assertNull(result)
     }
 
     @Test
-    fun `findByEmail is case sensitive`() {
+    fun `findByEmail is case sensitive`() = runBlocking {
         repository.create("student@alunos.isel.pt", UserRole.STUDENT, "hash")
 
         val result = repository.findByEmail("STUDENT@alunos.isel.pt")
@@ -94,7 +94,7 @@ class UserRepositoryTest {
     // ── findById ──────────────────────────────────────────────────────────────
 
     @Test
-    fun `findById returns user when id exists`() {
+    fun `findById returns user when id exists`() = runBlocking {
         val created = repository.create("student@alunos.isel.pt", UserRole.STUDENT, "hash")
 
         val result = repository.findById(created.id)
@@ -105,7 +105,7 @@ class UserRepositoryTest {
     }
 
     @Test
-    fun `findById returns null when id does not exist`() {
+    fun `findById returns null when id does not exist`() = runBlocking {
         val result = repository.findById(UUID.randomUUID())
 
         assertNull(result)
@@ -114,14 +114,14 @@ class UserRepositoryTest {
     // ── existsByEmail ─────────────────────────────────────────────────────────
 
     @Test
-    fun `existsByEmail returns true when email exists`() {
+    fun `existsByEmail returns true when email exists`() = runBlocking {
         repository.create("student@alunos.isel.pt", UserRole.STUDENT, "hash")
 
         assertTrue(repository.existsByEmail("student@alunos.isel.pt"))
     }
 
     @Test
-    fun `existsByEmail returns false when email does not exist`() {
+    fun `existsByEmail returns false when email does not exist`() = runBlocking {
         assertFalse(repository.existsByEmail("nobody@isel.pt"))
     }
 }

@@ -8,6 +8,7 @@ import com.oeims.models.SessionStatus
 import com.oeims.models.Sessions
 import com.oeims.models.UserRole
 import com.oeims.models.Users
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -29,7 +30,7 @@ class EventRepositoryTest {
     private var keepAlive: java.sql.Connection? = null
 
     @BeforeEach
-    fun setup() {
+    fun setup() = runBlocking {
         keepAlive = DriverManager.getConnection("jdbc:sqlite:file:testdb?mode=memory&cache=shared")
         Database.connect(
             url = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
@@ -42,9 +43,9 @@ class EventRepositoryTest {
         val sessionRepo     = SessionRepository()
         val participantRepo = ParticipantRepository()
 
-        val professorId = userRepo.create("prof@isel.pt",     UserRole.PROFESSOR, "hash").id
-        val student1Id  = userRepo.create("student1@alunos.isel.pt", UserRole.STUDENT, "hash").id
-        val student2Id  = userRepo.create("student2@alunos.isel.pt", UserRole.STUDENT, "hash").id
+        val professorId = userRepo.create("prof@isel.pt",            UserRole.PROFESSOR, "hash").id
+        val student1Id  = userRepo.create("student1@alunos.isel.pt", UserRole.STUDENT,   "hash").id
+        val student2Id  = userRepo.create("student2@alunos.isel.pt", UserRole.STUDENT,   "hash").id
         val examId      = examRepo.create(professorId, "Networks", null, 90).id
         sessionId       = sessionRepo.create(examId, professorId, "EVT001").id
         sessionRepo.updateStatus(sessionId, SessionStatus.ACTIVE)
@@ -65,7 +66,7 @@ class EventRepositoryTest {
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns record with correct fields`() {
+    fun `create returns record with correct fields`() = runBlocking {
         val event = eventRepository.create(participantId, "FocusMonitor", "Window lost focus", Severity.WARNING)
 
         assertEquals(participantId, event.participantId)
@@ -77,7 +78,7 @@ class EventRepositoryTest {
     }
 
     @Test
-    fun `create assigns unique ids to each event`() {
+    fun `create assigns unique ids to each event`() = runBlocking {
         val e1 = eventRepository.create(participantId, "FocusMonitor", "msg1", Severity.INFO)
         val e2 = eventRepository.create(participantId, "FocusMonitor", "msg2", Severity.INFO)
 
@@ -85,7 +86,7 @@ class EventRepositoryTest {
     }
 
     @Test
-    fun `create stores all severity levels correctly`() {
+    fun `create stores all severity levels correctly`() = runBlocking {
         val info     = eventRepository.create(participantId, "ProcessMonitor",   "proc started", Severity.INFO)
         val warning  = eventRepository.create(participantId, "FocusMonitor",     "focus lost",   Severity.WARNING)
         val critical = eventRepository.create(participantId, "ClipboardMonitor", "clipboard",    Severity.CRITICAL)
@@ -98,7 +99,7 @@ class EventRepositoryTest {
     // ── findByParticipant ─────────────────────────────────────────────────────
 
     @Test
-    fun `findByParticipant returns only events for that participant`() {
+    fun `findByParticipant returns only events for that participant`() = runBlocking {
         eventRepository.create(participantId,      "FocusMonitor", "A", Severity.INFO)
         eventRepository.create(participantId,      "FocusMonitor", "B", Severity.INFO)
         eventRepository.create(otherParticipantId, "FocusMonitor", "C", Severity.INFO)
@@ -110,14 +111,14 @@ class EventRepositoryTest {
     }
 
     @Test
-    fun `findByParticipant returns empty list when participant has no events`() {
+    fun `findByParticipant returns empty list when participant has no events`() = runBlocking {
         val results = eventRepository.findByParticipant(participantId)
 
         assertTrue(results.isEmpty())
     }
 
     @Test
-    fun `findByParticipant returns events ordered by occurredAt ascending`() {
+    fun `findByParticipant returns events ordered by occurredAt ascending`() = runBlocking {
         eventRepository.create(participantId, "FocusMonitor",     "first",  Severity.INFO)
         Thread.sleep(10) // ensure distinct timestamps
         eventRepository.create(participantId, "ClipboardMonitor", "second", Severity.WARNING)
@@ -132,7 +133,7 @@ class EventRepositoryTest {
     }
 
     @Test
-    fun `findByParticipant returns empty list for unknown participant id`() {
+    fun `findByParticipant returns empty list for unknown participant id`() = runBlocking {
         val results = eventRepository.findByParticipant(UUID.randomUUID())
 
         assertTrue(results.isEmpty())
@@ -141,7 +142,7 @@ class EventRepositoryTest {
     // ── findBySession ─────────────────────────────────────────────────────────
 
     @Test
-    fun `findBySession returns events from all participants in the session`() {
+    fun `findBySession returns events from all participants in the session`() = runBlocking {
         eventRepository.create(participantId,      "FocusMonitor", "from p1", Severity.INFO)
         eventRepository.create(otherParticipantId, "FocusMonitor", "from p2", Severity.WARNING)
 
@@ -151,14 +152,14 @@ class EventRepositoryTest {
     }
 
     @Test
-    fun `findBySession returns empty list when session has no events`() {
+    fun `findBySession returns empty list when session has no events`() = runBlocking {
         val results = eventRepository.findBySession(sessionId)
 
         assertTrue(results.isEmpty())
     }
 
     @Test
-    fun `findBySession returns events ordered by occurredAt ascending`() {
+    fun `findBySession returns events ordered by occurredAt ascending`() = runBlocking {
         eventRepository.create(participantId,      "FocusMonitor", "first",  Severity.INFO)
         Thread.sleep(10)
         eventRepository.create(otherParticipantId, "FocusMonitor", "second", Severity.WARNING)
@@ -170,15 +171,14 @@ class EventRepositoryTest {
     }
 
     @Test
-    fun `findBySession does not return events from a different session`() {
-        // Create a second session with its own participant and event
-        val userRepo2     = UserRepository()
-        val examRepo2     = ExamRepository()
-        val sessionRepo2  = SessionRepository()
-        val partRepo2     = ParticipantRepository()
+    fun `findBySession does not return events from a different session`() = runBlocking {
+        val userRepo2    = UserRepository()
+        val examRepo2    = ExamRepository()
+        val sessionRepo2 = SessionRepository()
+        val partRepo2    = ParticipantRepository()
 
-        val prof2Id    = userRepo2.create("prof2@isel.pt",     UserRole.PROFESSOR, "hash").id
-        val student3Id = userRepo2.create("student3@alunos.isel.pt", UserRole.STUDENT, "hash").id
+        val prof2Id    = userRepo2.create("prof2@isel.pt",           UserRole.PROFESSOR, "hash").id
+        val student3Id = userRepo2.create("student3@alunos.isel.pt", UserRole.STUDENT,   "hash").id
         val exam2Id    = examRepo2.create(prof2Id, "Algebra", null, 60).id
         val session2Id = sessionRepo2.create(exam2Id, prof2Id, "OTH002").id
         val part2Id    = partRepo2.create(session2Id, student3Id).id

@@ -2,6 +2,7 @@ package com.oeims.services
 
 import com.oeims.dto.EventResponse
 import com.oeims.dto.ParticipantStatusUpdate
+import com.oeims.exceptions.NotFoundException
 import com.oeims.models.ConnectionStatus
 import com.oeims.models.Severity
 import com.oeims.repositories.EventRecord
@@ -26,12 +27,12 @@ class EventServiceTest {
     private inner class FakeParticipantRepository : IParticipantRepository {
         val participants = mutableListOf<ParticipantRecord>()
 
-        override fun findById(id: UUID): ParticipantRecord? = participants.find { it.id == id }
-        override fun findBySession(sessionId: UUID): List<ParticipantRecord> =
+        override suspend fun findById(id: UUID): ParticipantRecord? = participants.find { it.id == id }
+        override suspend fun findBySession(sessionId: UUID): List<ParticipantRecord> =
             participants.filter { it.sessionId == sessionId }
-        override fun findByUserAndSession(userId: UUID, sessionId: UUID): ParticipantRecord? =
+        override suspend fun findByUserAndSession(userId: UUID, sessionId: UUID): ParticipantRecord? =
             participants.find { it.userId == userId && it.sessionId == sessionId }
-        override fun create(sessionId: UUID, userId: UUID): ParticipantRecord {
+        override suspend fun create(sessionId: UUID, userId: UUID): ParticipantRecord {
             val record = ParticipantRecord(
                 id               = UUID.randomUUID(),
                 sessionId        = sessionId,
@@ -44,22 +45,22 @@ class EventServiceTest {
             participants.add(record)
             return record
         }
-        override fun updateHeartbeat(id: UUID): Boolean = true
-        override fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean = true
-        override fun markTimedOut(threshold: Instant): List<ParticipantRecord> = emptyList()
+        override suspend fun updateHeartbeat(id: UUID): Boolean = true
+        override suspend fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean = true
+        override suspend fun markTimedOut(threshold: Instant): List<ParticipantRecord> = emptyList()
     }
 
     private inner class FakeEventRepository : IEventRepository {
         val events = mutableListOf<EventRecord>()
 
-        override fun create(participantId: UUID, monitorName: String, message: String, severity: Severity): EventRecord {
+        override suspend fun create(participantId: UUID, monitorName: String, message: String, severity: Severity): EventRecord {
             val record = EventRecord(UUID.randomUUID(), participantId, monitorName, message, severity, Instant.now())
             events.add(record)
             return record
         }
-        override fun findByParticipant(participantId: UUID): List<EventRecord> =
+        override suspend fun findByParticipant(participantId: UUID): List<EventRecord> =
             events.filter { it.participantId == participantId }
-        override fun findBySession(sessionId: UUID): List<EventRecord> =
+        override suspend fun findBySession(sessionId: UUID): List<EventRecord> =
             events // Fake: just return all; the test doesn't need session-level filtering here
     }
 
@@ -86,7 +87,7 @@ class EventServiceTest {
     private lateinit var participantId: UUID
 
     @BeforeEach
-    fun setup() {
+    fun setup() = runBlocking {
         fakeParticipants = FakeParticipantRepository()
         fakeEvents       = FakeEventRepository()
         fakeRegistry     = FakeConnectionRegistry()
@@ -136,20 +137,16 @@ class EventServiceTest {
     }
 
     @Test
-    fun `handleEvent throws NoSuchElementException when participant does not exist`() {
-        assertThrows<NoSuchElementException> {
-            runBlocking {
-                service.handleEvent(UUID.randomUUID(), "FocusMonitor", "msg", Severity.INFO)
-            }
+    fun `handleEvent throws NotFoundException when participant does not exist`() {
+        assertThrows<NotFoundException> {
+            runBlocking { service.handleEvent(UUID.randomUUID(), "FocusMonitor", "msg", Severity.INFO) }
         }
     }
 
     @Test
     fun `handleEvent does not broadcast when participant does not exist`() {
         runCatching {
-            runBlocking {
-                service.handleEvent(UUID.randomUUID(), "FocusMonitor", "msg", Severity.INFO)
-            }
+            runBlocking { service.handleEvent(UUID.randomUUID(), "FocusMonitor", "msg", Severity.INFO) }
         }
 
         assertTrue(fakeRegistry.broadcastedEvents.isEmpty())
@@ -168,7 +165,7 @@ class EventServiceTest {
     }
 
     @Test
-    fun `getSessionEvents returns empty list when no events exist`() {
+    fun `getSessionEvents returns empty list when no events exist`() = runBlocking {
         val results = service.getSessionEvents(sessionId)
 
         assertTrue(results.isEmpty())
