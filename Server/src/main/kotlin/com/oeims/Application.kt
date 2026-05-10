@@ -18,12 +18,20 @@ import com.oeims.services.SessionService
 import com.oeims.services.loadHeartbeatConfig
 import com.oeims.services.loadJwtConfig
 import com.oeims.websocket.ConnectionRegistry
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.callid.*
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.origin
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import kotlinx.serialization.json.Json
+import org.slf4j.event.Level
+import java.util.UUID
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
@@ -36,6 +44,25 @@ fun Application.module() {
             isLenient = true
             ignoreUnknownKeys = true
         })
+    }
+
+    // ── Request tracing ───────────────────────────────────────────────────────
+    install(CallId) {
+        retrieveFromHeader(HttpHeaders.XRequestId)
+        generate { UUID.randomUUID().toString() }
+    }
+
+    install(CallLogging) {
+        level = Level.INFO
+        callIdMdc("call-id")
+    }
+
+    // ── Rate limiting ─────────────────────────────────────────────────────────
+    install(RateLimit) {
+        register(RateLimitName("auth")) {
+            rateLimiter(limit = 10, refillPeriod = 1.minutes)
+            requestKey { call -> call.request.origin.remoteHost }
+        }
     }
 
     // ── WebSockets ────────────────────────────────────────────────────────────
