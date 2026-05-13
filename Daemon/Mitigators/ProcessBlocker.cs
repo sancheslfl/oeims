@@ -1,5 +1,5 @@
 using Microsoft.Win32;
-using Daemon.Abstractions;
+using Daemon.Domain;
 
 namespace Daemon.Mitigators
 {

@@ -1,4 +1,4 @@
-using Daemon.Abstractions;
+using Daemon.Domain;
 using Daemon.Monitors;
 
 namespace Daemon
