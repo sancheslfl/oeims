@@ -14,8 +14,6 @@ builder.Services.AddWindowsPlatform();
 builder.Services.AddMonitors();
 builder.Services.AddMitigators();
 
-// Server communication — reads [Server] section from appsettings.json / user secrets.
-// If BaseUrl/Token/ParticipantId are empty the daemon runs in standalone mode.
 var serverConfig = builder.Configuration
     .GetSection("Server")
     .Get<ServerConfig>() ?? new ServerConfig();

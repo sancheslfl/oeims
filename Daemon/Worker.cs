@@ -18,18 +18,15 @@ namespace Daemon
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // ── Mitigators ────────────────────────────────────────────────────────
             foreach (var mitigator in _mitigators)
             {
                 mitigator.Apply();
                 logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
             }
 
-            // ── Pre-exam network validation ───────────────────────────────────────
             var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
             await networkMonitor.StartPreExamAsync(OnLocalEvent, stoppingToken);
 
-            // ── Server communication ──────────────────────────────────────────────
             if (serverConfig.IsConfigured)
             {
                 logger.LogInformation("[ServerConnection] Connecting to {BaseUrl}", serverConfig.BaseUrl);
@@ -43,18 +40,15 @@ namespace Daemon
                     "Set Server:BaseUrl, Server:Token and Server:ParticipantId in appsettings.json.");
             }
 
-            // ── Monitors ──────────────────────────────────────────────────────────
             await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
         }
 
-        // Used during pre-exam phase — logs locally only, WS not open yet.
         private Task OnLocalEvent(MonitorEvent e)
         {
             Log(e);
             return Task.CompletedTask;
         }
 
-        // Used during exam — logs locally and forwards to the server.
         private async Task OnEvent(MonitorEvent e)
         {
             Log(e);

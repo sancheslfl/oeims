@@ -2,10 +2,6 @@ using System.Net.Http.Headers;
 
 namespace Daemon.ServerConnection;
 
-/// <summary>
-/// Periodically POSTs to /participants/{participantId}/heartbeat
-/// so the server knows the daemon is still alive.
-/// </summary>
 internal sealed class HeartbeatSender(
     ServerConfig config,
     HttpClient httpClient,
