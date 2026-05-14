@@ -7,6 +7,7 @@ import com.oeims.repositories.EventRecord
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.websocket.IConnectionRegistry
+import org.slf4j.LoggerFactory
 import java.util.UUID
 
 class EventService(
@@ -14,6 +15,7 @@ class EventService(
     private val participantRepository: IParticipantRepository,
     private val connectionRegistry: IConnectionRegistry
 ) {
+    private val log = LoggerFactory.getLogger(EventService::class.java)
 
     suspend fun handleEvent(
         participantId: UUID,
@@ -26,6 +28,8 @@ class EventService(
 
         val record = eventRepository.create(participantId, monitorName, message, severity)
         val response = record.toResponse()
+
+        log.info("[{}] [{}] {}", monitorName, severity.name, message)
 
         connectionRegistry.broadcastEventToSession(participant.sessionId, response)
 

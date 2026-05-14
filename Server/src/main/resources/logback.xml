@@ -1,0 +1,25 @@
+<configuration>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss} [%-5level] %logger{20} — %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Application logs — INFO and above -->
+    <logger name="com.oeims" level="INFO"/>
+
+    <!-- Ktor request logs — INFO and above -->
+    <logger name="Application" level="INFO"/>
+
+    <!-- Suppress Exposed SQL query spam -->
+    <logger name="Exposed" level="WARN"/>
+
+    <!-- Suppress Netty internals -->
+    <logger name="io.netty" level="WARN"/>
+
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
