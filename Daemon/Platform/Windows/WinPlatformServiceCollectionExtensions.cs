@@ -8,6 +8,7 @@ public static class WinPlatformServiceCollectionExtensions
     {
         services.AddSingleton<IProcessSource, WindowsProcessSource>();
         services.AddSingleton<IActiveWindowSource, WinActiveWindowSource>();
+        services.AddSingleton<IClipboardSource, WinClipboardSource>();
 
         return services;
     }
