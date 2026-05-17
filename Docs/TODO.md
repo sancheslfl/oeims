@@ -8,7 +8,7 @@
 - [ ] Corrigir o problema em que o serviço não interceta nem termina processos proibidos
 - [ ] Investigar que valor usar para `maxFrameSize` na configuração das WebSockets
 - [ ] Analisar o código do repositório
-- [ ] Resolver vulnerabilidades do ClipboardBlocker **(3º prioridade)**
+- [X] Resolver vulnerabilidades do ClipboardBlocker **(3º prioridade)**
 - [ ] Evitar o logging repetido e excessivo especialmente no NetworkMonitor e ProcessMonitor **(3º prioridade)**
 - [ ] Começar a trabalhar na consola do professor **(2º prioridade)**
 - [ ] Implementar o proprio logger dedicado à comunicação WebSockets **(1º prioridade)**
