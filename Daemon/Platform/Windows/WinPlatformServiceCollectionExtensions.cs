@@ -1,4 +1,4 @@
-﻿using Daemon.Domain;
+﻿using Daemon.Domain.Platform;
 
 namespace Daemon.Platform.Windows;
 

@@ -1,4 +1,5 @@
 using Daemon.Domain;
+using Daemon.Domain.Platform;
 
 namespace Daemon.Mitigators;
 

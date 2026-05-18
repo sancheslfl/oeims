@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using System.Management;
-using Daemon.Domain;
+using Daemon.Domain.Platform;
 
 namespace Daemon.Platform.Windows;
 

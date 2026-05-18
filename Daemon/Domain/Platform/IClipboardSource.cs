@@ -1,4 +1,4 @@
-namespace Daemon.Domain;
+namespace Daemon.Domain.Platform;
 
 internal interface IClipboardSource : IDisposable
 {
