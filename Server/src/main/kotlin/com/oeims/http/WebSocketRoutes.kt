@@ -1,8 +1,9 @@
-package com.oeims.routes
+package com.oeims.http
 
-import com.oeims.dto.DaemonEventMessage
-import com.oeims.dto.toDomainSeverity
+import com.oeims.models.dto.DaemonEventMessage
+import com.oeims.models.dto.toDomainSeverity
 import com.oeims.models.ConnectionStatus
+import com.oeims.models.ids.toParticipantId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.services.EventService
 import com.oeims.websocket.IConnectionRegistry
@@ -42,23 +43,29 @@ fun Route.webSocketRoutes(
                         try {
                             val msg      = Json.decodeFromString<DaemonEventMessage>(frame.readText())
                             val severity = msg.severity.toDomainSeverity()
+
                             if (severity == null) {
-                                application.log.warn("Daemon sent unknown severity '${msg.severity}' for participant $participantId — frame dropped")
+                                application.log.warn("Service sent unknown severity '${msg.severity}' for participant $participantId — frame dropped")
                             } else {
                                 eventService.handleEvent(
-                                    participantId = participant.id,
+                                    participantId = participant.id.toParticipantId(),
                                     monitorName   = msg.monitorName,
                                     message       = msg.message,
                                     severity      = severity
                                 )
                             }
                         } catch (e: SerializationException) {
-                            application.log.debug("Daemon sent malformed frame for $participantId — ignored: ${e.message}")
+                            // Malformed frame so ignore and keep connection alive
+                            application.log.debug(
+                                "Daemon sent malformed frame for {} - ignored: {}",
+                                participantId,
+                                e.message
+                            )
                         }
                     }
                 }
-            } catch (e: ClosedReceiveChannelException) {
-                application.log.debug("Daemon disconnected: $participantId — ${closeReason.await()}")
+            } catch (_: ClosedReceiveChannelException) {
+                application.log.debug("Daemon disconnected: {} — {}", participantId, closeReason.await())
             } catch (e: Throwable) {
                 application.log.warn("Daemon WebSocket error for $participantId", e)
             } finally {
@@ -78,7 +85,7 @@ fun Route.webSocketRoutes(
             }
 
             runCatching {
-                for (frame in incoming) { /* server → client only; ignore any client frames */ }
+                for (frame in incoming) { /* server -> client only; ignore any client frames */ }
             }.onFailure { e ->
                 when (e) {
                     is CancellationException -> throw e

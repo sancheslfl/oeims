@@ -2,7 +2,7 @@ package com.oeims.plugins
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import com.oeims.dto.ErrorResponse
+import com.oeims.models.dto.ErrorResponse
 import com.oeims.services.JwtConfig
 import io.ktor.http.*
 import io.ktor.server.application.*

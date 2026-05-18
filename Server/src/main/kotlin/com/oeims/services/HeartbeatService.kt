@@ -1,12 +1,13 @@
 package com.oeims.services
 
-import com.oeims.dto.ParticipantStatusUpdate
+import com.oeims.models.dto.ParticipantStatusUpdate
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.websocket.IConnectionRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
+import kotlin.time.Duration.Companion.milliseconds
 
 class HeartbeatService(
     private val participantRepository: IParticipantRepository,
@@ -17,7 +18,7 @@ class HeartbeatService(
     fun start(scope: CoroutineScope) {
         scope.launch {
             while (true) {
-                delay(config.intervalMs)
+                delay(config.intervalMs.milliseconds)
                 checkHeartbeats()
             }
         }

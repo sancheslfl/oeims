@@ -9,7 +9,7 @@ import com.oeims.repositories.ExamRepository
 import com.oeims.repositories.ParticipantRepository
 import com.oeims.repositories.SessionRepository
 import com.oeims.repositories.UserRepository
-import com.oeims.routes.webSocketRoutes
+import com.oeims.http.webSocketRoutes
 import com.oeims.services.AuthService
 import com.oeims.services.EventService
 import com.oeims.services.ExamService

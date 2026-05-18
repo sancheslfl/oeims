@@ -1,14 +1,15 @@
 package com.oeims.services
 
-import com.oeims.dto.EventResponse
+import com.oeims.models.dto.EventResponse
 import com.oeims.exceptions.NotFoundException
+import com.oeims.models.ids.ParticipantId
+import com.oeims.models.ids.SessionId
 import com.oeims.models.Severity
 import com.oeims.repositories.EventRecord
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.websocket.IConnectionRegistry
 import org.slf4j.LoggerFactory
-import java.util.UUID
 
 class EventService(
     private val eventRepository: IEventRepository,
@@ -18,15 +19,15 @@ class EventService(
     private val log = LoggerFactory.getLogger(EventService::class.java)
 
     suspend fun handleEvent(
-        participantId: UUID,
+        participantId: ParticipantId,
         monitorName: String,
         message: String,
         severity: Severity
     ): EventResponse {
-        val participant = participantRepository.findById(participantId)
+        val participant = participantRepository.findById(participantId.value)
             ?: throw NotFoundException("Participant not found")
 
-        val record = eventRepository.create(participantId, monitorName, message, severity)
+        val record = eventRepository.create(participantId.value, monitorName, message, severity)
         val response = record.toResponse()
 
         log.info("[{}] [{}] {}", monitorName, severity.name, message)
@@ -36,8 +37,8 @@ class EventService(
         return response
     }
 
-    suspend fun getSessionEvents(sessionId: UUID): List<EventResponse> =
-        eventRepository.findBySession(sessionId).map { it.toResponse() }
+    suspend fun getSessionEvents(sessionId: SessionId): List<EventResponse> =
+        eventRepository.findBySession(sessionId.value).map { it.toResponse() }
 
     private fun EventRecord.toResponse() = EventResponse(
         id            = id.toString(),
