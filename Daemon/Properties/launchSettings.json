@@ -1,12 +1,18 @@
-﻿{
-  "$schema": "https://json.schemastore.org/launchsettings.json",
+{
   "profiles": {
-    "Daemon": {
+    "Production": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Production"
+      }
+    },
+    "Development": {
+      "commandName": "Project",
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
-      }
+      },
+      "dotnetRunMessages": true
     }
-  }
+  },
+  "$schema": "https://json.schemastore.org/launchsettings.json"
 }

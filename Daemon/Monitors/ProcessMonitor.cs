@@ -20,19 +20,25 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
 
     public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
     {
-        var monitoringTask = processSource.StartAsync(
-            process => KillIfForbiddenProcessAsync(process, onEvent, ct),
-            ct);
-
-        await KillForbiddenProcessesAsync(onEvent, ct);
-
         try
         {
+            var monitoringTask = processSource.StartAsync(
+                process => KillIfForbiddenProcessAsync(process, onEvent, ct),
+                ct);
+
+            await KillForbiddenProcessesAsync(onEvent, ct);
+
             await monitoringTask;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            
+            // ignore since normal shutdown.
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                "The process monitor failed to start or stopped unexpectedly.",
+                ex);
         }
     }
 

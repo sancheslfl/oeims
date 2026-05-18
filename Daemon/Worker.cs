@@ -27,16 +27,21 @@ namespace Daemon
             var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
             await networkMonitor.StartPreExamAsync(OnLocalEvent, stoppingToken);
 
-            if (serverConfig.IsConfigured)
+            if (serverConfig.ShouldConnect)
             {
                 logger.LogInformation("[ServerConnection] Connecting to {BaseUrl}", serverConfig.BaseUrl);
                 _ = wsClient.RunAsync(stoppingToken);
                 _ = heartbeatSender.RunAsync(stoppingToken);
             }
+            else if (!serverConfig.Enabled)
+            {
+                logger.LogWarning(
+                    "[ServerConnection] Disabled by configuration — running without server connection.");
+            }
             else
             {
                 logger.LogWarning(
-                    "[ServerConnection] No server config found — running in standalone mode. " +
+                    "[ServerConnection] No server config found — running without server connection. " +
                     "Set Server:BaseUrl, Server:Token and Server:ParticipantId in appsettings.json.");
             }
 
@@ -53,7 +58,7 @@ namespace Daemon
         {
             Log(e);
 
-            if (serverConfig.IsConfigured)
+            if (serverConfig.ShouldConnect)
                 await wsClient.SendEventAsync(e, CancellationToken.None);
         }
 
