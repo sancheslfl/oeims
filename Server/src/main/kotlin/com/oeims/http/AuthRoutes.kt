@@ -15,16 +15,17 @@ fun Route.authRoutes(authService: AuthService) {
     route("/auth") {
         rateLimit(RateLimitName("auth")) {
 
-        post("/register") {
-            val req = call.receive<RegisterRequest>()
-            val response = authService.register(req.email.toEmail(), req.password.toPassword(), req.role)
-            call.respond(HttpStatusCode.Created, response)
-        }
+            post("/register") {
+                val req = call.receive<RegisterRequest>()
+                val response = authService.register(req.email.toEmail(), req.password.toPassword(), req.role)
+                call.respond(HttpStatusCode.Created, response)
+            }
 
-        post("/login") {
-            val req = call.receive<LoginRequest>()
-            val response = authService.login(req.email.toEmail(), req.password.toPassword())
-            call.respond(HttpStatusCode.OK, response)
+            post("/login") {
+                val req = call.receive<LoginRequest>()
+                val response = authService.login(req.email.toEmail(), req.password.toPassword())
+                call.respond(HttpStatusCode.OK, response)
+            }
         }
     }
 }
