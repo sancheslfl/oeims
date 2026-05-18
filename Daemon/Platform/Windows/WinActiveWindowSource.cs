@@ -1,4 +1,6 @@
-﻿using Daemon.Domain.Platform;
+﻿using System.Diagnostics;
+using System.Text;
+using Daemon.Domain.Platform;
 using Daemon.Platform.Windows.Native;
 
 namespace Daemon.Platform.Windows;
@@ -9,7 +11,7 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
     private IntPtr _nameChangeHook = IntPtr.Zero;
 
     private IntPtr _foregroundHwnd = IntPtr.Zero;
-    private string _lastTitle = string.Empty;
+    private string _lastName = string.Empty;
 
     private User32.WinEventDelegate? _foregroundCallback;
     private User32.WinEventDelegate? _nameChangeCallback;
@@ -48,7 +50,7 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
 
     private void RegisterHooks(Func<ActiveWindowInfo, Task> onChanged)
     {
-        _foregroundCallback = (_, _, hwnd, idObject, _, _, _) =>
+        _foregroundCallback = (_, _, hwnd, _, _, _, _) =>
         {
             if (hwnd == IntPtr.Zero)
                 return;
@@ -95,21 +97,71 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
 
     private void NotifyIfChanged(IntPtr hwnd, Func<ActiveWindowInfo, Task> onChanged)
     {
-        var title = User32.GetWindowTitle(hwnd);
+        var name = GetWindowName(hwnd);
 
-        if (title == _lastTitle)
+        if (string.IsNullOrWhiteSpace(name))
+            name = "<unknown>";
+
+        if (name == _lastName)
             return;
 
-        _lastTitle = title;
+        _lastName = name;
 
-        _ = NotifyAsync(title, onChanged);
+        _ = NotifyAsync(name, onChanged);
     }
 
-    private static async Task NotifyAsync(string title, Func<ActiveWindowInfo, Task> onChanged)
+    private static string GetWindowName(IntPtr hwnd)
+    {
+        var title = GetWindowTitle(hwnd);
+
+        if (!string.IsNullOrWhiteSpace(title))
+            return title;
+
+        return GetProcessName(hwnd);
+    }
+
+    private static string GetWindowTitle(IntPtr hwnd)
+    {
+        var length = User32.GetWindowTextLength(hwnd);
+
+        if (length <= 0)
+            return string.Empty;
+
+        var builder = new StringBuilder(length + 1);
+
+        var copied = User32.GetWindowText(
+            hwnd,
+            builder,
+            builder.Capacity);
+
+        return copied <= 0
+            ? string.Empty
+            : builder.ToString();
+    }
+
+    private static string GetProcessName(IntPtr hwnd)
+    {
+        User32.GetWindowThreadProcessId(hwnd, out var processId);
+
+        if (processId == 0)
+            return string.Empty;
+
+        try
+        {
+            using var process = Process.GetProcessById((int)processId);
+            return process.ProcessName;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static async Task NotifyAsync(string name, Func<ActiveWindowInfo, Task> onChanged)
     {
         try
         {
-            await onChanged(new ActiveWindowInfo(title));
+            await onChanged(new ActiveWindowInfo(name));
         }
         catch
         {

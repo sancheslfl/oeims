@@ -37,9 +37,9 @@ internal sealed class HeartbeatSender(
             using var response = await httpClient.SendAsync(request, ct);
 
             if (response.IsSuccessStatusCode)
-                logger.LogDebug("[Heartbeat] ✓ {StatusCode}", (int)response.StatusCode);
+                logger.LogDebug("[Heartbeat] {StatusCode}", (int)response.StatusCode);
             else
-                logger.LogWarning("[Heartbeat] ✗ Unexpected status {StatusCode}", (int)response.StatusCode);
+                logger.LogWarning("[Heartbeat] Unexpected status {StatusCode}", (int)response.StatusCode);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)

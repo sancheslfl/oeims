@@ -28,13 +28,13 @@ internal static class User32
     internal static extern bool UnhookWinEvent(IntPtr hWinEventHook);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetWindowText(
+    internal static extern int GetWindowText(
         IntPtr hWnd,
         StringBuilder text,
         int count);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetWindowTextLength(IntPtr hWnd);
+    internal static extern int GetWindowTextLength(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     internal static extern bool PeekMessage(
@@ -50,20 +50,8 @@ internal static class User32
     [DllImport("user32.dll")]
     internal static extern IntPtr DispatchMessage(ref MSG lpMsg);
 
-    internal static string GetWindowTitle(IntPtr hwnd)
-    {
-        if (hwnd == IntPtr.Zero)
-            return string.Empty;
-
-        var length = GetWindowTextLength(hwnd);
-
-        if (length <= 0)
-            return string.Empty;
-
-        var builder = new StringBuilder(length + 1);
-
-        GetWindowText(hwnd, builder, builder.Capacity);
-
-        return builder.ToString();
-    }
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern uint GetWindowThreadProcessId(
+        IntPtr hWnd,
+        out uint lpdwProcessId);
 }
