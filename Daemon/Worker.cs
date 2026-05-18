@@ -1,106 +1,96 @@
+using Daemon.Domain;
 using Daemon.Monitors;
+using Daemon.ServerConnection;
 
 namespace Daemon
 {
-    public class Worker(ILogger<Worker> logger) : BackgroundService
+    internal class Worker(
+        IEnumerable<IMonitor> monitors,
+        IEnumerable<IMitigator> mitigators,
+        ServerConfig serverConfig,
+        DaemonWebSocketClient wsClient,
+        HeartbeatSender heartbeatSender,
+        ILogger<Worker> logger
+        ) : BackgroundService
     {
-        private readonly FocusMonitor _focusMonitor = new FocusMonitor();
-        private readonly NetworkMonitor _networkMonitor = new NetworkMonitor();
-
-        private readonly TaskCompletionSource _tcs = new TaskCompletionSource();
+        private readonly IReadOnlyList<IMonitor> _monitors = monitors.ToList();
+        private readonly IReadOnlyList<IMitigator> _mitigators = mitigators.ToList();
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var clipboardMonitor = new ClipboardMonitor();
-            clipboardMonitor.BlockClipboard();
-
-            _networkMonitor.Start();
-
-            try
+            foreach (var mitigator in _mitigators)
             {
-                await WaitForValidNetwork(stoppingToken);
-
-                _networkMonitor.InitializeBaseline();
-                SubscribeEvents();
-
-                await WaitForShutdown(stoppingToken);
+                mitigator.Apply();
+                logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
             }
-            finally
+
+            var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
+            await networkMonitor.StartPreExamAsync(OnLocalEvent, stoppingToken);
+
+            if (serverConfig.IsConfigured)
             {
-                UnsubscribeEvents();
-                _networkMonitor.Stop();
+                logger.LogInformation("[ServerConnection] Connecting to {BaseUrl}", serverConfig.BaseUrl);
+                _ = wsClient.RunAsync(stoppingToken);
+                _ = heartbeatSender.RunAsync(stoppingToken);
             }
+            else
+            {
+                logger.LogWarning(
+                    "[ServerConnection] No server config found — running in standalone mode. " +
+                    "Set Server:BaseUrl, Server:Token and Server:ParticipantId in appsettings.json.");
+            }
+
+            await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
         }
 
-        private async Task WaitForValidNetwork(CancellationToken stoppingToken)
+        private Task OnLocalEvent(MonitorEvent e)
         {
-            if (_networkMonitor.IsValidNetworkState())
-            {
-                logger.LogInformation("Valid network state. Proceeding...");
-                return;
-            }
-
-            logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
-
-            _networkMonitor.NetworkChanged += OnNetworkChange;
-
-            try
-            {
-                await _tcs.Task.WaitAsync(stoppingToken);
-            }
-            finally
-            {
-                _networkMonitor.NetworkChanged -= OnNetworkChange;
-            }
+            Log(e);
+            return Task.CompletedTask;
         }
 
-        private void OnNetworkViolationDetected(NetworkEvent eventType)
+        private async Task OnEvent(MonitorEvent e)
         {
-            switch (eventType)
+            Log(e);
+
+            if (serverConfig.IsConfigured)
+                await wsClient.SendEventAsync(e, CancellationToken.None);
+        }
+
+        private void Log(MonitorEvent e)
+        {
+            switch (e.Severity)
             {
-                case NetworkEvent.NetworkChanged:
-                    logger.LogWarning("Network change detected!");
+                case Severity.Info:
+                    logger.LogInformation("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
-
-                case NetworkEvent.MultipleInterfacesDetected:
-                    logger.LogWarning("Suspicious interfaces detected!");
+                case Severity.Warning:
+                    logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
-
-                case NetworkEvent.MultipleActiveNetworksDetected:
-                    logger.LogWarning("Multiple active networks detected!");
+                case Severity.Critical:
+                    logger.LogCritical("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
-
-                case NetworkEvent.NoActiveNetworkDetected:
-                    logger.LogWarning("No active network detected!");
+                default:
+                    logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
             }
         }
 
-        private void OnNetworkChange()
+        public override async Task StopAsync(CancellationToken cancellationToken)
         {
-            if (!_networkMonitor.IsValidNetworkState())
-            {
-                logger.LogWarning("Invalid network state. Guarantee only one physical network connected. Waiting...");
-                return;
-            }
-
-            logger.LogInformation("Valid network state. Proceeding...");
-            _tcs.TrySetResult();
+            await base.StopAsync(cancellationToken);
+            await wsClient.DisposeAsync();
         }
 
-        private static async Task WaitForShutdown(CancellationToken stoppingToken)
+        public override void Dispose()
         {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-        }
+            foreach (var mitigator in _mitigators)
+                mitigator.Dispose();
 
-        private void SubscribeEvents()
-        {
-            _networkMonitor.NetworkViolationDetected += OnNetworkViolationDetected;
-        }
+            foreach (var monitor in _monitors)
+                monitor.Dispose();
 
-        private void UnsubscribeEvents()
-        {
-            _networkMonitor.NetworkViolationDetected -= OnNetworkViolationDetected;
+            base.Dispose();
         }
     }
 }

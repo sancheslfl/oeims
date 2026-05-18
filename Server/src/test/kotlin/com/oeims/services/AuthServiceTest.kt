@@ -1,9 +1,13 @@
 package com.oeims.services
 
 import com.auth0.jwt.JWT
+import com.oeims.exceptions.ConflictException
+import com.oeims.exceptions.UnauthorizedException
+import com.oeims.exceptions.ValidationException
 import com.oeims.models.UserRole
 import com.oeims.repositories.UserRecord
 import com.oeims.repositories.interfaces.IUserRepository
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -19,16 +23,16 @@ class AuthServiceTest {
     private inner class FakeUserRepository : IUserRepository {
         val users = mutableListOf<UserRecord>()
 
-        override fun findById(id: UUID): UserRecord? =
+        override suspend fun findById(id: UUID): UserRecord? =
             users.find { it.id == id }
 
-        override fun findByEmail(email: String): UserRecord? =
+        override suspend fun findByEmail(email: String): UserRecord? =
             users.find { it.email == email }
 
-        override fun existsByEmail(email: String): Boolean =
+        override suspend fun existsByEmail(email: String): Boolean =
             users.any { it.email == email }
 
-        override fun create(email: String, role: UserRole, passwordHash: String): UserRecord {
+        override suspend fun create(email: String, role: UserRole, passwordHash: String): UserRecord {
             val record = UserRecord(UUID.randomUUID(), email, role, passwordHash, Instant.now())
             users.add(record)
             return record
@@ -57,7 +61,7 @@ class AuthServiceTest {
     // ── register ──────────────────────────────────────────────────────────────
 
     @Test
-    fun `register returns response with correct email and role`() {
+    fun `register returns response with correct email and role`() = runBlocking {
         val response = service.register("student@alunos.isel.pt", "password123", "STUDENT")
 
         assertEquals("student@alunos.isel.pt", response.email)
@@ -67,40 +71,54 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `register persists the user so a subsequent login works`() {
-        service.register("prof@isel.pt", "pass", "PROFESSOR")
+    fun `register persists the user so a subsequent login works`() = runBlocking {
+        service.register("prof@isel.pt", "password123", "PROFESSOR")
 
-        val response = service.login("prof@isel.pt", "pass")
+        val response = service.login("prof@isel.pt", "password123")
 
         assertEquals("prof@isel.pt", response.email)
     }
 
     @Test
-    fun `register throws IllegalStateException when email already exists`() {
-        service.register("student@alunos.isel.pt", "pass1", "STUDENT")
+    fun `register throws ConflictException when email already exists`() = runBlocking<Unit> {
+        service.register("student@alunos.isel.pt", "password1", "STUDENT")
 
-        assertThrows<IllegalStateException> {
-            service.register("student@alunos.isel.pt", "pass2", "STUDENT")
+        assertThrows<ConflictException> {
+            runBlocking { service.register("student@alunos.isel.pt", "password2", "STUDENT") }
         }
     }
 
     @Test
-    fun `register throws IllegalArgumentException for an unknown role`() {
-        assertThrows<IllegalArgumentException> {
-            service.register("student@alunos.isel.pt", "pass", "ADMIN")
+    fun `register throws ValidationException for an unknown role`() {
+        assertThrows<ValidationException> {
+            runBlocking { service.register("student@alunos.isel.pt", "password1", "ADMIN") }
         }
     }
 
     @Test
-    fun `register accepts role in any case`() {
-        val response = service.register("student@alunos.isel.pt", "pass", "student")
+    fun `register throws ValidationException for invalid email format`() {
+        assertThrows<ValidationException> {
+            runBlocking { service.register("not-an-email", "password123", "STUDENT") }
+        }
+    }
+
+    @Test
+    fun `register throws ValidationException for password shorter than 8 characters`() {
+        assertThrows<ValidationException> {
+            runBlocking { service.register("student@alunos.isel.pt", "short", "STUDENT") }
+        }
+    }
+
+    @Test
+    fun `register accepts role in any case`() = runBlocking {
+        val response = service.register("student@alunos.isel.pt", "password1", "student")
 
         assertEquals("STUDENT", response.role)
     }
 
     @Test
-    fun `register issues a JWT with correct userId and role claims`() {
-        val response = service.register("prof@isel.pt", "pass", "PROFESSOR")
+    fun `register issues a JWT with correct userId and role claims`() = runBlocking {
+        val response = service.register("prof@isel.pt", "password123", "PROFESSOR")
 
         val decoded = JWT.decode(response.token)
         assertEquals(response.userId, decoded.getClaim("userId").asString())
@@ -110,10 +128,10 @@ class AuthServiceTest {
     // ── login ─────────────────────────────────────────────────────────────────
 
     @Test
-    fun `login returns response with correct email and role`() {
-        service.register("prof@isel.pt", "securepass", "PROFESSOR")
+    fun `login returns response with correct email and role`() = runBlocking {
+        service.register("prof@isel.pt", "securepass1", "PROFESSOR")
 
-        val response = service.login("prof@isel.pt", "securepass")
+        val response = service.login("prof@isel.pt", "securepass1")
 
         assertEquals("prof@isel.pt", response.email)
         assertEquals("PROFESSOR", response.role)
@@ -121,10 +139,10 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `login issues a JWT with correct claims`() {
-        service.register("student@alunos.isel.pt", "pass", "STUDENT")
+    fun `login issues a JWT with correct claims`() = runBlocking {
+        service.register("student@alunos.isel.pt", "password1", "STUDENT")
 
-        val response = service.login("student@alunos.isel.pt", "pass")
+        val response = service.login("student@alunos.isel.pt", "password1")
         val decoded  = JWT.decode(response.token)
 
         assertEquals(response.userId, decoded.getClaim("userId").asString())
@@ -132,27 +150,27 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `login throws IllegalArgumentException when email does not exist`() {
-        assertThrows<IllegalArgumentException> {
-            service.login("nobody@isel.pt", "pass")
+    fun `login throws UnauthorizedException when email does not exist`() {
+        assertThrows<UnauthorizedException> {
+            runBlocking { service.login("nobody@isel.pt", "password1") }
         }
     }
 
     @Test
-    fun `login throws IllegalArgumentException when password is wrong`() {
-        service.register("student@alunos.isel.pt", "correct", "STUDENT")
+    fun `login throws UnauthorizedException when password is wrong`() = runBlocking<Unit> {
+        service.register("student@alunos.isel.pt", "correct12", "STUDENT")
 
-        assertThrows<IllegalArgumentException> {
-            service.login("student@alunos.isel.pt", "wrong")
+        assertThrows<UnauthorizedException> {
+            runBlocking { service.login("student@alunos.isel.pt", "wrongpass1") }
         }
     }
 
     @Test
-    fun `login returns the same error message for wrong email and wrong password`() {
-        service.register("student@alunos.isel.pt", "correct", "STUDENT")
+    fun `login returns the same error message for wrong email and wrong password`() = runBlocking<Unit> {
+        service.register("student@alunos.isel.pt", "correct12", "STUDENT")
 
-        val wrongEmail    = assertThrows<IllegalArgumentException> { service.login("nobody@isel.pt", "anything") }
-        val wrongPassword = assertThrows<IllegalArgumentException> { service.login("student@alunos.isel.pt", "wrong") }
+        val wrongEmail    = assertThrows<UnauthorizedException> { runBlocking { service.login("nobody@isel.pt", "anything1") } }
+        val wrongPassword = assertThrows<UnauthorizedException> { runBlocking { service.login("student@alunos.isel.pt", "wrongpass1") } }
 
         assertEquals(wrongEmail.message, wrongPassword.message)
     }

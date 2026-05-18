@@ -1,31 +1,38 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
+﻿using Daemon.Domain;
 
-namespace Daemon.Monitors
+namespace Daemon.Monitors;
+
+internal sealed class FocusMonitor(IActiveWindowSource activeWindowSource) : IMonitor
 {
-    internal class FocusMonitor
+    public string Name => nameof(FocusMonitor);
+
+    private const string ExamWindowTitle = "OEIMS Exam";
+
+    private string _lastTitle = string.Empty;
+
+    public Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
     {
-        private const string ExamWindowTitle = "OEIMS Exam";
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
-
-        internal string GetForegroundWindowTitle()
+        return activeWindowSource.StartAsync(async activeWindow =>
         {
-            IntPtr handle = GetForegroundWindow();
-            StringBuilder title = new StringBuilder(256);
-            GetWindowText(handle, title, 256);
-            return title.ToString();
-        }
+            var title = activeWindow.Title;
 
-        internal bool IsExamWindowFocused()
-        {
-            return GetForegroundWindowTitle().Contains(ExamWindowTitle);
-        }
+            if (title == _lastTitle)
+                return;
+
+            _lastTitle = title;
+
+            if (!title.Contains(ExamWindowTitle, StringComparison.Ordinal))
+            {
+                await onEvent(new MonitorEvent(
+                    Name,
+                    $"Focus lost: {title}",
+                    Severity.Warning));
+            }
+        }, ct);
+    }
+
+    public void Dispose()
+    {
+        activeWindowSource.Dispose();
     }
 }

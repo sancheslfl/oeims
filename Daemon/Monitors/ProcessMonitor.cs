@@ -1,61 +1,145 @@
-using System.Diagnostics;
-using System.Management;
+using Daemon.Domain;
 
-namespace Daemon.Monitors
+namespace Daemon.Monitors;
+
+internal enum ProcessEvent
 {
-    internal class ProcessMonitor : IDisposable
+    ForbiddenProcessKilled,
+    ForbiddenProcessKillFailed
+}
+
+internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
+{
+    public string Name => nameof(ProcessMonitor);
+
+    private readonly HashSet<string> _forbiddenProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
-        private readonly ManagementEventWatcher? _watcher;
-        private readonly string[] _forbiddenProcesses =
-        [
-            "slack"
-        ];
+        "slack"
+    };
 
-        internal ProcessMonitor()
+    public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
+    {
+        var monitoringTask = processSource.StartAsync(
+            process => KillIfForbiddenProcessAsync(process, onEvent, ct),
+            ct);
+
+        await KillForbiddenProcessesAsync(onEvent, ct);
+
+        try
         {
-            _watcher = new ManagementEventWatcher(
-            new WqlEventQuery("SELECT * FROM Win32_ProcessStartTrace"));
-            _watcher.EventArrived += OnProcessStarted;
+            await monitoringTask;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            
+        }
+    }
+
+    private async Task KillIfForbiddenProcessAsync(
+        ProcessInfo process,
+        Func<MonitorEvent, Task> onEvent,
+        CancellationToken ct)
+    {
+        var processName = NormalizeProcessName(process.Name);
+
+        if (string.IsNullOrWhiteSpace(processName))
+            return;
+
+        if (!_forbiddenProcesses.Contains(processName))
+            return;
+
+        await KillProcessByNameAsync(processName, onEvent, ct);
+    }
+
+    private async Task KillForbiddenProcessesAsync(
+        Func<MonitorEvent, Task> onEvent,
+        CancellationToken ct)
+    {
+        foreach (var forbiddenProcess in _forbiddenProcesses)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            await KillProcessByNameAsync(forbiddenProcess, onEvent, ct);
+        }
+    }
+
+    private async Task KillProcessByNameAsync(
+        string processName,
+        Func<MonitorEvent, Task> onEvent,
+        CancellationToken ct)
+    {
+        IReadOnlyList<ProcessKillResult> results;
+
+        try
+        {
+            results = await processSource.KillByNameAsync(processName, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await onEvent(CreateMonitorEvent(
+                ProcessEvent.ForbiddenProcessKillFailed,
+                processName,
+                ex.Message));
+
+            return;
         }
 
-        internal void StartWatching()
+        foreach (var result in results)
         {
-            _watcher.Start();
-        }
+            var eventType = result.Succeeded
+                ? ProcessEvent.ForbiddenProcessKilled
+                : ProcessEvent.ForbiddenProcessKillFailed;
 
-        // Without filtering this can kill all processes that run after the daemon has started (FALAR COM O PROF)
-        private void OnProcessStarted(object sender, EventArrivedEventArgs e)
+            await onEvent(CreateMonitorEvent(
+                eventType,
+                result.ProcessName,
+                result.ErrorMessage));
+        }
+    }
+
+    private MonitorEvent CreateMonitorEvent(
+        ProcessEvent eventType,
+        string processName,
+        string? errorMessage = null)
+    {
+        return eventType switch
         {
-            var processName = e.NewEvent["ProcessName"]?.ToString()?.Replace(".exe", "").ToLower();
+            ProcessEvent.ForbiddenProcessKilled =>
+                new MonitorEvent(
+                    Name,
+                    $"Forbidden process killed: {processName}",
+                    Severity.Warning),
 
-            if (processName != null && _forbiddenProcesses.Contains(processName))
-            {
-                var processes = Process.GetProcessesByName(processName);
-                foreach (var process in processes)
-                {
-                    process.Kill();
-                }
-            }
-        }
+            ProcessEvent.ForbiddenProcessKillFailed =>
+                new MonitorEvent(
+                    Name,
+                    string.IsNullOrWhiteSpace(errorMessage)
+                        ? $"Failed to kill forbidden process: {processName}"
+                        : $"Failed to kill forbidden process: {processName} ({errorMessage})",
+                    Severity.Warning),
 
-        internal IEnumerable<string> KillForbiddenProcesses()
-        {
-            var killed = new List<string>();
-            foreach (var process in Process.GetProcesses())
-            {
-                if (_forbiddenProcesses.Contains(process.ProcessName.ToLower()))
-                {
-                    killed.Add(process.ProcessName);
-                    process.Kill();
-                }
-            }
-            return killed;
-        }
+            _ =>
+                new MonitorEvent(
+                    Name,
+                    $"Unhandled process event: {eventType} ({processName})",
+                    Severity.Warning)
+        };
+    }
 
-        public void Dispose()
-        {
-            _watcher?.Stop();
-            _watcher?.Dispose();
-        }
+    private static string NormalizeProcessName(string processName)
+    {
+        return Path
+            .GetFileNameWithoutExtension(processName)
+            .Trim()
+            .ToLowerInvariant();
+    }
+
+    public void Dispose()
+    {
+        processSource.Dispose();
     }
 }

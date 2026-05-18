@@ -6,12 +6,14 @@ import com.oeims.models.toEmail
 import com.oeims.models.toPassword
 import com.oeims.services.AuthService
 import io.ktor.http.*
+import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
 fun Route.authRoutes(authService: AuthService) {
     route("/auth") {
+        rateLimit(RateLimitName("auth")) {
 
         post("/register") {
             val req = call.receive<RegisterRequest>()

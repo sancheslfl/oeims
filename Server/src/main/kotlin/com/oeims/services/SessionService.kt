@@ -21,6 +21,7 @@ import com.oeims.repositories.interfaces.IExamRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.repositories.interfaces.IUserRepository
+import java.time.Instant
 
 class SessionService(
     private val sessionRepository: ISessionRepository,
@@ -49,29 +50,22 @@ class SessionService(
         if (session.status != SessionStatus.PENDING)
             throw ConflictException("Only a pending session can be started")
 
-        sessionRepository.updateStatus(sessionId.value, SessionStatus.ACTIVE)
-        val updatedSession = sessionRepository.findById(sessionId.value)
-            ?: throw NotFoundException("Session not found")
-
-        return updatedSession.toResponse()
+        sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE)
+        return session.copy(status = SessionStatus.ACTIVE, startedAt = Instant.now()).toResponse()
     }
 
     suspend fun endSession(sessionId: SessionId, professorId: ProfessorId): SessionResponse {
-        val session = sessionRepository.findById(sessionId.value)
+        val session = sessionRepository.findById(sessionId)
             ?: throw NotFoundException("Session not found")
 
-        if (session.supervisorId != professorId.value)
+        if (session.supervisorId != professorId)
             throw ForbiddenException("Only the session supervisor can end it")
 
         if (session.status != SessionStatus.ACTIVE)
             throw ConflictException("Only an active session can be ended")
 
-        sessionRepository.updateStatus(sessionId.value, SessionStatus.ENDED)
-
-        val updatedSession = sessionRepository.findById(sessionId.value)
-            ?: throw NotFoundException("Session not found after update")
-
-        return updatedSession.toResponse()
+        sessionRepository.updateStatus(sessionId, SessionStatus.ENDED)
+        return session.copy(status = SessionStatus.ENDED, endedAt = Instant.now()).toResponse()
     }
 
     suspend fun joinSession(code: SessionCode, studentId: StudentId): JoinSessionResponse {

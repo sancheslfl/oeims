@@ -9,12 +9,14 @@ import com.oeims.repositories.EventRecord
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.websocket.IConnectionRegistry
+import org.slf4j.LoggerFactory
 
 class EventService(
     private val eventRepository: IEventRepository,
     private val participantRepository: IParticipantRepository,
     private val connectionRegistry: IConnectionRegistry
 ) {
+    private val log = LoggerFactory.getLogger(EventService::class.java)
 
     suspend fun handleEvent(
         participantId: ParticipantId,
@@ -27,6 +29,8 @@ class EventService(
 
         val record = eventRepository.create(participantId.value, monitorName, message, severity)
         val response = record.toResponse()
+
+        log.info("[{}] [{}] {}", monitorName, severity.name, message)
 
         connectionRegistry.broadcastEventToSession(participant.sessionId, response)
 

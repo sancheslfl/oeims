@@ -7,6 +7,7 @@ import com.oeims.models.SessionStatus
 import com.oeims.models.Sessions
 import com.oeims.models.UserRole
 import com.oeims.models.Users
+import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -32,7 +33,7 @@ class ParticipantRepositoryTest {
     private var keepAlive: java.sql.Connection? = null
 
     @BeforeEach
-    fun setup() {
+    fun setup() = runBlocking {
         keepAlive = DriverManager.getConnection("jdbc:sqlite:file:testdb?mode=memory&cache=shared")
         Database.connect(
             url = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
@@ -44,9 +45,9 @@ class ParticipantRepositoryTest {
         val examRepo = ExamRepository()
         sessionRepository = SessionRepository()
 
-        val professorId  = userRepo.create("prof@isel.pt",     UserRole.PROFESSOR, "hash").id
-        studentId        = userRepo.create("student1@alunos.isel.pt", UserRole.STUDENT, "hash").id
-        otherStudentId   = userRepo.create("student2@alunos.isel.pt", UserRole.STUDENT, "hash").id
+        val professorId  = userRepo.create("prof@isel.pt",             UserRole.PROFESSOR, "hash").id
+        studentId        = userRepo.create("student1@alunos.isel.pt",  UserRole.STUDENT,   "hash").id
+        otherStudentId   = userRepo.create("student2@alunos.isel.pt",  UserRole.STUDENT,   "hash").id
         val examId       = examRepo.create(professorId, "Networks", null, 90).id
         sessionId        = sessionRepository.create(examId, professorId, "SES001").id
 
@@ -66,7 +67,7 @@ class ParticipantRepositoryTest {
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns record with CONNECTED status and correct fields`() {
+    fun `create returns record with CONNECTED status and correct fields`() = runBlocking {
         val participant = participantRepository.create(sessionId, studentId)
 
         assertEquals(sessionId, participant.sessionId)
@@ -79,7 +80,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `create assigns unique ids to each participant`() {
+    fun `create assigns unique ids to each participant`() = runBlocking {
         val p1 = participantRepository.create(sessionId, studentId)
         val p2 = participantRepository.create(sessionId, otherStudentId)
 
@@ -89,7 +90,7 @@ class ParticipantRepositoryTest {
     // ── findById ──────────────────────────────────────────────────────────────
 
     @Test
-    fun `findById returns participant when id exists`() {
+    fun `findById returns participant when id exists`() = runBlocking {
         val created = participantRepository.create(sessionId, studentId)
 
         val result = participantRepository.findById(created.id)
@@ -100,7 +101,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `findById returns null when id does not exist`() {
+    fun `findById returns null when id does not exist`() = runBlocking {
         val result = participantRepository.findById(UUID.randomUUID())
 
         assertNull(result)
@@ -109,7 +110,7 @@ class ParticipantRepositoryTest {
     // ── findBySession ─────────────────────────────────────────────────────────
 
     @Test
-    fun `findBySession returns all participants in the session`() {
+    fun `findBySession returns all participants in the session`() = runBlocking {
         participantRepository.create(sessionId, studentId)
         participantRepository.create(sessionId, otherStudentId)
 
@@ -120,7 +121,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `findBySession returns empty list when session has no participants`() {
+    fun `findBySession returns empty list when session has no participants`() = runBlocking {
         val results = participantRepository.findBySession(sessionId)
 
         assertTrue(results.isEmpty())
@@ -129,7 +130,7 @@ class ParticipantRepositoryTest {
     // ── findByUserAndSession ──────────────────────────────────────────────────
 
     @Test
-    fun `findByUserAndSession returns participant when both match`() {
+    fun `findByUserAndSession returns participant when both match`() = runBlocking {
         participantRepository.create(sessionId, studentId)
 
         val result = participantRepository.findByUserAndSession(studentId, sessionId)
@@ -140,7 +141,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `findByUserAndSession returns null when student is not in that session`() {
+    fun `findByUserAndSession returns null when student is not in that session`() = runBlocking {
         val result = participantRepository.findByUserAndSession(studentId, sessionId)
 
         assertNull(result)
@@ -149,7 +150,7 @@ class ParticipantRepositoryTest {
     // ── updateHeartbeat ───────────────────────────────────────────────────────
 
     @Test
-    fun `updateHeartbeat sets lastHeartbeat and returns true`() {
+    fun `updateHeartbeat sets lastHeartbeat and returns true`() = runBlocking {
         val participant = participantRepository.create(sessionId, studentId)
 
         val updated = participantRepository.updateHeartbeat(participant.id)
@@ -161,7 +162,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `updateHeartbeat returns false when participant does not exist`() {
+    fun `updateHeartbeat returns false when participant does not exist`() = runBlocking {
         val updated = participantRepository.updateHeartbeat(UUID.randomUUID())
 
         assertFalse(updated)
@@ -170,7 +171,7 @@ class ParticipantRepositoryTest {
     // ── updateConnectionStatus ────────────────────────────────────────────────
 
     @Test
-    fun `updateConnectionStatus changes status and returns true`() {
+    fun `updateConnectionStatus changes status and returns true`() = runBlocking {
         val participant = participantRepository.create(sessionId, studentId)
 
         val updated = participantRepository.updateConnectionStatus(participant.id, ConnectionStatus.DISCONNECTED)
@@ -181,7 +182,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `updateConnectionStatus returns false when participant does not exist`() {
+    fun `updateConnectionStatus returns false when participant does not exist`() = runBlocking {
         val updated = participantRepository.updateConnectionStatus(UUID.randomUUID(), ConnectionStatus.TIMED_OUT)
 
         assertFalse(updated)
@@ -190,9 +191,8 @@ class ParticipantRepositoryTest {
     // ── markTimedOut ──────────────────────────────────────────────────────────
 
     @Test
-    fun `markTimedOut marks CONNECTED participants whose heartbeat is older than threshold`() {
+    fun `markTimedOut marks CONNECTED participants whose heartbeat is older than threshold`() = runBlocking {
         val participant = participantRepository.create(sessionId, studentId)
-        // Simulate an old heartbeat by using a past threshold far in the future
         participantRepository.updateHeartbeat(participant.id)
 
         // threshold = now + 1 hour → every heartbeat is "older than" this
@@ -207,7 +207,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `markTimedOut does not mark participants whose heartbeat is recent`() {
+    fun `markTimedOut does not mark participants whose heartbeat is recent`() = runBlocking {
         val participant = participantRepository.create(sessionId, studentId)
         participantRepository.updateHeartbeat(participant.id)
 
@@ -222,7 +222,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `markTimedOut ignores participants that have never sent a heartbeat`() {
+    fun `markTimedOut ignores participants that have never sent a heartbeat`() = runBlocking {
         // lastHeartbeat is NULL — the `lessEq` condition does not match NULL
         participantRepository.create(sessionId, studentId)
 
@@ -233,7 +233,7 @@ class ParticipantRepositoryTest {
     }
 
     @Test
-    fun `markTimedOut only considers participants in ACTIVE sessions`() {
+    fun `markTimedOut only considers participants in ACTIVE sessions`() = runBlocking {
         // Create a second session and leave it PENDING
         val userRepo = UserRepository()
         val examRepo = ExamRepository()

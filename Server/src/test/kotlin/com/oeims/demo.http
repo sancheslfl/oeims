@@ -1,0 +1,144 @@
+
+### 1. Register professor
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "professor@isel.pt",
+  "password": "profpass123",
+  "role": "PROFESSOR"
+}
+
+> {%
+  client.global.set("professorToken", response.body.token);
+  client.global.set("professorId", response.body.userId);
+  client.test("Register professor → 201", function() {
+    client.assert(response.status === 201, "Expected 201 Created");
+  });
+%}
+
+
+### 2. Login as professor (shows JWT is issued on login too)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "professor@isel.pt",
+  "password": "profpass123"
+}
+
+> {%
+  client.global.set("professorToken", response.body.token);
+  client.test("Login professor → 200", function() {
+    client.assert(response.status === 200, "Expected 200 OK");
+  });
+%}
+
+### 3. Create exam
+POST {{baseUrl}}/exams
+Content-Type: application/json
+Authorization: Bearer {{professorToken}}
+
+{
+  "title": "Software Engineering Final Exam",
+  "description": "Closed-book, no internet access permitted.",
+  "durationMins": 120
+}
+
+> {%
+  client.global.set("examId", response.body.id);
+  client.test("Create exam → 201", function() {
+    client.assert(response.status === 201, "Expected 201 Created");
+  });
+%}
+
+### 4. Create session — server returns a 6-character join code
+POST {{baseUrl}}/sessions
+Content-Type: application/json
+Authorization: Bearer {{professorToken}}
+
+{
+  "examId": "{{examId}}"
+}
+
+> {%
+  client.global.set("sessionId", response.body.id);
+  client.global.set("sessionCode", response.body.code);
+  client.test("Create session → 201 PENDING", function() {
+    client.assert(response.status === 201, "Expected 201 Created");
+    client.assert(response.body.status === "PENDING", "Expected PENDING status");
+  });
+%}
+
+### 5. Start session
+POST {{baseUrl}}/sessions/{{sessionId}}/start
+Authorization: Bearer {{professorToken}}
+
+> {%
+  client.test("Start session → 200 ACTIVE", function() {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.body.status === "ACTIVE", "Expected ACTIVE status");
+  });
+%}
+
+### 6. Register student
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "student@alunos.isel.pt",
+  "password": "studpass123",
+  "role": "STUDENT"
+}
+
+> {%
+  client.global.set("studentToken", response.body.token);
+  client.test("Register student → 201", function() {
+    client.assert(response.status === 201, "Expected 201 Created");
+  });
+%}
+
+### 7. Student joins session using the 6-character code
+POST {{baseUrl}}/sessions/join
+Content-Type: application/json
+Authorization: Bearer {{studentToken}}
+
+{
+  "code": "{{sessionCode}}"
+}
+
+> {%
+  client.global.set("participantId", response.body.participantId);
+  client.test("Join session → 200", function() {
+    client.assert(response.status === 200, "Expected 200 OK");
+  });
+%}
+
+### 8. Student sends heartbeat — server responds 204 No Content
+POST {{baseUrl}}/participants/{{participantId}}/heartbeat
+Authorization: Bearer {{studentToken}}
+
+> {%
+  client.test("Heartbeat → 204 No Content", function() {
+    client.assert(response.status === 204, "Expected 204 No Content");
+  });
+%}
+
+### 9. Professor ends the session
+POST {{baseUrl}}/sessions/{{sessionId}}/end
+Authorization: Bearer {{professorToken}}
+
+> {%
+  client.test("End session → 200 ENDED", function() {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.body.status === "ENDED", "Expected ENDED status");
+  });
+%}
+
+### 10. Professor queries session participants
+GET {{baseUrl}}/sessions/{{sessionId}}/participants
+Authorization: Bearer {{professorToken}}
+
+### 11. Professor queries session events
+GET {{baseUrl}}/sessions/{{sessionId}}/events
+Authorization: Bearer {{professorToken}}
