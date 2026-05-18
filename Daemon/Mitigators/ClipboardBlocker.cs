@@ -1,28 +1,12 @@
-using System.Runtime.InteropServices;
 using Daemon.Domain;
 
-namespace Daemon.Mitigators
+namespace Daemon.Mitigators;
+
+internal sealed class ClipboardBlocker(IClipboardSource clipboardSource) : IMitigator
 {
-    internal class ClipboardBlocker : IMitigator
-    {
-        public string Name => nameof(ClipboardBlocker);
+    public string Name => nameof(ClipboardBlocker);
 
-        [DllImport("user32.dll")]
-        private static extern bool OpenClipboard(IntPtr hWndNewOwner);
+    public void Apply() => clipboardSource.Block();
 
-        [DllImport("user32.dll")]
-        private static extern bool CloseClipboard();
-
-
-        public void Apply()
-        {
-           OpenClipboard(IntPtr.Zero);
-        }
-
-        public void Dispose()
-        {
-            CloseClipboard();
-        }
-
-    }
+    public void Dispose() => clipboardSource.Unblock();
 }
