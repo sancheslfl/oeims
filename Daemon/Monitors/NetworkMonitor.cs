@@ -115,57 +115,50 @@ internal sealed class NetworkMonitor : IMonitor
         var baselineInterfaces = FormatInterfaces(_baseline.ActiveInterfaces);
         var activeInterfaces = FormatInterfaces(currentState.ActiveInterfaces);
 
-        if (HasNoActiveNetwork(currentState))
+        return currentState switch
         {
-            return new NetworkViolation(
-                Key: "NoActiveNetwork",
-                Event: new MonitorEvent(
-                    Name,
-                    $"Network disconnected: no active network interface. Baseline was: {baselineInterfaces}.",
-                    Severity.Warning));
-        }
+            _ when HasNoActiveNetwork(currentState) =>
+                new NetworkViolation(
+                    Key: "NoActiveNetwork",
+                    Event: new MonitorEvent(
+                        Name,
+                        $"Network disconnected: no active network interface. Baseline was: {baselineInterfaces}.",
+                        Severity.Warning)),
 
-        if (HasNoPhysicalInterface(currentState))
-        {
-            return new NetworkViolation(
-                Key: $"NoPhysicalInterface:{activeInterfaces}",
-                Event: new MonitorEvent(
-                    Name,
-                    $"Invalid network state: active interfaces exist, but none are physical. Active interfaces: {activeInterfaces}. Baseline was: {baselineInterfaces}.",
-                    Severity.Warning));
-        }
+            _ when HasNoPhysicalInterface(currentState) =>
+                new NetworkViolation(
+                    Key: $"NoPhysicalInterface:{activeInterfaces}",
+                    Event: new MonitorEvent(
+                        Name,
+                        $"Invalid network state: active interfaces exist, but none are physical. Active interfaces: {activeInterfaces}. Baseline was: {baselineInterfaces}.",
+                        Severity.Warning)),
 
-        if (HasMultipleActiveInterfaces(currentState))
-        {
-            return new NetworkViolation(
-                Key: $"MultipleInterfaces:{activeInterfaces}",
-                Event: new MonitorEvent(
-                    Name,
-                    $"Multiple or suspicious active interfaces detected: {activeInterfaces}. Only one physical interface is allowed. Baseline was: {baselineInterfaces}.",
-                    Severity.Warning));
-        }
+            _ when HasMultipleActiveInterfaces(currentState) =>
+                new NetworkViolation(
+                    Key: $"MultipleInterfaces:{activeInterfaces}",
+                    Event: new MonitorEvent(
+                        Name,
+                        $"Multiple or suspicious active interfaces detected: {activeInterfaces}. Only one physical interface is allowed. Baseline was: {baselineInterfaces}.",
+                        Severity.Warning)),
 
-        if (HasInterfaceChanged(_baseline, currentState))
-        {
-            return new NetworkViolation(
-                Key: $"InterfacesChanged:{activeInterfaces}",
-                Event: new MonitorEvent(
-                    Name,
-                    $"Network interface changed: baseline was {baselineInterfaces}, current is {activeInterfaces}.",
-                    Severity.Warning));
-        }
+            _ when HasInterfaceChanged(_baseline, currentState) =>
+                new NetworkViolation(
+                    Key: $"InterfacesChanged:{activeInterfaces}",
+                    Event: new MonitorEvent(
+                        Name,
+                        $"Network interface changed: baseline was {baselineInterfaces}, current is {activeInterfaces}.",
+                        Severity.Warning)),
 
-        if (HasNetworkIdentityChanged(_baseline, currentState))
-        {
-            return new NetworkViolation(
-                Key: $"NetworkChanged:{currentState.NetworkId}",
-                Event: new MonitorEvent(
-                    Name,
-                    $"Network changed on the same interface: baseline was {_baseline.NetworkId}, current is {currentState.NetworkId}.",
-                    Severity.Warning));
-        }
+            _ when HasNetworkIdentityChanged(_baseline, currentState) =>
+                new NetworkViolation(
+                    Key: $"NetworkChanged:{currentState.NetworkId}",
+                    Event: new MonitorEvent(
+                        Name,
+                        $"Network changed on the same interface: baseline was {_baseline.NetworkId}, current is {currentState.NetworkId}.",
+                        Severity.Warning)),
 
-        return null;
+            _ => null
+        };
     }
 
     public bool IsValidNetworkState()
