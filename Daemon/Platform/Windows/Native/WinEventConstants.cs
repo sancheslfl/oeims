@@ -10,4 +10,6 @@ internal static class WinEventConstants
     public const uint PM_REMOVE = 0x0001;
 
     public const int OBJID_WINDOW = 0;
+
+    public static readonly IntPtr HWND_MESSAGE = new(-3);
 }

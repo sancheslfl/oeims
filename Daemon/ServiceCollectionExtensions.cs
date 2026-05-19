@@ -17,7 +17,7 @@ internal static class ServiceCollectionExtensions
 
     public static IServiceCollection AddMitigators(this IServiceCollection services)
     {
-        // services.AddSingleton<IMitigator, ClipboardBlocker>();
+        services.AddSingleton<IMitigator, ClipboardBlocker>();
         services.AddSingleton<IMitigator, ProcessBlocker>();
 
         return services;
