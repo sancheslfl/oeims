@@ -24,6 +24,7 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.routing.*
@@ -37,6 +38,19 @@ import kotlin.time.Duration.Companion.seconds
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
 fun Application.module() {
+    // ── CORS ──────────────────────────────────────────────────────────────────
+    install(CORS) {
+        allowHost("localhost:5173")   // Vite dev server
+        allowHost("localhost:4173")   // Vite preview
+        allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Authorization)
+        allowMethod(HttpMethod.Options)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Patch)
+    }
+
     // ── Serialization ─────────────────────────────────────────────────────────
     install(ContentNegotiation) {
         json(Json {

@@ -50,21 +50,21 @@ class SessionService(
         if (session.status != SessionStatus.PENDING)
             throw ConflictException("Only a pending session can be started")
 
-        sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE)
+        sessionRepository.updateStatus(sessionId.value, SessionStatus.ACTIVE)
         return session.copy(status = SessionStatus.ACTIVE, startedAt = Instant.now()).toResponse()
     }
 
     suspend fun endSession(sessionId: SessionId, professorId: ProfessorId): SessionResponse {
-        val session = sessionRepository.findById(sessionId)
+        val session = sessionRepository.findById(sessionId.value)
             ?: throw NotFoundException("Session not found")
 
-        if (session.supervisorId != professorId)
+        if (session.supervisorId != professorId.value)
             throw ForbiddenException("Only the session supervisor can end it")
 
         if (session.status != SessionStatus.ACTIVE)
             throw ConflictException("Only an active session can be ended")
 
-        sessionRepository.updateStatus(sessionId, SessionStatus.ENDED)
+        sessionRepository.updateStatus(sessionId.value, SessionStatus.ENDED)
         return session.copy(status = SessionStatus.ENDED, endedAt = Instant.now()).toResponse()
     }
 
