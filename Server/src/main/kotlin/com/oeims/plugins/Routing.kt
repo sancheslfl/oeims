@@ -26,7 +26,6 @@ fun Application.configureRouting(
     sessionService: SessionService,
     eventService: EventService
 ) {
-    // ── Global error handling ─────────────────────────────────────────────────
     install(StatusPages) {
         exception<ValidationException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, ErrorResponse(cause.message ?: "Bad request"))
@@ -49,11 +48,17 @@ fun Application.configureRouting(
         }
     }
 
-    // ── Routes ────────────────────────────────────────────────────────────────
+    val basePath = environment.config
+    .propertyOrNull("app.api.base-path")
+    ?.getString()
+        ?: throw IllegalStateException("API base path is not configured in config file")
+
     routing {
-        authRoutes(authService)
-        examRoutes(examService)
-        sessionRoutes(sessionService, eventService)
-        participantRoutes(sessionService)
+        route(basePath) {
+            authRoutes(authService)
+            examRoutes(examService)
+            participantRoutes(sessionService)
+            sessionRoutes(sessionService, eventService)
+        }
     }
 }
