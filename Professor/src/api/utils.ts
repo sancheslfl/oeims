@@ -1,26 +1,37 @@
-const { VITE_BASE_URL } = import.meta.env;
+const { API_URI } = import.meta.env.VITE_API_URL;
+const { WEBSOCKETS_URL } = import.meta.env.VITE_WS_URL;
 
-const API_URI = `${VITE_BASE_URL}/api`;
+export async function apiFetch<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    token?: string
+): Promise<T> {
+  const headers = new Headers(options.headers);
 
-export async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
-    const defaultOptions: RequestInit = {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
-    };
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
-    const res = await fetch(`${API_URI}${endpoint}`, {
-        ...defaultOptions,
-        ...options,
-    });
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
 
-    // TODO: We intend to pass the API response error message in the body to here
-    if (!res.ok) throw new Error();
+  const res = await fetch(`${API_URI}${endpoint}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
 
-    try {
-        return await res.json();
-    } catch {
-        return res;
-    }
+  if (!res.ok) {
+    const message = await res.text().catch(() => "");
+    throw new Error(message || `HTTP ${res.status}`);
+  }
+
+  if (res.status === 204) return undefined as T;
+
+  return await res.json() as T;
+}
+
+export function wsUrl(path: string, token: string): string {
+  return `${WEBSOCKETS_URL}${path}?token=${encodeURIComponent(token)}`;
 }

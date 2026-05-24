@@ -54,4 +54,19 @@ internal static class User32
     internal static extern uint GetWindowThreadProcessId(
         IntPtr hWnd,
         out uint lpdwProcessId);
+
+    [DllImport("user32.dll")]
+    internal static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [DllImport("user32.dll")]
+    internal static extern bool CloseClipboard();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern IntPtr CreateWindowEx(
+        uint dwExStyle, string lpClassName, string lpWindowName,
+        uint dwStyle, int x, int y, int nWidth, int nHeight,
+        IntPtr hWndParent, IntPtr hMenu, IntPtr hInstance, IntPtr lpParam);
+
+    [DllImport("user32.dll")]
+    internal static extern bool DestroyWindow(IntPtr hWnd);
 }

@@ -1,8 +1,9 @@
-import {apiFetch} from "./utils.ts";
+import { apiFetch } from './client';
+import type { AuthResponse } from '../types';
 
-export async function login(email: string, password: string): Promise<Response> {
-    return apiFetch("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-    })
+export function login(email: string, password: string): Promise<AuthResponse> {
+  return apiFetch<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
 }

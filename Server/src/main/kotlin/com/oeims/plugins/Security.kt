@@ -5,6 +5,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.oeims.models.dto.ErrorResponse
 import com.oeims.services.JwtConfig
 import io.ktor.http.*
+import io.ktor.http.auth.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
@@ -23,6 +24,13 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
         jwt("auth-jwt") {
             realm = jwtConfig.realm
             this.verifier(verifier)
+            // Browser WebSocket APIs cannot set Authorization header; fall back to ?token= query param.
+            authHeader { call ->
+                call.request.parseAuthorizationHeader()
+                    ?: call.request.queryParameters["token"]?.let { token ->
+                        HttpAuthHeader.Single("Bearer", token)
+                    }
+            }
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
                 val role   = credential.payload.getClaim("role").asString()
@@ -41,6 +49,12 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
         jwt("auth-professor") {
             realm = jwtConfig.realm
             this.verifier(verifier)
+            authHeader { call ->
+                call.request.parseAuthorizationHeader()
+                    ?: call.request.queryParameters["token"]?.let { token ->
+                        HttpAuthHeader.Single("Bearer", token)
+                    }
+            }
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
                 val role   = credential.payload.getClaim("role").asString()
@@ -59,6 +73,12 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
         jwt("auth-student") {
             realm = jwtConfig.realm
             this.verifier(verifier)
+            authHeader { call ->
+                call.request.parseAuthorizationHeader()
+                    ?: call.request.queryParameters["token"]?.let { token ->
+                        HttpAuthHeader.Single("Bearer", token)
+                    }
+            }
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
                 val role   = credential.payload.getClaim("role").asString()
