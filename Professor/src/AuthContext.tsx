@@ -1,41 +1,74 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { AuthResponse } from './types';
+import { createContext, useContext, useState } from "react";
+import type { ReactNode } from "react";
+import {Navigate} from "react-router-dom";
+import {USER_ROLES, type UserRole} from "./types";
 
-interface AuthContextValue {
-  auth: AuthResponse | null;
-  setAuth: (a: AuthResponse | null) => void;
-  logout: () => void;
-}
+export type AuthUser = {
+  id: string;
+  email: string;
+  role: UserRole;
+  token: string;
+};
+
+type AuthContextValue = {
+  auth: AuthUser | null;
+  setAuth: (auth: AuthUser) => void;
+  clearAuth: () => void;
+};
+
+const AUTH_STORAGE_KEY = "oeims:auth";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [auth, setAuthState] = useState<AuthResponse | null>(() => {
+  const [auth, setAuthState] = useState<AuthUser | null>(() => {
+    const storedAuth = sessionStorage.getItem(AUTH_STORAGE_KEY);
+
+    if (!storedAuth) {
+      return null;
+    }
+
     try {
-      const stored = localStorage.getItem('oeims_auth');
-      return stored ? (JSON.parse(stored) as AuthResponse) : null;
+      return JSON.parse(storedAuth) as AuthUser;
     } catch {
+      sessionStorage.removeItem(AUTH_STORAGE_KEY);
       return null;
     }
   });
 
-  const setAuth = useCallback((a: AuthResponse | null) => {
-    setAuthState(a);
-    if (a) localStorage.setItem('oeims_auth', JSON.stringify(a));
-    else localStorage.removeItem('oeims_auth');
-  }, []);
+  function setAuth(auth: AuthUser) {
+    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+    setAuthState(auth);
+  }
 
-  const logout = useCallback(() => setAuth(null), [setAuth]);
+  function clearAuth() {
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    setAuthState(null);
+  }
 
   return (
-    <AuthContext.Provider value={{ auth, setAuth, logout }}>
-      {children}
-    </AuthContext.Provider>
+      <AuthContext.Provider value={{ auth, setAuth, clearAuth }}>
+        {children}
+      </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used inside AuthProvider.");
+  }
+
+  return context;
+}
+
+export function AuthRequire({ children, allowedRole = USER_ROLES.Professor }: { children: ReactNode; allowedRole?: UserRole }) {
+  const { auth } = useAuth();
+
+  if (!auth || auth.role !== allowedRole) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
 }

@@ -1,5 +1,5 @@
-const { API_URI } = import.meta.env.VITE_API_URL;
-const { WEBSOCKETS_URL } = import.meta.env.VITE_WS_URL;
+export const API_URL = import.meta.env.VITE_API_URL;
+const WEBSOCKETS_URL = import.meta.env.VITE_WS_URL;
 
 export async function apiFetch<T>(
     endpoint: string,
@@ -16,10 +16,10 @@ export async function apiFetch<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const res = await fetch(`${API_URI}${endpoint}`, {
+  const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: "include",
+    credentials: "same-origin",
   });
 
   if (!res.ok) {

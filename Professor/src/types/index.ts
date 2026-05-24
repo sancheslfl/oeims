@@ -47,3 +47,23 @@ export interface ParticipantStatusUpdate {
   participantId: string;
   connectionStatus: string;
 }
+
+export type Teacher = {
+  name: string;
+  email?: string;
+};
+
+export type ExamDraft = {
+  title: string;
+  scheduledAt: string;
+};
+
+export type SessionDraft = {
+  examCode: string;
+};
+
+export const USER_ROLES = {
+  Professor: "PROFESSOR",
+} as const;
+
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
