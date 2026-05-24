@@ -1,20 +1,42 @@
-import { apiFetch } from './utils';
-import type { SessionResponse, ParticipantResponse, EventResponse } from '../types';
+import { apiFetch } from "./utils";
+import type {SessionResponse} from "../types";
 
-export const createSession = (token: string, examId: string): Promise<SessionResponse> =>
-  apiFetch<SessionResponse>('/sessions', { method: 'POST', body: JSON.stringify({ examId }) }, token);
+export function createSession(
+    examId: string,
+    token: string,
+): Promise<SessionResponse> {
+    return apiFetch<SessionResponse>("/sessions", {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ examId }),
+    });
+}
 
-export const getSession = (token: string, id: string): Promise<SessionResponse> =>
-  apiFetch<SessionResponse>(`/sessions/${id}`, {}, token);
+export function getSession(id: string, token: string): Promise<SessionResponse> {
+    return apiFetch<SessionResponse>(`/sessions/${id}`, {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}
 
-export const startSession = (token: string, id: string): Promise<SessionResponse> =>
-  apiFetch<SessionResponse>(`/sessions/${id}/start`, { method: 'POST' }, token);
+export function startSession(id: string, token: string): Promise<SessionResponse> {
+    return apiFetch<SessionResponse>(`/sessions/${id}/start`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}
 
-export const endSession = (token: string, id: string): Promise<SessionResponse> =>
-  apiFetch<SessionResponse>(`/sessions/${id}/end`, { method: 'POST' }, token);
-
-export const getParticipants = (token: string, id: string): Promise<ParticipantResponse[]> =>
-  apiFetch<ParticipantResponse[]>(`/sessions/${id}/participants`, {}, token);
-
-export const getEvents = (token: string, id: string): Promise<EventResponse[]> =>
-  apiFetch<EventResponse[]>(`/sessions/${id}/events`, {}, token);
+export function endSession(id: string, token: string): Promise<SessionResponse> {
+    return apiFetch<SessionResponse>(`/sessions/${id}/end`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}

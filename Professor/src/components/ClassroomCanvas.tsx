@@ -2,7 +2,8 @@ const seats = Array.from({ length: 12 }, (_, index) => index + 1);
 
 export function ClassroomCanvas() {
     return (
-        <div className="grid min-h-104 w-full min-w-3xl max-w-5xl gap-8 rounded-[3.5rem] border-3 border-isel-purple bg-isel-white p-8 shadow-[0_0.75rem_2rem_rgba(95,20,55,0.12)]">            <div className="flex items-start justify-between gap-4">
+        <div className="grid min-h-104 w-full min-w-3xl max-w-5xl gap-8 rounded-[3.5rem] border-3 border-isel-purple bg-isel-white p-8 shadow-[0_0.75rem_2rem_rgba(95,20,55,0.12)]">
+            <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="m-0 text-3xl font-bold text-isel-purple">
                         Classroom

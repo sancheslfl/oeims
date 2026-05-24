@@ -5,24 +5,36 @@ export interface AuthResponse {
   role: string;
 }
 
-export interface ExamResponse {
+export type CreateExamRequest = {
+  title: string;
+  description?: string | null;
+  durationMins: number;
+};
+
+export type ExamResponse = {
   id: string;
   createdBy: string;
   title: string;
-  description?: string;
+  description: string | null;
   durationMins: number;
   createdAt: string;
-}
+};
 
-export interface SessionResponse {
+export type CreateSessionRequest = {
+  examId: string;
+};
+
+export type SessionStatus = "PENDING" | "ACTIVE" | "ENDED";
+
+export type SessionResponse = {
   id: string;
   examId: string;
   supervisorId: string;
   code: string;
-  status: 'PENDING' | 'ACTIVE' | 'ENDED';
-  startedAt?: string;
-  endedAt?: string;
-}
+  status: SessionStatus;
+  startedAt: string | null;
+  endedAt: string | null;
+};
 
 export interface ParticipantResponse {
   id: string;
@@ -53,10 +65,20 @@ export type Teacher = {
   email?: string;
 };
 
+export type Exam = {
+  id: string;
+  title: string;
+  description: string;
+  durationMinutes: number;
+};
+
 export type ExamDraft = {
   title: string;
-  scheduledAt: string;
+  description: string;
+  durationMinutes: number;
 };
+
+export type SessionsByExamId = Record<Exam["id"], string>;
 
 export type SessionDraft = {
   examCode: string;

@@ -1,44 +1,122 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type {CreateExamRequest, ExamResponse, SessionResponse} from "../types";
 import {useAuth} from "../AuthContext.tsx";
+import {createExam, getExams} from "../api/exams.ts";
+import {createSession} from "../api/sessions.ts";
 import {TopBar} from "../components/TopBar.tsx";
 import {Sidebar} from "../components/Sidebar.tsx";
 import {ClassroomCanvas} from "../components/ClassroomCanvas.tsx";
 
+type SessionsByExamId = Record<string, SessionResponse>;
 
 export function Dashboard() {
     const { auth, clearAuth } = useAuth();
     const navigate = useNavigate();
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [exams, setExams] = useState<ExamResponse[]>([]);
+    const [sessionsByExamId, setSessionsByExamId] = useState<SessionsByExamId>({});
+    const [isLoadingExams, setIsLoadingExams] = useState(false);
+    const [isCreatingExam, setIsCreatingExam] = useState(false);
+    const [creatingSessionExamId, setCreatingSessionExamId] = useState<string | null>(null);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!auth) return;
+
+        let ignore = false;
+        const token = auth.token; // snapshot for this effect run
+
+        async function loadExams() {
+            setError("");
+            setIsLoadingExams(true);
+
+            try {
+                const exams = await getExams(token);
+                if (!ignore) setExams(exams);
+            } catch (error) {
+                if (!ignore) setError(getErrorMessage(error));
+            } finally {
+                if (!ignore) setIsLoadingExams(false);
+            }
+        }
+
+        void loadExams();
+        return () => { ignore = true; };
+    }, [auth]);
 
     if (!auth) {
         return null;
+    }
+
+    const currentAuth = auth;
+
+    async function handleCreateExam(draft: CreateExamRequest) {
+        setError("");
+        setIsCreatingExam(true);
+
+        try {
+            const createdExam = await createExam(draft, currentAuth.token);
+            setExams((current) => [createdExam, ...current]);
+        } catch (error) {
+            setError(getErrorMessage(error));
+            throw error;
+        } finally {
+            setIsCreatingExam(false);
+        }
+    }
+
+    async function handleGenerateSession(examId: string) {
+        if (sessionsByExamId[examId]) {
+            return;
+        }
+
+        setError("");
+        setCreatingSessionExamId(examId);
+
+        try {
+            const session = await createSession(examId, currentAuth.token);
+
+            setSessionsByExamId((current) => ({
+                ...current,
+                [examId]: session,
+            }));
+        } catch (error) {
+            setError(getErrorMessage(error));
+            throw error;
+        } finally {
+            setCreatingSessionExamId(null);
+        }
+    }
+
+    function handleSignOut() {
+        clearAuth();
+        navigate("/");
     }
 
     return (
         <div className="grid min-h-dvh grid-rows-[auto_1fr] bg-isel-white text-isel-purple">
             <TopBar
                 teacher={{
-                    name: "", // TODO: Add name in the response
+                    name: "",
                     email: auth.email,
                 }}
-                onSignOut={() => {
-                    clearAuth();
-                    navigate("/");
-                }}
+                onSignOut={handleSignOut}
             />
 
             <main className="flex min-h-0">
                 <Sidebar
                     isOpen={isSidebarOpen}
                     onToggle={() => setIsSidebarOpen((current) => !current)}
-                    onCreateExam={(draft) => {
-                        console.log("Create exam", draft);
-                    }}
-                    onGenerateSession={(draft) => {
-                        console.log("Generate session", draft);
-                    }}
+                    exams={exams}
+                    sessionsByExamId={sessionsByExamId}
+                    isLoadingExams={isLoadingExams}
+                    isCreatingExam={isCreatingExam}
+                    creatingSessionExamId={creatingSessionExamId}
+                    error={error}
+                    onCreateExam={handleCreateExam}
+                    onGenerateSession={handleGenerateSession}
                 />
 
                 <section
@@ -50,4 +128,8 @@ export function Dashboard() {
             </main>
         </div>
     );
+}
+
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : "Unexpected error.";
 }
