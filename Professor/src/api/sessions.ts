@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiFetch } from './utils';
 import type { SessionResponse, ParticipantResponse, EventResponse } from '../types';
 
 export const createSession = (token: string, examId: string): Promise<SessionResponse> =>

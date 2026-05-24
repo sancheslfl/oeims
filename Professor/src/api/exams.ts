@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiFetch } from './utils';
 import type { ExamResponse } from '../types';
 
 export function getExams(token: string): Promise<ExamResponse[]> {
@@ -7,7 +7,7 @@ export function getExams(token: string): Promise<ExamResponse[]> {
 
 export function createExam(
   token: string,
-  payload: { title: string; description?: string; durationMins: number }
+  payload: { title: string; description?: string; durationMins: number } // TODO: Create type
 ): Promise<ExamResponse> {
   return apiFetch<ExamResponse>('/exams', {
     method: 'POST',
