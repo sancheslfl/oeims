@@ -21,6 +21,7 @@
 - [ ] Adicionar filtro/arquivo para ocultar exames e sessões terminadas
 - [ ] Adicionar opção de eliminar ou arquivar exames
 - [ ] Criar um campo para a sala no formulário de criação de exame em vez de estar explicito no título
+- [ ] Usar reducer hook no componente Dashboard e Login que tem bastantes estados
 
 ## Documentação
 

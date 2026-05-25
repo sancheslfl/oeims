@@ -74,7 +74,7 @@ export function CreateExamForm({isCreating, onCreateExam}: CreateExamFormProps) 
                         className="app-input min-h-24 resize-none"
                         value={description}
                         onChange={(event) => setDescription(event.target.value)}
-                        placeholder="Final assessment for the OS module"
+                        placeholder="First assessment for the AED module"
                         required
                     />
                 </div>

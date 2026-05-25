@@ -52,4 +52,17 @@
   .app-section-title {
     @apply text-base font-semibold text-isel-purple;
   }
+
+  .sidebar-scroll {
+    direction: rtl;
+    scrollbar-width: none;
+  }
+
+  .sidebar-scroll > * {
+    direction: ltr;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar {
+    display: none;
+  }
 }

@@ -89,31 +89,33 @@ export function SessionList({
     }
 
     return (
-        <section className="grid gap-4">
+        <section className="grid min-h-0 flex-1 grid-rows-[auto_1fr] gap-4">
             <h2 className="app-section-title">Available exams</h2>
 
-            {isLoading ? (
-                <p className="text-sm font-semibold text-isel-purple/70">
-                    Loading exams...
-                </p>
-            ) : exams.length === 0 ? (
-                <p className="text-sm font-semibold text-isel-purple/70">
-                    No exams created yet.
-                </p>
-            ) : (
-                <div className="grid gap-3">
-                    {exams.map((exam) => (
-                        <ExamCard
-                            key={exam.id}
-                            exam={exam}
-                            session={sessionsByExamId[exam.id]}
-                            isExpanded={expandedExamId === exam.id}
-                            isCreatingSession={creatingSessionExamId === exam.id}
-                            onToggleSession={handleToggleSession}
-                        />
-                    ))}
-                </div>
-            )}
+            <div className="min-h-0 overflow-y-auto pr-1">
+                {isLoading ? (
+                    <p className="text-sm font-semibold text-isel-purple/70">
+                        Loading exams...
+                    </p>
+                ) : exams.length === 0 ? (
+                    <p className="text-sm font-semibold text-isel-purple/70">
+                        No exams created yet.
+                    </p>
+                ) : (
+                    <div className="grid gap-3">
+                        {exams.map((exam) => (
+                            <ExamCard
+                                key={exam.id}
+                                exam={exam}
+                                session={sessionsByExamId[exam.id]}
+                                isExpanded={expandedExamId === exam.id}
+                                isCreatingSession={creatingSessionExamId === exam.id}
+                                onToggleSession={handleToggleSession}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
         </section>
     );
 }

@@ -104,7 +104,7 @@ export function Dashboard() {
     }
 
     return (
-        <div className="grid min-h-dvh grid-rows-[auto_1fr] bg-isel-white text-isel-purple">
+        <div className="grid h-dvh overflow-hidden grid-rows-[auto_1fr] bg-isel-white text-isel-purple">
             <TopBar
                 teacher={{
                     name: "",   // TODO: Retrieve name from server response
@@ -113,7 +113,7 @@ export function Dashboard() {
                 onSignOut={handleSignOut}
             />
 
-            <main className="flex min-h-0">
+            <main className="flex min-h-0 overflow-hidden">
                 <Sidebar
                     isOpen={isSidebarOpen}
                     onToggle={() => setIsSidebarOpen((current) => !current)}
@@ -140,9 +140,9 @@ export function Dashboard() {
 
                 <section
                     aria-label="Classroom layout"
-                    className="flex min-w-0 flex-1 items-center justify-center overflow-x-auto bg-linear-to-br from-isel-white from-60% to-isel-pink p-6"
+                    className="flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-linear-to-br from-isel-white from-60% to-isel-pink p-6"
                 >
-                    <ClassroomCanvas/>
+                    <ClassroomCanvas />
                 </section>
             </main>
         </div>
