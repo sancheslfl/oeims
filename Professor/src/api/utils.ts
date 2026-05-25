@@ -1,10 +1,14 @@
-export const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL;
 const WEBSOCKETS_URL = import.meta.env.VITE_WS_URL;
+
+type ApiErrorResponse = {
+  error: string;
+};
 
 export async function apiFetch<T>(
     endpoint: string,
     options: RequestInit = {},
-    token?: string
+    token?: string,
 ): Promise<T> {
   const headers = new Headers(options.headers);
 
@@ -23,13 +27,28 @@ export async function apiFetch<T>(
   });
 
   if (!res.ok) {
-    const message = await res.text().catch(() => "");
-    throw new Error(message || `HTTP ${res.status}`);
+    throw new Error(await getApiErrorMessage(res));
   }
 
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) {
+    return undefined as T;
+  }
 
   return await res.json() as T;
+}
+
+async function getApiErrorMessage(res: Response): Promise<string> {
+  try {
+    const body = await res.json() as ApiErrorResponse;
+
+    if (typeof body.error === "string") {
+      return body.error;
+    }
+  } catch {
+    // invalid error body.
+  }
+
+  return `It seems a strange error occurred. Please try again later.`;
 }
 
 export function wsUrl(path: string, token: string): string {
