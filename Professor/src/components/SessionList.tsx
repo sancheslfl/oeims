@@ -2,23 +2,26 @@ import { useState } from "react";
 import type { ExamResponse, OpenedSession, SessionResponse } from "../types";
 import { useAuth } from "../AuthContext";
 import { createSession } from "../api/sessions";
+import { saveLastSessionId } from "../sessionStorage";
 
 type SessionListProps = {
     exams: ExamResponse[];
     isLoading: boolean;
+    openedSession: OpenedSession | null;
     onOpenSession: (openedSession: OpenedSession) => void;
 };
 
 type ExamCardProps = {
     exam: ExamResponse;
+    restoredSession?: SessionResponse;
     onOpenSession: (openedSession: OpenedSession) => void;
 };
 
-function ExamCard({ exam, onOpenSession }: ExamCardProps) {
+function ExamCard({ exam, restoredSession, onOpenSession }: ExamCardProps) {
     const { auth } = useAuth();
 
-    const [session, setSession] = useState<SessionResponse | undefined>();
-    const [isExpanded, setIsExpanded] = useState(false);
+    const [session, setSession] = useState<SessionResponse | undefined>(restoredSession);
+    const [isExpanded, setIsExpanded] = useState(Boolean(restoredSession));
     const [isCreatingSession, setIsCreatingSession] = useState(false);
     const [error, setError] = useState("");
 
@@ -30,6 +33,7 @@ function ExamCard({ exam, onOpenSession }: ExamCardProps) {
 
         if (session) {
             setIsExpanded(true);
+            onOpenSession({ exam, session });
             return;
         }
 
@@ -45,12 +49,16 @@ function ExamCard({ exam, onOpenSession }: ExamCardProps) {
 
             setSession(createdSession);
             setIsExpanded(true);
+            saveLastSessionId(auth.id, createdSession.id);
+
             onOpenSession({
                 exam,
                 session: createdSession,
             });
         } catch (error) {
-            setError(error instanceof Error ? error.message : "Unexpected error.");
+            if (error instanceof Error) {
+                setError(error.message);
+            }
         } finally {
             setIsCreatingSession(false);
         }
@@ -84,7 +92,7 @@ function ExamCard({ exam, onOpenSession }: ExamCardProps) {
                 type="button"
                 className="app-button app-button-secondary"
                 disabled={isCreatingSession}
-                onClick={() => void handleToggleSession()}
+                onClick={() => handleToggleSession()}
             >
                 {getSessionButtonLabel(session, isExpanded, isCreatingSession)}
             </button>
@@ -107,6 +115,7 @@ function ExamCard({ exam, onOpenSession }: ExamCardProps) {
 export function SessionList({
                                 exams,
                                 isLoading,
+                                openedSession,
                                 onOpenSession,
                             }: SessionListProps) {
     return (
@@ -124,13 +133,21 @@ export function SessionList({
                     </p>
                 ) : (
                     <div className="grid gap-3">
-                        {exams.map((exam) => (
-                            <ExamCard
-                                key={exam.id}
-                                exam={exam}
-                                onOpenSession={onOpenSession}
-                            />
-                        ))}
+                        {exams.map((exam) => {
+                            const restoredSession =
+                                openedSession?.exam.id === exam.id
+                                    ? openedSession.session
+                                    : undefined;
+
+                            return (
+                                <ExamCard
+                                    key={`${exam.id}:${restoredSession?.id ?? "empty"}`}
+                                    exam={exam}
+                                    restoredSession={restoredSession}
+                                    onOpenSession={onOpenSession}
+                                />
+                            );
+                        })}
                     </div>
                 )}
             </div>
