@@ -1,46 +1,69 @@
-import {type SubmitEventHandler, useState} from "react";
-import type {CreateExamRequest} from "../types";
+import { type SubmitEventHandler, useState } from "react";
+import type { CreateExamRequest, ExamResponse } from "../types";
+import { useAuth } from "../AuthContext";
+import { createExam } from "../api/exams";
 
 type CreateExamFormProps = {
-    isCreating: boolean;
-    onCreateExam: (draft: CreateExamRequest) => Promise<void>;
-}
+    onExamCreated: (exam: ExamResponse) => void;
+};
 
+export function CreateExamForm({ onExamCreated }: CreateExamFormProps) {
+    const { auth } = useAuth();
 
-export function CreateExamForm({isCreating, onCreateExam}: CreateExamFormProps) {
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [durationMins, setDurationMins] = useState("");
+    const [isCreating, setIsCreating] = useState(false);
+    const [error, setError] = useState("");
 
     const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
         event.preventDefault();
+
+        if (!auth) {
+            return;
+        }
 
         const trimmedTitle = title.trim();
         const trimmedDescription = description.trim();
         const parsedDuration = Number(durationMins);
 
-        if (!title || !description || !Number.isInteger(parsedDuration) || parsedDuration <= 0) {
+        if (!trimmedTitle || !Number.isInteger(parsedDuration) || parsedDuration <= 0) {
             return;
         }
 
+        const draft: CreateExamRequest = {
+            title: trimmedTitle,
+            description: trimmedDescription || null,
+            durationMins: parsedDuration,
+        };
+
+        setError("");
+        setIsCreating(true);
+
         try {
-            await onCreateExam({
-                title: trimmedTitle,
-                description: trimmedDescription,
-                durationMins: parsedDuration,
-            });
+            const exam = await createExam(draft, auth.token);
+
+            onExamCreated(exam);
 
             setTitle("");
             setDescription("");
             setDurationMins("");
-        } catch {
-            // error displayed by the parent.
+        } catch (error) {
+            setError(error instanceof Error ? error.message : "Unexpected error.");
+        } finally {
+            setIsCreating(false);
         }
     };
 
     return (
         <section className="grid gap-4">
             <h2 className="app-section-title">Create exam</h2>
+
+            {error && (
+                <p className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
+                    {error}
+                </p>
+            )}
 
             <form className="grid gap-4" onSubmit={handleSubmit}>
                 <div className="grid gap-1">
@@ -75,7 +98,6 @@ export function CreateExamForm({isCreating, onCreateExam}: CreateExamFormProps) 
                         value={description}
                         onChange={(event) => setDescription(event.target.value)}
                         placeholder="First assessment for the AED module"
-                        required
                     />
                 </div>
 
@@ -96,11 +118,7 @@ export function CreateExamForm({isCreating, onCreateExam}: CreateExamFormProps) 
                     />
                 </div>
 
-                <button
-                    type="submit"
-                    className="app-button"
-                    disabled={isCreating}
-                >
+                <button type="submit" className="app-button" disabled={isCreating}>
                     {isCreating ? "Creating..." : "Create exam"}
                 </button>
             </form>

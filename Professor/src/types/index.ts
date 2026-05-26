@@ -20,10 +20,6 @@ export type ExamResponse = {
   createdAt: string;
 };
 
-export type CreateSessionRequest = {
-  examId: string;
-};
-
 export type SessionStatus = "PENDING" | "ACTIVE" | "ENDED";
 
 export type SessionResponse = {
@@ -72,16 +68,9 @@ export type Exam = {
   durationMinutes: number;
 };
 
-export type ExamDraft = {
-  title: string;
-  description: string;
-  durationMinutes: number;
-};
-
-export type SessionsByExamId = Record<Exam["id"], string>;
-
-export type SessionDraft = {
-  examCode: string;
+export type OpenedSession = {
+  exam: ExamResponse;
+  session: SessionResponse;
 };
 
 export const USER_ROLES = {
