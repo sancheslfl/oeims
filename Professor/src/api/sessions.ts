@@ -15,6 +15,18 @@ export function createSession(
     );
 }
 
+export function getCurrentSession(
+    token: string,
+): Promise<SessionResponse | undefined> {
+    return apiFetch<SessionResponse | undefined>(
+        "/sessions/current",
+        {
+            method: "GET",
+        },
+        token,
+    );
+}
+
 export function startSession(
     sessionId: string,
     token: string,

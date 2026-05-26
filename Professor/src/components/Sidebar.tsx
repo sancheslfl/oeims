@@ -6,10 +6,11 @@ import { CreateExamForm } from "./CreateExamForm";
 import { SessionList } from "./SessionList";
 
 type SidebarProps = {
+    openedSession: OpenedSession | null;
     onOpenSession: (openedSession: OpenedSession) => void;
 };
 
-export function Sidebar({ onOpenSession }: SidebarProps) {
+export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
     const { auth } = useAuth();
 
     const [isOpen, setIsOpen] = useState(true);
@@ -85,6 +86,7 @@ export function Sidebar({ onOpenSession }: SidebarProps) {
                         <SessionList
                             exams={exams}
                             isLoading={isLoadingExams}
+                            openedSession={openedSession}
                             onOpenSession={onOpenSession}
                         />
                     </div>
