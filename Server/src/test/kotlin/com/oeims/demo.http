@@ -40,7 +40,7 @@ Content-Type: application/json
 Authorization: Bearer {{professorToken}}
 
 {
-  "title": "Software Engineering Final Exam",
+  "title": "LEIC-PC T1 C.1.07",
   "description": "Closed-book, no internet access permitted.",
   "durationMins": 120
 }
