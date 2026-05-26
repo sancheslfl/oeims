@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import type { OpenedSession } from "../types";
-import { useAuth } from "../AuthContext";
-import { getCurrentSession } from "../api/sessions";
-import { getExam } from "../api/exams";
-import { clearLastSessionId, saveLastSessionId } from "../localStorage";
-import { TopBar } from "../components/TopBar";
-import { Sidebar } from "../components/Sidebar";
+
 import { ClassroomCanvas } from "../components/ClassroomCanvas";
 
 export function Dashboard() {
