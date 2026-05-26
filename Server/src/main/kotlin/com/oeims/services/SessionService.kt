@@ -90,6 +90,11 @@ class SessionService(
         sessionRepository.findById(sessionId.value)?.toResponse()
             ?: throw NotFoundException("Session not found")
 
+    suspend fun getCurrentSession(professorId: ProfessorId): SessionResponse? =
+        sessionRepository
+            .findLatestOpenBySupervisor(professorId.value)
+            ?.toResponse()
+
     suspend fun getParticipants(sessionId: SessionId): List<ParticipantResponse> {
         sessionRepository.findById(sessionId.value)
             ?: throw NotFoundException("Session not found")

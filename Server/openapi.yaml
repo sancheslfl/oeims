@@ -464,6 +464,36 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /sessions/current:
+    get:
+      tags: [ Sessions ]
+      summary: Get current session
+      description: |
+        Return the authenticated professor's latest non-ended session.
+
+        A current session is the most recently created session supervised by the authenticated professor
+        whose status is either `PENDING` or `ACTIVE`.
+
+        If the professor has no current session, the response is `204 No Content`.
+      operationId: getCurrentSession
+      security:
+        - bearerAuth: [ ]
+      responses:
+        '200':
+          description: Current session found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '204':
+          description: No current session exists for the authenticated professor.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /sessions/join:
     post:
       tags: [Sessions]

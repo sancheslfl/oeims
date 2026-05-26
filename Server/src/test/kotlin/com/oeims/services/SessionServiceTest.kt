@@ -6,6 +6,11 @@ import com.oeims.exceptions.NotFoundException
 import com.oeims.models.ConnectionStatus
 import com.oeims.models.SessionStatus
 import com.oeims.models.UserRole
+import com.oeims.models.ids.toExamId
+import com.oeims.models.ids.toProfessorId
+import com.oeims.models.ids.toSessionId
+import com.oeims.models.ids.toStudentId
+import com.oeims.models.toSessionCode
 import com.oeims.repositories.ExamRecord
 import com.oeims.repositories.ParticipantRecord
 import com.oeims.repositories.SessionRecord
@@ -28,7 +33,7 @@ class SessionServiceTest {
 
     // ── Fakes ─────────────────────────────────────────────────────────────────
 
-    private inner class FakeUserRepository : IUserRepository {
+    private class FakeUserRepository : IUserRepository {
         val users = mutableListOf<UserRecord>()
 
         override suspend fun findById(id: UUID): UserRecord? = users.find { it.id == id }
@@ -41,7 +46,7 @@ class SessionServiceTest {
         }
     }
 
-    private inner class FakeExamRepository : IExamRepository {
+    private class FakeExamRepository : IExamRepository {
         val exams = mutableListOf<ExamRecord>()
 
         override suspend fun findById(id: UUID): ExamRecord? = exams.find { it.id == id }
@@ -55,7 +60,7 @@ class SessionServiceTest {
         }
     }
 
-    private inner class FakeSessionRepository : ISessionRepository {
+    private class FakeSessionRepository : ISessionRepository {
         val sessions = mutableMapOf<UUID, SessionRecord>()
 
         override suspend fun findById(id: UUID): SessionRecord? = sessions[id]
@@ -63,8 +68,23 @@ class SessionServiceTest {
         override suspend fun findBySupervisor(supervisorId: UUID): List<SessionRecord> =
             sessions.values.filter { it.supervisorId == supervisorId }
 
+        override suspend fun findLatestOpenBySupervisor(supervisorId: UUID): SessionRecord? =
+            sessions.values.filter {
+                it.supervisorId == supervisorId && it.status in listOf(SessionStatus.PENDING, SessionStatus.ACTIVE)
+            }
+                .maxByOrNull { it.createdAt }
+
         override suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord {
-            val record = SessionRecord(UUID.randomUUID(), examId, supervisorId, code, SessionStatus.PENDING, null, null)
+            val record = SessionRecord(
+                UUID.randomUUID(),
+                examId,
+                supervisorId,
+                code,
+                SessionStatus.PENDING,
+                Instant.now(),
+                null,
+                null
+            )
             sessions[record.id] = record
             return record
         }
@@ -81,7 +101,7 @@ class SessionServiceTest {
         }
     }
 
-    private inner class FakeParticipantRepository : IParticipantRepository {
+    private class FakeParticipantRepository : IParticipantRepository {
         val participants = mutableListOf<ParticipantRecord>()
 
         override suspend fun findById(id: UUID): ParticipantRecord? = participants.find { it.id == id }
@@ -135,8 +155,8 @@ class SessionServiceTest {
     // ── createSession ─────────────────────────────────────────────────────────
 
     @Test
-    fun `createSession returns PENDING session with a 6-char code`() = runBlocking {
-        val response = service.createSession(professorId, examId)
+    fun `createSession returns PENDING session with a 6-char code`() = runBlocking<Unit> {
+        val response = service.createSession(professorId.toProfessorId(), examId.toExamId())
 
         assertEquals("PENDING", response.status)
         assertEquals(examId.toString(), response.examId)
@@ -148,17 +168,17 @@ class SessionServiceTest {
     @Test
     fun `createSession throws NotFoundException when exam does not exist`() {
         assertThrows<NotFoundException> {
-            runBlocking { service.createSession(professorId, UUID.randomUUID()) }
+            runBlocking { service.createSession(professorId.toProfessorId(), UUID.randomUUID().toExamId()) }
         }
     }
 
     // ── startSession ──────────────────────────────────────────────────────────
 
     @Test
-    fun `startSession transitions session to ACTIVE`() = runBlocking {
-        val session = service.createSession(professorId, examId)
+    fun `startSession transitions session to ACTIVE`() = runBlocking<Unit> {
+        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
 
-        val result = service.startSession(UUID.fromString(session.id), professorId)
+        val result = service.startSession(UUID.fromString(session.id).toSessionId(), professorId.toProfessorId())
 
         assertEquals("ACTIVE", result.status)
         assertNotNull(result.startedAt)
@@ -167,51 +187,51 @@ class SessionServiceTest {
     @Test
     fun `startSession throws NotFoundException when session does not exist`() {
         assertThrows<NotFoundException> {
-            runBlocking { service.startSession(UUID.randomUUID(), professorId) }
+            runBlocking { service.startSession(UUID.randomUUID().toSessionId(), professorId.toProfessorId()) }
         }
     }
 
     @Test
     fun `startSession throws ForbiddenException when called by a different professor`() = runBlocking<Unit> {
-        val session = service.createSession(professorId, examId)
+        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
         val otherId = UUID.randomUUID()
 
         assertThrows<ForbiddenException> {
-            runBlocking { service.startSession(UUID.fromString(session.id), otherId) }
+            service.startSession(UUID.fromString(session.id).toSessionId(), otherId.toProfessorId())
         }
     }
 
     @Test
     fun `startSession throws ConflictException when session is already ACTIVE`() = runBlocking<Unit> {
-        val session = service.createSession(professorId, examId)
-        service.startSession(UUID.fromString(session.id), professorId)
+        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        service.startSession(UUID.fromString(session.id).toSessionId(), professorId.toProfessorId())
 
         assertThrows<ConflictException> {
-            runBlocking { service.startSession(UUID.fromString(session.id), professorId) }
+            service.startSession(UUID.fromString(session.id).toSessionId(), professorId.toProfessorId())
         }
     }
 
     @Test
     fun `startSession throws ConflictException when session is ENDED`() = runBlocking<Unit> {
-        val session   = service.createSession(professorId, examId)
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
         val sessionId = UUID.fromString(session.id)
-        service.startSession(sessionId, professorId)
-        service.endSession(sessionId, professorId)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
+        service.endSession(sessionId.toSessionId(), professorId.toProfessorId())
 
         assertThrows<ConflictException> {
-            runBlocking { service.startSession(sessionId, professorId) }
+            service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
         }
     }
 
     // ── endSession ────────────────────────────────────────────────────────────
 
     @Test
-    fun `endSession transitions session to ENDED`() = runBlocking {
-        val session   = service.createSession(professorId, examId)
+    fun `endSession transitions session to ENDED`() = runBlocking<Unit> {
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
         val sessionId = UUID.fromString(session.id)
-        service.startSession(sessionId, professorId)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
 
-        val result = service.endSession(sessionId, professorId)
+        val result = service.endSession(sessionId.toSessionId(), professorId.toProfessorId())
 
         assertEquals("ENDED", result.status)
         assertNotNull(result.endedAt)
@@ -220,27 +240,27 @@ class SessionServiceTest {
     @Test
     fun `endSession throws NotFoundException when session does not exist`() {
         assertThrows<NotFoundException> {
-            runBlocking { service.endSession(UUID.randomUUID(), professorId) }
+            runBlocking { service.endSession(UUID.randomUUID().toSessionId(), professorId.toProfessorId()) }
         }
     }
 
     @Test
     fun `endSession throws ForbiddenException when called by a different professor`() = runBlocking<Unit> {
-        val session   = service.createSession(professorId, examId)
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
         val sessionId = UUID.fromString(session.id)
-        service.startSession(sessionId, professorId)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
 
         assertThrows<ForbiddenException> {
-            runBlocking { service.endSession(sessionId, UUID.randomUUID()) }
+            service.endSession(sessionId.toSessionId(), UUID.randomUUID().toProfessorId())
         }
     }
 
     @Test
     fun `endSession throws ConflictException when session is still PENDING`() = runBlocking<Unit> {
-        val session = service.createSession(professorId, examId)
+        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
 
         assertThrows<ConflictException> {
-            runBlocking { service.endSession(UUID.fromString(session.id), professorId) }
+            service.endSession(UUID.fromString(session.id).toSessionId(), professorId.toProfessorId())
         }
     }
 
@@ -248,8 +268,8 @@ class SessionServiceTest {
 
     @Test
     fun `joinSession returns participantId and exam details for a new join`() = runBlocking {
-        val session  = service.createSession(professorId, examId)
-        val response = service.joinSession(session.code, studentId)
+        val session  = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val response = service.joinSession(session.code.toSessionCode(), studentId.toStudentId())
 
         assertNotNull(response.participantId)
         assertEquals(session.id, response.sessionId)
@@ -259,51 +279,51 @@ class SessionServiceTest {
 
     @Test
     fun `joinSession is idempotent and returns the same participantId on repeated calls`() = runBlocking {
-        val session = service.createSession(professorId, examId)
+        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
 
-        val first  = service.joinSession(session.code, studentId)
-        val second = service.joinSession(session.code, studentId)
+        val first  = service.joinSession(session.code.toSessionCode(), studentId.toStudentId())
+        val second = service.joinSession(session.code.toSessionCode(), studentId.toStudentId())
 
         assertEquals(first.participantId, second.participantId)
     }
 
     @Test
-    fun `joinSession allows joining a PENDING session`() = runBlocking {
-        val session  = service.createSession(professorId, examId)
+    fun `joinSession allows joining a PENDING session`() = runBlocking<Unit> {
+        val session  = service.createSession(professorId.toProfessorId(), examId.toExamId())
         assertEquals("PENDING", session.status)
 
-        val response = service.joinSession(session.code, studentId)
+        val response = service.joinSession(session.code.toSessionCode(), studentId.toStudentId())
 
         assertNotNull(response.participantId)
     }
 
     @Test
-    fun `joinSession allows joining an ACTIVE session`() = runBlocking {
-        val session   = service.createSession(professorId, examId)
+    fun `joinSession allows joining an ACTIVE session`() = runBlocking<Unit> {
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
         val sessionId = UUID.fromString(session.id)
-        service.startSession(sessionId, professorId)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
 
-        val response = service.joinSession(session.code, studentId)
+        val response = service.joinSession(session.code.toSessionCode(), studentId.toStudentId())
 
         assertNotNull(response.participantId)
     }
 
     @Test
     fun `joinSession throws ConflictException when session has ENDED`() = runBlocking<Unit> {
-        val session   = service.createSession(professorId, examId)
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
         val sessionId = UUID.fromString(session.id)
-        service.startSession(sessionId, professorId)
-        service.endSession(sessionId, professorId)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
+        service.endSession(sessionId.toSessionId(), professorId.toProfessorId())
 
         assertThrows<ConflictException> {
-            runBlocking { service.joinSession(session.code, studentId) }
+            service.joinSession(session.code.toSessionCode(), studentId.toStudentId())
         }
     }
 
     @Test
     fun `joinSession throws NotFoundException when code does not exist`() {
         assertThrows<NotFoundException> {
-            runBlocking { service.joinSession("XXXXXX", studentId) }
+            runBlocking { service.joinSession("XXXXXX".toSessionCode(), studentId.toStudentId()) }
         }
     }
 
@@ -311,9 +331,9 @@ class SessionServiceTest {
 
     @Test
     fun `getSession returns session when it exists`() = runBlocking {
-        val created = service.createSession(professorId, examId)
+        val created = service.createSession(professorId.toProfessorId(), examId.toExamId())
 
-        val result = service.getSession(UUID.fromString(created.id))
+        val result = service.getSession(UUID.fromString(created.id).toSessionId())
 
         assertEquals(created.id, result.id)
         assertEquals("PENDING", result.status)
@@ -322,7 +342,7 @@ class SessionServiceTest {
     @Test
     fun `getSession throws NotFoundException when session does not exist`() {
         assertThrows<NotFoundException> {
-            runBlocking { service.getSession(UUID.randomUUID()) }
+            runBlocking { service.getSession(UUID.randomUUID().toSessionId()) }
         }
     }
 
@@ -330,14 +350,14 @@ class SessionServiceTest {
 
     @Test
     fun `getParticipants returns all participants in the session`() = runBlocking {
-        val session    = service.createSession(professorId, examId)
+        val session    = service.createSession(professorId.toProfessorId(), examId.toExamId())
         val sessionId  = UUID.fromString(session.id)
         val student2Id = fakeUsers.create("student2@alunos.isel.pt", UserRole.STUDENT, "hash").id
 
-        service.joinSession(session.code, studentId)
-        service.joinSession(session.code, student2Id)
+        service.joinSession(session.code.toSessionCode(), studentId.toStudentId())
+        service.joinSession(session.code.toSessionCode(), student2Id.toStudentId())
 
-        val results = service.getParticipants(sessionId)
+        val results = service.getParticipants(sessionId.toSessionId())
 
         assertEquals(2, results.size)
         assertTrue(results.all { it.sessionId == session.id })
@@ -346,7 +366,7 @@ class SessionServiceTest {
     @Test
     fun `getParticipants throws NotFoundException when session does not exist`() {
         assertThrows<NotFoundException> {
-            runBlocking { service.getParticipants(UUID.randomUUID()) }
+            runBlocking { service.getParticipants(UUID.randomUUID().toSessionId()) }
         }
     }
 }

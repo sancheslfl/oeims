@@ -18,17 +18,28 @@ import io.ktor.server.routing.*
 
 fun Route.sessionRoutes(sessionService: SessionService, eventService: EventService) {
 
-    // ── Professor endpoints ───────────────────────────────────────────────────
-
     authenticate("auth-professor") {
 
-        // POST /sessions — create a session for an exam
+        // POST /sessions - create a session for an exam
         post("/sessions") {
             val professorId = call.userId()
             val req = call.receive<CreateSessionRequest>()
             val examId = call.uuidParam(req.examId, "examId")
             val response = sessionService.createSession(professorId.toProfessorId(), examId.toExamId())
             call.respond(HttpStatusCode.Created, response)
+        }
+
+        // GET /sessions/current - latest pending or active session for professor
+        get("/sessions/current") {
+            val professorId = call.userId()
+            val response = sessionService.getCurrentSession(professorId.toProfessorId())
+
+            if (response == null) {
+                call.respond(HttpStatusCode.NoContent)
+                return@get
+            }
+
+            call.respond(HttpStatusCode.OK, response)
         }
 
         route("/sessions/{id}") {
@@ -72,11 +83,10 @@ fun Route.sessionRoutes(sessionService: SessionService, eventService: EventServi
         }
     }
 
-    // ── Student endpoints ─────────────────────────────────────────────────────
 
     authenticate("auth-student") {
 
-        // POST /sessions/join — join a session by code
+        // POST /sessions/join - join a session by code
         post("/sessions/join") {
             val studentId = call.userId()
             val req = call.receive<JoinSessionRequest>()
