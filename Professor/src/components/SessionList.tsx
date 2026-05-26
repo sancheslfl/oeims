@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type {ExamResponse, SessionResponse} from "../types";
+import type { ExamResponse, SessionResponse } from "../types";
 
 type SessionListProps = {
     exams: ExamResponse[];
@@ -7,6 +7,7 @@ type SessionListProps = {
     isLoading: boolean;
     creatingSessionExamId: string | null;
     onGenerateSession: (examId: string) => Promise<void>;
+    onOpenSession: (examId: string) => void;
 };
 
 type ExamCardProps = {
@@ -15,6 +16,7 @@ type ExamCardProps = {
     isExpanded: boolean;
     isCreatingSession: boolean;
     onToggleSession: (examId: string) => Promise<void>;
+    onOpenSession: (examId: string) => void;
 };
 
 function ExamCard({
@@ -23,6 +25,7 @@ function ExamCard({
                       isExpanded,
                       isCreatingSession,
                       onToggleSession,
+                      onOpenSession,
                   }: ExamCardProps) {
     return (
         <article className="grid gap-3 rounded-md border-2 border-isel-purple bg-isel-white p-4">
@@ -52,14 +55,24 @@ function ExamCard({
             </button>
 
             {isExpanded && session && (
-                <div className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-isel-purple">
-                        Session code
-                    </span>
+                <div className="grid gap-3 rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2">
+                    <div>
+                        <span className="text-xs font-bold uppercase tracking-widest text-isel-purple">
+                            Session code
+                        </span>
 
-                    <p className="mt-1 text-2xl font-bold text-isel-red">
-                        {session.code}
-                    </p>
+                        <p className="mt-1 text-2xl font-bold text-isel-red">
+                            {session.code}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        className="app-button"
+                        onClick={() => onOpenSession(exam.id)}
+                    >
+                        Open
+                    </button>
                 </div>
             )}
         </article>
@@ -67,12 +80,13 @@ function ExamCard({
 }
 
 export function SessionList({
-                                    exams,
-                                    sessionsByExamId,
-                                    isLoading,
-                                    creatingSessionExamId,
-                                    onGenerateSession,
-                                }: SessionListProps) {
+                                exams,
+                                sessionsByExamId,
+                                isLoading,
+                                creatingSessionExamId,
+                                onGenerateSession,
+                                onOpenSession,
+                            }: SessionListProps) {
     const [expandedExamId, setExpandedExamId] = useState<string | null>(null);
 
     async function handleToggleSession(examId: string) {
@@ -111,6 +125,7 @@ export function SessionList({
                                 isExpanded={expandedExamId === exam.id}
                                 isCreatingSession={creatingSessionExamId === exam.id}
                                 onToggleSession={handleToggleSession}
+                                onOpenSession={onOpenSession}
                             />
                         ))}
                     </div>

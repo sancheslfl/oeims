@@ -21,6 +21,7 @@ export function Dashboard() {
     const [sessionsByExamId, setSessionsByExamId] = useState<SessionsByExamId>({});
     const [isLoadingExams, setIsLoadingExams] = useState(false);
     const [isCreatingExam, setIsCreatingExam] = useState(false);
+    const [openedExamId, setOpenedExamId] = useState<string | null>(null);
     const [creatingSessionExamId, setCreatingSessionExamId] = useState<string | null>(null);
     const [error, setError] = useState("");
 
@@ -103,6 +104,14 @@ export function Dashboard() {
         navigate("/");
     }
 
+    const openedExam = openedExamId
+        ? exams.find((exam) => exam.id === openedExamId)
+        : undefined;
+
+    const openedSession = openedExamId
+        ? sessionsByExamId[openedExamId]
+        : undefined;
+
     return (
         <div className="grid h-dvh overflow-hidden grid-rows-[auto_1fr] bg-isel-white text-isel-purple">
             <TopBar
@@ -135,6 +144,7 @@ export function Dashboard() {
                         isLoading={isLoadingExams}
                         creatingSessionExamId={creatingSessionExamId}
                         onGenerateSession={handleGenerateSession}
+                        onOpenSession={setOpenedExamId}
                     />
                 </Sidebar>
 
@@ -142,7 +152,10 @@ export function Dashboard() {
                     aria-label="Classroom layout"
                     className="flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-linear-to-br from-isel-white from-60% to-isel-pink p-6"
                 >
-                    <ClassroomCanvas />
+                    <ClassroomCanvas
+                        exam={openedExam}
+                        session={openedSession}
+                    />
                 </section>
             </main>
         </div>
