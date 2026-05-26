@@ -1,5 +1,5 @@
 import { apiFetch } from "./utils";
-import type { SessionResponse } from "../types";
+import type {ParticipantResponse, SessionResponse} from "../types";
 
 export function createSession(
     examId: string,
@@ -35,6 +35,19 @@ export function startSession(
         `/sessions/${sessionId}/start`,
         {
             method: "POST",
+        },
+        token,
+    );
+}
+
+export function getSessionParticipants(
+    sessionId: string,
+    token: string,
+): Promise<ParticipantResponse[]> {
+    return apiFetch<ParticipantResponse[]>(
+        `/sessions/${sessionId}/participants`,
+        {
+            method: "GET",
         },
         token,
     );
