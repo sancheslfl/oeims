@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL;
+export const API_URL = import.meta.env.VITE_API_URL;
 const WEBSOCKETS_URL = import.meta.env.VITE_WS_URL;
 
 type ApiErrorResponse = {
@@ -23,7 +23,7 @@ export async function apiFetch<T>(
   const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
-    credentials: "same-origin",
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -53,4 +53,11 @@ async function getApiErrorMessage(res: Response): Promise<string> {
 
 export function wsUrl(path: string, token: string): string {
   return `${WEBSOCKETS_URL}${path}?token=${encodeURIComponent(token)}`;
+}
+
+export function createEventSource(eventId: string): EventSource {
+  return new EventSource(
+      `${API_URL}/events/${encodeURIComponent(eventId)}/listen`,
+      { withCredentials: true },
+  );
 }

@@ -52,3 +52,7 @@ export function getSessionParticipants(
         token,
     );
 }
+
+export function getSessionStreamEndpoint(sessionId: string): string {
+    return `/sessions/${sessionId}/stream`;
+}

@@ -1,19 +1,14 @@
 package com.oeims.services
 
-import com.oeims.models.dto.JoinSessionResponse
-import com.oeims.models.dto.ParticipantResponse
-import com.oeims.models.dto.SessionResponse
 import com.oeims.exceptions.ConflictException
 import com.oeims.exceptions.ForbiddenException
 import com.oeims.exceptions.NotFoundException
 import com.oeims.models.SessionCode
-import com.oeims.models.ids.ExamId
-import com.oeims.models.ids.ParticipantId
-import com.oeims.models.ids.ProfessorId
-import com.oeims.models.ids.SessionId
 import com.oeims.models.SessionStatus
-import com.oeims.models.ids.StudentId
-import com.oeims.models.ids.UserId
+import com.oeims.models.dto.JoinSessionResponse
+import com.oeims.models.dto.ParticipantResponse
+import com.oeims.models.dto.SessionResponse
+import com.oeims.models.ids.*
 import com.oeims.models.toSessionCode
 import com.oeims.repositories.ParticipantRecord
 import com.oeims.repositories.SessionRecord
@@ -21,13 +16,18 @@ import com.oeims.repositories.interfaces.IExamRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.repositories.interfaces.IUserRepository
+import com.oeims.sse.SseBroadcaster
+import com.oeims.sse.SseChannels
+import com.oeims.sse.SseEvent
+import kotlinx.serialization.json.Json
 import java.time.Instant
 
 class SessionService(
     private val sessionRepository: ISessionRepository,
     private val examRepository: IExamRepository,
     private val participantRepository: IParticipantRepository,
-    private val userRepository: IUserRepository
+    private val userRepository: IUserRepository,
+    private val sseBroadcaster: SseBroadcaster,
 ) {
 
     suspend fun createSession(professorId: ProfessorId, examId: ExamId): SessionResponse {
@@ -83,6 +83,13 @@ class SessionService(
             return buildJoinResponse(existing, session)
 
         val participant = participantRepository.create(session.id, studentId.value)
+
+        sseBroadcaster.publish(
+            channel = SseChannels.session(session.id.toSessionId()),
+            event = SseEvent.PARTICIPANT_JOINED,
+            data = Json.encodeToString(participant.toResponse())
+        )
+
         return buildJoinResponse(participant, session)
     }
 

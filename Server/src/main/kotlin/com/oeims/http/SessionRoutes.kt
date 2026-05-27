@@ -6,7 +6,6 @@ import com.oeims.models.ids.toExamId
 import com.oeims.models.ids.toProfessorId
 import com.oeims.models.ids.toSessionId
 import com.oeims.models.ids.toStudentId
-import com.oeims.models.ids.toUserId
 import com.oeims.models.toSessionCode
 import com.oeims.services.EventService
 import com.oeims.services.SessionService
@@ -16,7 +15,10 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.sessionRoutes(sessionService: SessionService, eventService: EventService) {
+fun Route.sessionRoutes(
+    sessionService: SessionService,
+    eventService: EventService,
+) {
 
     authenticate("auth-professor") {
 

@@ -7,7 +7,7 @@ interface Callbacks {
   onStatusUpdate: (update: ParticipantStatusUpdate) => void;
 }
 
-export function useWebsockets(
+export function useWebSockets(
   sessionId: string | null,
   token: string | null,
   callbacks: Callbacks

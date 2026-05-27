@@ -1,19 +1,13 @@
 package com.oeims.plugins
 
+import com.oeims.exceptions.*
+import com.oeims.http.*
 import com.oeims.models.dto.ErrorResponse
-import com.oeims.exceptions.ConflictException
-import com.oeims.exceptions.ForbiddenException
-import com.oeims.exceptions.NotFoundException
-import com.oeims.exceptions.UnauthorizedException
-import com.oeims.exceptions.ValidationException
-import com.oeims.http.authRoutes
-import com.oeims.http.examRoutes
-import com.oeims.http.participantRoutes
-import com.oeims.http.sessionRoutes
 import com.oeims.services.AuthService
 import com.oeims.services.EventService
 import com.oeims.services.ExamService
 import com.oeims.services.SessionService
+import com.oeims.sse.SseBroadcaster
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
@@ -24,7 +18,8 @@ fun Application.configureRouting(
     authService: AuthService,
     examService: ExamService,
     sessionService: SessionService,
-    eventService: EventService
+    eventService: EventService,
+    sseBroadcaster: SseBroadcaster,
 ) {
     install(StatusPages) {
         exception<ValidationException> { call, cause ->
@@ -59,6 +54,7 @@ fun Application.configureRouting(
             examRoutes(examService)
             participantRoutes(sessionService)
             sessionRoutes(sessionService, eventService)
+            sseRoutes(sessionService, sseBroadcaster)
         }
     }
 }

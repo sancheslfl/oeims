@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { OpenedSession, ParticipantResponse, SessionResponse } from "../types";
 import { useAuth } from "../AuthContext";
 import { getSessionParticipants, startSession } from "../api/sessions";
+import {REALTIME_CHANNELS, REALTIME_EVENTS, useEventListener} from "../hooks/useEventListener";
 
 const seats = Array.from({ length: 12 }, (_, index) => index + 1);
 
@@ -25,22 +26,57 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
     const exam = openedSession?.exam;
 
     const session =
-        startedSession && startedSession?.id === openedSession?.session.id
+        startedSession && startedSession.id === openedSession?.session.id
             ? startedSession
             : openedSession?.session;
 
+    const sessionId = session?.id;
+
     const participants =
-        participantsState && participantsState.sessionId === session?.id
+        participantsState && participantsState.sessionId === sessionId
             ? participantsState.participants
             : [];
 
     const canStartSession = session?.status === "PENDING";
 
+    const eventId =
+        sessionId && session?.status !== "ENDED"
+            ? REALTIME_CHANNELS.session(sessionId)
+            : null;
+
+    const sseMessageHandler = useMemo(
+        () => ({
+            [REALTIME_EVENTS.ParticipantJoined]: (data: unknown) => {
+                if (!sessionId) {
+                    return;
+                }
+
+                const participant = data as ParticipantResponse;
+
+                setParticipantsState((current) => {
+                    const currentParticipants =
+                        current?.sessionId === sessionId ? current.participants : [];
+
+                    if (currentParticipants.some((item) => item.id === participant.id)) {
+                        return current;
+                    }
+
+                    return {
+                        sessionId,
+                        participants: [...currentParticipants, participant],
+                    };
+                });
+            },
+        }),
+        [sessionId],
+    );
+
+    useEventListener(eventId, sseMessageHandler);
+
     useEffect(() => {
         const token = auth?.token;
-        const sessionId = session?.id;
 
-        if (!token || !sessionId || session.status === "ENDED") {
+        if (!token || !sessionId || session?.status === "ENDED") {
             return;
         }
 
@@ -65,15 +101,10 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
 
         void loadParticipants(token, sessionId);
 
-        const intervalId = window.setInterval(() => {
-            void loadParticipants(token, sessionId);
-        }, 2000);
-
         return () => {
             ignore = true;
-            window.clearInterval(intervalId);
         };
-    }, [auth?.token, session?.id, session?.status]);
+    }, [auth?.token, sessionId, session?.status]);
 
     async function handleStartSession() {
         if (!auth || !session) {
@@ -140,7 +171,9 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
                             <div key={seat} className="grid justify-items-center gap-1">
                                 <div
                                     className={`grid h-12 w-32 place-items-center rounded-md border-2 border-isel-purple font-bold ${
-                                        participant ? "bg-isel-pink text-isel-purple" : "bg-isel-purple/5"
+                                        participant
+                                            ? "bg-isel-pink text-isel-purple"
+                                            : "bg-isel-purple/5"
                                     }`}
                                 >
                                     {participant && getStudentNumber(participant.email)}
