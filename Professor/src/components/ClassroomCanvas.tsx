@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { OpenedSession, ParticipantResponse, SessionResponse } from "../types";
 import { useAuth } from "../AuthContext";
 import { getSessionParticipants, startSession } from "../api/sessions";
-import {REALTIME_CHANNELS, REALTIME_EVENTS, useEventListener} from "../hooks/useEventListener";
+import {
+    REALTIME_CHANNELS,
+    REALTIME_EVENTS,
+    useEventListener,
+} from "../hooks/useEventListener";
 
 const seats = Array.from({ length: 12 }, (_, index) => index + 1);
 
@@ -24,12 +28,15 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
     const [error, setError] = useState("");
 
     const exam = openedSession?.exam;
+    const openedSessionData = openedSession?.session;
 
-    const session =
-        startedSession && startedSession.id === openedSession?.session.id
-            ? startedSession
-            : openedSession?.session;
+    const canUseStartedSession =
+        startedSession &&
+        openedSessionData &&
+        startedSession.id === openedSessionData.id &&
+        openedSessionData.status === "PENDING";
 
+    const session = canUseStartedSession ? startedSession : openedSessionData;
     const sessionId = session?.id;
 
     const participants =
@@ -57,13 +64,9 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
                     const currentParticipants =
                         current?.sessionId === sessionId ? current.participants : [];
 
-                    if (currentParticipants.some((item) => item.id === participant.id)) {
-                        return current;
-                    }
-
                     return {
                         sessionId,
-                        participants: [...currentParticipants, participant],
+                        participants: addParticipantIfMissing(currentParticipants, participant),
                     };
                 });
             },
@@ -84,13 +87,23 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
 
         async function loadParticipants(token: string, sessionId: string) {
             try {
-                const participants = await getSessionParticipants(sessionId, token);
+                const loadedParticipants = await getSessionParticipants(sessionId, token);
 
                 if (!ignore) {
-                    setParticipantsState({
-                        sessionId,
-                        participants,
+                    setParticipantsState((current) => {
+                        const currentParticipants =
+                            current?.sessionId === sessionId ? current.participants : [];
+
+                        return {
+                            sessionId,
+                            participants: mergeParticipants(
+                                loadedParticipants,
+                                currentParticipants,
+                            ),
+                        };
                     });
+
+                    setError("");
                 }
             } catch (error) {
                 if (!ignore && error instanceof Error) {
@@ -118,7 +131,9 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
             const started = await startSession(session.id, auth.token);
             setStartedSession(started);
         } catch (error) {
-            setError(error instanceof Error ? error.message : "Unexpected error.");
+            if (error instanceof Error) {
+                setError(error.message);
+            }
         } finally {
             setIsStarting(false);
         }
@@ -187,6 +202,41 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
             </div>
         </div>
     );
+}
+
+function addParticipantIfMissing(
+    participants: ParticipantResponse[],
+    participant: ParticipantResponse,
+) {
+    const participantIds = new Set(participants.map((item) => item.id));
+
+    if (participantIds.has(participant.id)) {
+        return participants;
+    }
+
+    return [...participants, participant];
+}
+
+// SSE can receive event before REST finishes loading. REST result then can overwrite the SSE result,
+// causing the joined participant to disappear from the list.
+// This function ensures that all participants are included, giving priority to REST result.
+function mergeParticipants(
+    primaryParticipants: ParticipantResponse[],
+    fallbackParticipants: ParticipantResponse[],
+) {
+    const participantsById = new Map<string, ParticipantResponse>();
+
+    for (const participant of primaryParticipants) {
+        participantsById.set(participant.id, participant);
+    }
+
+    for (const participant of fallbackParticipants) {
+        if (!participantsById.has(participant.id)) {
+            participantsById.set(participant.id, participant);
+        }
+    }
+
+    return Array.from(participantsById.values());
 }
 
 function getSessionStatusLabel(session?: SessionResponse) {
