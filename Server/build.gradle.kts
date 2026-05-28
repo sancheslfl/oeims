@@ -34,6 +34,8 @@ dependencies {
     implementation("io.ktor:ktor-server-call-id:$ktor_version")
     implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
     implementation("io.ktor:ktor-server-status-pages:$ktor_version")
+    implementation("io.ktor:ktor-server-cors:$ktor_version")
+    implementation("io.ktor:ktor-server-sse:${ktor_version}")               // SSE
 
     // Exposed ORM
     implementation("org.jetbrains.exposed:exposed-core:$exposed_version")

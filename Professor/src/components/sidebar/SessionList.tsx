@@ -1,0 +1,172 @@
+import { useState } from "react";
+import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
+import { useAuth } from "../../AuthContext";
+import { createSession } from "../../api/sessions";
+import { saveLastSessionId } from "../../localStorage.ts";
+
+type SessionListProps = {
+    exams: ExamResponse[];
+    isLoading: boolean;
+    openedSession: OpenedSession | null;
+    onOpenSession: (openedSession: OpenedSession) => void;
+};
+
+type ExamCardProps = {
+    exam: ExamResponse;
+    restoredSession?: SessionResponse;
+    onOpenSession: (openedSession: OpenedSession) => void;
+};
+
+function ExamCard({ exam, restoredSession, onOpenSession }: ExamCardProps) {
+    const { auth } = useAuth();
+
+    const [session, setSession] = useState<SessionResponse | undefined>(restoredSession);
+    const [isExpanded, setIsExpanded] = useState(Boolean(restoredSession));
+    const [isCreatingSession, setIsCreatingSession] = useState(false);
+    const [error, setError] = useState("");
+
+    async function handleToggleSession() {
+        if (isExpanded) {
+            setIsExpanded(false);
+            return;
+        }
+
+        if (session) {
+            setIsExpanded(true);
+            onOpenSession({ exam, session });
+            return;
+        }
+
+        if (!auth) {
+            return;
+        }
+
+        setError("");
+        setIsCreatingSession(true);
+
+        try {
+            const createdSession = await createSession(exam.id, auth.token);
+
+            setSession(createdSession);
+            setIsExpanded(true);
+            saveLastSessionId(auth.id, createdSession.id);
+
+            onOpenSession({
+                exam,
+                session: createdSession,
+            });
+        } catch (error) {
+            if (error instanceof Error) {
+                setError(error.message);
+            }
+        } finally {
+            setIsCreatingSession(false);
+        }
+    }
+
+    return (
+        <article className="grid gap-3 rounded-md border-2 border-isel-purple bg-isel-white p-4">
+            <div className="grid gap-1">
+                <h3 className="font-bold text-isel-purple">
+                    {exam.title}
+                </h3>
+
+                {exam.description && (
+                    <p className="text-sm text-isel-purple/80">
+                        {exam.description}
+                    </p>
+                )}
+
+                <span className="text-sm font-semibold text-isel-red">
+                    {exam.durationMins} minutes
+                </span>
+            </div>
+
+            {error && (
+                <p className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
+                    {error}
+                </p>
+            )}
+
+            <button
+                type="button"
+                className="app-button app-button-secondary"
+                disabled={isCreatingSession}
+                onClick={() => handleToggleSession()}
+            >
+                {getSessionButtonLabel(session, isExpanded, isCreatingSession)}
+            </button>
+
+            {isExpanded && session && (
+                <div className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-isel-purple">
+                        Session code
+                    </span>
+
+                    <p className="mt-1 text-2xl font-bold text-isel-red">
+                        {session.code}
+                    </p>
+                </div>
+            )}
+        </article>
+    );
+}
+
+export function SessionList({
+                                exams,
+                                isLoading,
+                                openedSession,
+                                onOpenSession,
+                            }: SessionListProps) {
+    return (
+        <section className="grid min-h-0 flex-1 grid-rows-[auto_1fr] gap-4">
+            <h2 className="app-section-title">Available exams</h2>
+
+            <div className="min-h-0">
+                {isLoading ? (
+                    <p className="text-sm font-semibold text-isel-purple/70">
+                        Loading exams...
+                    </p>
+                ) : exams.length === 0 ? (
+                    <p className="text-sm font-semibold text-isel-purple/70">
+                        No exams created yet.
+                    </p>
+                ) : (
+                    <div className="grid gap-3">
+                        {exams.map((exam) => {
+                            const restoredSession =
+                                openedSession?.exam.id === exam.id
+                                    ? openedSession.session
+                                    : undefined;
+
+                            return (
+                                <ExamCard
+                                    key={`${exam.id}:${restoredSession?.id ?? "empty"}`}
+                                    exam={exam}
+                                    restoredSession={restoredSession}
+                                    onOpenSession={onOpenSession}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </section>
+    );
+}
+
+function getSessionButtonLabel(
+    session: SessionResponse | undefined,
+    isExpanded: boolean,
+    isCreatingSession: boolean,
+) {
+    if (isCreatingSession) {
+        return "Generating...";
+    }
+
+    if (!session) {
+        return "Generate session";
+    }
+
+    return isExpanded ? "Hide code" : "Show code";
+}

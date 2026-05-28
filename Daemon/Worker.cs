@@ -29,20 +29,20 @@ namespace Daemon
 
             if (serverConfig.ShouldConnect)
             {
-                logger.LogInformation("[ServerConnection] Connecting to {BaseUrl}", serverConfig.BaseUrl);
+                logger.LogInformation("Connecting to server...");
                 _ = wsClient.RunAsync(stoppingToken);
                 _ = heartbeatSender.RunAsync(stoppingToken);
             }
             else if (!serverConfig.Enabled)
             {
                 logger.LogWarning(
-                    "[ServerConnection] Disabled by configuration — running without server connection.");
+                    "Disabled by configuration - running without server connection.");
             }
             else
             {
                 logger.LogWarning(
-                    "[ServerConnection] No server config found — running without server connection. " +
-                    "Set Server:BaseUrl, Server:Token and Server:ParticipantId in appsettings.json.");
+                    "No server config found so running without server connection. " +
+                    "Set Server:ApiBaseUrl, Server:RealtimeBaseUrl, Server:Token and Server:ParticipantId in appsettings.json.");
             }
 
             await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));

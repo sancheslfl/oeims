@@ -2,12 +2,16 @@ package com.oeims.plugins
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.oeims.http.AUTH_COOKIE_NAME
 import com.oeims.models.dto.ErrorResponse
 import com.oeims.services.JwtConfig
 import io.ktor.http.*
+import io.ktor.http.auth.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
+import io.ktor.server.request.httpMethod
+import io.ktor.server.request.uri
 import io.ktor.server.response.*
 
 fun Application.configureSecurity(jwtConfig: JwtConfig) {
@@ -18,17 +22,20 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
         .build()
 
     install(Authentication) {
-
-        // Any authenticated user — professor or student
-        jwt("auth-jwt") {
-            realm = jwtConfig.realm
+        jwtWithCookie("auth-jwt", jwtConfig) {
             this.verifier(verifier)
+
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
-                val role   = credential.payload.getClaim("role").asString()
-                if (userId != null && role != null) JWTPrincipal(credential.payload)
-                else null
+                val role = credential.payload.getClaim("role").asString()
+
+                if (userId != null && role != null) {
+                    JWTPrincipal(credential.payload)
+                } else {
+                    null
+                }
             }
+
             challenge { _, _ ->
                 call.respond(
                     HttpStatusCode.Unauthorized,
@@ -37,16 +44,20 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
             }
         }
 
-        // Professors only
-        jwt("auth-professor") {
-            realm = jwtConfig.realm
+        jwtWithCookie("auth-professor", jwtConfig) {
             this.verifier(verifier)
+
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
-                val role   = credential.payload.getClaim("role").asString()
-                if (userId != null && role == "PROFESSOR") JWTPrincipal(credential.payload)
-                else null
+                val role = credential.payload.getClaim("role").asString()
+
+                if (userId != null && role == "PROFESSOR") {
+                    JWTPrincipal(credential.payload)
+                } else {
+                    null
+                }
             }
+
             challenge { _, _ ->
                 call.respond(
                     HttpStatusCode.Forbidden,
@@ -55,16 +66,20 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
             }
         }
 
-        // Students only
-        jwt("auth-student") {
-            realm = jwtConfig.realm
+        jwtWithCookie("auth-student", jwtConfig) {
             this.verifier(verifier)
+
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
-                val role   = credential.payload.getClaim("role").asString()
-                if (userId != null && role == "STUDENT") JWTPrincipal(credential.payload)
-                else null
+                val role = credential.payload.getClaim("role").asString()
+
+                if (userId != null && role == "STUDENT") {
+                    JWTPrincipal(credential.payload)
+                } else {
+                    null
+                }
             }
+
             challenge { _, _ ->
                 call.respond(
                     HttpStatusCode.Forbidden,
@@ -72,5 +87,24 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
                 )
             }
         }
+    }
+}
+
+private fun AuthenticationConfig.jwtWithCookie(
+    name: String,
+    jwtConfig: JwtConfig,
+    configure: JWTAuthenticationProvider.Config.() -> Unit
+) {
+    jwt(name) {
+        realm = jwtConfig.realm
+
+        authHeader { call ->
+            call.request.parseAuthorizationHeader()
+                ?: call.request.cookies[AUTH_COOKIE_NAME]?.let { token ->
+                    HttpAuthHeader.Single("Bearer", token)
+                }
+        }
+
+        configure()
     }
 }

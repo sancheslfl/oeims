@@ -5,16 +5,20 @@ ktor:
   deployment:
     port: 8080
 
+app:
+  api:
+    base-path: "/api"
+
 jwt:
-  secret: "change-me-before-production"   # overridden by JWT_SECRET env var at runtime
+  secret: "change-me-before-production"
   issuer: "oeims"
   audience: "oeims-users"
   realm: "OEIMS"
-  expiration-ms: 86400000 # 24 hours
+  expiration-ms: 86400000
 
 database:
   path: "./oeims.db"
 
 heartbeat:
-  interval-ms: 15000   # how often daemon sends heartbeat
-  timeout-ms: 30000    # how long before a participant is marked timed out
+  interval-ms: 15000
+  timeout-ms: 30000

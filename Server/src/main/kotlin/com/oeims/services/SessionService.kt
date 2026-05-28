@@ -1,19 +1,14 @@
 package com.oeims.services
 
-import com.oeims.models.dto.JoinSessionResponse
-import com.oeims.models.dto.ParticipantResponse
-import com.oeims.models.dto.SessionResponse
 import com.oeims.exceptions.ConflictException
 import com.oeims.exceptions.ForbiddenException
 import com.oeims.exceptions.NotFoundException
 import com.oeims.models.SessionCode
-import com.oeims.models.ids.ExamId
-import com.oeims.models.ids.ParticipantId
-import com.oeims.models.ids.ProfessorId
-import com.oeims.models.ids.SessionId
 import com.oeims.models.SessionStatus
-import com.oeims.models.ids.StudentId
-import com.oeims.models.ids.UserId
+import com.oeims.models.dto.JoinSessionResponse
+import com.oeims.models.dto.ParticipantResponse
+import com.oeims.models.dto.SessionResponse
+import com.oeims.models.ids.*
 import com.oeims.models.toSessionCode
 import com.oeims.repositories.ParticipantRecord
 import com.oeims.repositories.SessionRecord
@@ -21,13 +16,18 @@ import com.oeims.repositories.interfaces.IExamRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.repositories.interfaces.IUserRepository
+import com.oeims.sse.SseBroadcaster
+import com.oeims.sse.SseChannels
+import com.oeims.sse.SseEvent
+import kotlinx.serialization.json.Json
 import java.time.Instant
 
 class SessionService(
     private val sessionRepository: ISessionRepository,
     private val examRepository: IExamRepository,
     private val participantRepository: IParticipantRepository,
-    private val userRepository: IUserRepository
+    private val userRepository: IUserRepository,
+    private val sseBroadcaster: SseBroadcaster,
 ) {
 
     suspend fun createSession(professorId: ProfessorId, examId: ExamId): SessionResponse {
@@ -50,21 +50,21 @@ class SessionService(
         if (session.status != SessionStatus.PENDING)
             throw ConflictException("Only a pending session can be started")
 
-        sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE)
+        sessionRepository.updateStatus(sessionId.value, SessionStatus.ACTIVE)
         return session.copy(status = SessionStatus.ACTIVE, startedAt = Instant.now()).toResponse()
     }
 
     suspend fun endSession(sessionId: SessionId, professorId: ProfessorId): SessionResponse {
-        val session = sessionRepository.findById(sessionId)
+        val session = sessionRepository.findById(sessionId.value)
             ?: throw NotFoundException("Session not found")
 
-        if (session.supervisorId != professorId)
+        if (session.supervisorId != professorId.value)
             throw ForbiddenException("Only the session supervisor can end it")
 
         if (session.status != SessionStatus.ACTIVE)
             throw ConflictException("Only an active session can be ended")
 
-        sessionRepository.updateStatus(sessionId, SessionStatus.ENDED)
+        sessionRepository.updateStatus(sessionId.value, SessionStatus.ENDED)
         return session.copy(status = SessionStatus.ENDED, endedAt = Instant.now()).toResponse()
     }
 
@@ -83,12 +83,24 @@ class SessionService(
             return buildJoinResponse(existing, session)
 
         val participant = participantRepository.create(session.id, studentId.value)
+
+        sseBroadcaster.publish(
+            channel = SseChannels.session(session.id.toSessionId()),
+            event = SseEvent.PARTICIPANT_JOINED,
+            data = Json.encodeToString(participant.toResponse())
+        )
+
         return buildJoinResponse(participant, session)
     }
 
     suspend fun getSession(sessionId: SessionId): SessionResponse =
         sessionRepository.findById(sessionId.value)?.toResponse()
             ?: throw NotFoundException("Session not found")
+
+    suspend fun getCurrentSession(professorId: ProfessorId): SessionResponse? =
+        sessionRepository
+            .findLatestOpenBySupervisor(professorId.value)
+            ?.toResponse()
 
     suspend fun getParticipants(sessionId: SessionId): List<ParticipantResponse> {
         sessionRepository.findById(sessionId.value)

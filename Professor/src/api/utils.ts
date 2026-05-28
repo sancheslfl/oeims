@@ -1,0 +1,63 @@
+export const API_URL = import.meta.env.VITE_API_URL;
+const WEBSOCKETS_URL = import.meta.env.VITE_WS_URL;
+
+type ApiErrorResponse = {
+  error: string;
+};
+
+export async function apiFetch<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    token?: string,
+): Promise<T> {
+  const headers = new Headers(options.headers);
+
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error(await getApiErrorMessage(res));
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  return await res.json() as T;
+}
+
+async function getApiErrorMessage(res: Response): Promise<string> {
+  try {
+    const body = await res.json() as ApiErrorResponse;
+
+    if (typeof body.error === "string") {
+      return body.error;
+    }
+  } catch {
+    // invalid error body.
+  }
+
+  return `It seems a strange error occurred. Please try again later.`;
+}
+
+export function wsUrl(path: string, token: string): string {
+  return `${WEBSOCKETS_URL}${path}?token=${encodeURIComponent(token)}`;
+}
+
+export function createEventSource(eventId: string): EventSource {
+  return new EventSource(
+      `${API_URL}/events/${encodeURIComponent(eventId)}/listen`,
+      { withCredentials: true },
+  );
+}

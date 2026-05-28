@@ -6,7 +6,6 @@ import com.oeims.models.ids.toExamId
 import com.oeims.models.ids.toProfessorId
 import com.oeims.models.ids.toSessionId
 import com.oeims.models.ids.toStudentId
-import com.oeims.models.ids.toUserId
 import com.oeims.models.toSessionCode
 import com.oeims.services.EventService
 import com.oeims.services.SessionService
@@ -16,19 +15,33 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.sessionRoutes(sessionService: SessionService, eventService: EventService) {
-
-    // ── Professor endpoints ───────────────────────────────────────────────────
+fun Route.sessionRoutes(
+    sessionService: SessionService,
+    eventService: EventService,
+) {
 
     authenticate("auth-professor") {
 
-        // POST /sessions — create a session for an exam
+        // POST /sessions - create a session for an exam
         post("/sessions") {
             val professorId = call.userId()
             val req = call.receive<CreateSessionRequest>()
             val examId = call.uuidParam(req.examId, "examId")
             val response = sessionService.createSession(professorId.toProfessorId(), examId.toExamId())
             call.respond(HttpStatusCode.Created, response)
+        }
+
+        // GET /sessions/current - latest pending or active session for professor
+        get("/sessions/current") {
+            val professorId = call.userId()
+            val response = sessionService.getCurrentSession(professorId.toProfessorId())
+
+            if (response == null) {
+                call.respond(HttpStatusCode.NoContent)
+                return@get
+            }
+
+            call.respond(HttpStatusCode.OK, response)
         }
 
         route("/sessions/{id}") {
@@ -72,11 +85,10 @@ fun Route.sessionRoutes(sessionService: SessionService, eventService: EventServi
         }
     }
 
-    // ── Student endpoints ─────────────────────────────────────────────────────
 
     authenticate("auth-student") {
 
-        // POST /sessions/join — join a session by code
+        // POST /sessions/join - join a session by code
         post("/sessions/join") {
             val studentId = call.userId()
             val req = call.receive<JoinSessionRequest>()

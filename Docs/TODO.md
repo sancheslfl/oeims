@@ -5,7 +5,8 @@
 - [ ] Corrigir o logging do servidor para incluir a identidade do utilizador (email/role) em cada request
 - [ ] Adicionar a claim de email ao JWT para facilitar o logging e rastreabilidade
 - [ ] Investigar que valor usar para `maxFrameSize` na configuração das WebSockets
-- [ ] Implementar o próprio logger dedicado à comunicação WebSockets **(2º prioridade)**
+- [ ] (NEW) Alterar o campo supervisor_id para um array de IDs e suportar vários supervisor para uma sessão
+- [ ] (NEW) Permitir que contas de professores acedam a sessões ativas usando os códigos
 
 ## Daemon
 
@@ -21,6 +22,8 @@
 - [ ] Redesenhar o student card para mostrar as infrações inline com scroll em vez de tooltip flutuante (resolve o bug de hover)
 - [ ] Adicionar filtro/arquivo para ocultar exames e sessões terminadas
 - [ ] Adicionar opção de eliminar ou arquivar exames
+- [ ] Criar um campo para a sala no formulário de criação de exame em vez de estar explicito no título
+- [ ] Usar reducer hook no componente Dashboard e Login que tem bastantes estados
 
 ## Documentação
 
@@ -30,8 +33,6 @@
 
 ## Dúvidas
 
-- O que o prof. quis dizer com a implementação do nosso próprio logger?
-- Deveremos arranjar uma solução mais robusta para o logging excessivo do FocusMonitor?
 
 ## Concluído
 

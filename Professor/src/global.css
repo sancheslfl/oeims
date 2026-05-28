@@ -1,0 +1,68 @@
+@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-isel-red: #ff3c28;
+  --color-isel-purple: #5f1437;
+  --color-isel-pink: #ffd2f5;
+  --color-isel-white: #ffffff;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: "Chakra Petch", Verdana, sans-serif;
+    background: var(--color-isel-white);
+    color: var(--color-isel-purple);
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .app-button {
+    @apply rounded-md border-2 border-isel-purple bg-isel-red px-4 py-2 font-semibold text-isel-white transition hover:brightness-95;
+  }
+
+  .app-button-secondary {
+    @apply bg-isel-white text-isel-purple;
+  }
+
+  .app-input {
+    @apply w-full rounded-md border-2 border-isel-purple bg-isel-white px-3 py-2 text-isel-purple outline-none focus:ring-2 focus:ring-isel-red;
+  }
+
+  .app-label {
+    @apply text-sm font-semibold text-isel-purple;
+  }
+
+  .app-section-title {
+    @apply text-base font-semibold text-isel-purple;
+  }
+
+  .sidebar-scroll {
+    direction: rtl;
+    scrollbar-width: none;
+  }
+
+  .sidebar-scroll > * {
+    direction: ltr;
+  }
+
+  .sidebar-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}

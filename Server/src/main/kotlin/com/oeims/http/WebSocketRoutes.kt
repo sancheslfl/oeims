@@ -6,24 +6,19 @@ import com.oeims.models.ConnectionStatus
 import com.oeims.models.ids.toParticipantId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.services.EventService
-import com.oeims.websocket.IConnectionRegistry
 import io.ktor.server.application.log
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
-import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 fun Route.webSocketRoutes(
-    connectionRegistry: IConnectionRegistry,
     eventService: EventService,
     participantRepository: IParticipantRepository
 ) {
-    // ── Daemon channel ────────────────────────────────────────────────────────
     authenticate("auth-student") {
         webSocket("/ws/daemon/{participantId}") {
             val authenticatedUserId = call.userId()
@@ -55,7 +50,7 @@ fun Route.webSocketRoutes(
                                 )
                             }
                         } catch (e: SerializationException) {
-                            // Malformed frame so ignore and keep connection alive
+                            // suppress because malformed frame and keep connection alive
                             application.log.debug(
                                 "Daemon sent malformed frame for {} - ignored: {}",
                                 participantId,
@@ -70,29 +65,6 @@ fun Route.webSocketRoutes(
                 application.log.warn("Daemon WebSocket error for $participantId", e)
             } finally {
                 participantRepository.updateConnectionStatus(participantId, ConnectionStatus.DISCONNECTED)
-            }
-        }
-    }
-
-    // ── Professor console channel ─────────────────────────────────────────────
-    authenticate("auth-professor") {
-        webSocket("/ws/console/{sessionId}") {
-            val sessionId = call.uuidParam("sessionId")
-            val flow = connectionRegistry.flowForSession(sessionId)
-
-            val job = launch {
-                flow.collect { message -> send(message) }
-            }
-
-            runCatching {
-                for (frame in incoming) { /* server -> client only; ignore any client frames */ }
-            }.onFailure { e ->
-                when (e) {
-                    is CancellationException -> throw e
-                    !is ClosedReceiveChannelException -> application.log.warn("Console WebSocket error for session $sessionId", e)
-                }
-            }.also {
-                job.cancel()
             }
         }
     }

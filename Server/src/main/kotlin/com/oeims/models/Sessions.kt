@@ -10,6 +10,7 @@ object Sessions : UUIDTable("sessions") {
     val supervisorId = reference("supervisor_id", Users)
     val code         = char("code", 6).uniqueIndex()
     val status       = enumerationByName("status", 16, SessionStatus::class)
+    val createdAt    = timestamp("created_at")
     val startedAt    = timestamp("started_at").nullable()
     val endedAt      = timestamp("ended_at").nullable()
 }

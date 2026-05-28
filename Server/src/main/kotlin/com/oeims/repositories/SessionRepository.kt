@@ -5,6 +5,8 @@ import com.oeims.models.Sessions
 import com.oeims.repositories.interfaces.ISessionRepository
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
@@ -18,6 +20,7 @@ data class SessionRecord(
     val supervisorId: UUID,
     val code: String,
     val status: SessionStatus,
+    val createdAt: Instant,
     val startedAt: Instant?,
     val endedAt: Instant?
 )
@@ -38,45 +41,75 @@ class SessionRepository : ISessionRepository {
             ?.toRecord()
     }
 
-    override suspend fun findBySupervisor(supervisorId: UUID): List<SessionRecord> = newSuspendedTransaction(Dispatchers.IO) {
-        Sessions.selectAll()
-            .where { Sessions.supervisorId eq supervisorId }
-            .map { it.toRecord() }
-    }
-
-    override suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord = newSuspendedTransaction(Dispatchers.IO) {
-        val id = UUID.randomUUID()
-        Sessions.insert {
-            it[Sessions.id] = id
-            it[Sessions.examId] = examId
-            it[Sessions.supervisorId] = supervisorId
-            it[Sessions.code] = code
-            it[Sessions.status] = SessionStatus.PENDING
-            it[Sessions.startedAt] = null
-            it[Sessions.endedAt] = null
+    override suspend fun findBySupervisor(supervisorId: UUID): List<SessionRecord> =
+        newSuspendedTransaction(Dispatchers.IO) {
+            Sessions.selectAll()
+                .where { Sessions.supervisorId eq supervisorId }
+                .map { it.toRecord() }
         }
-        SessionRecord(id, examId, supervisorId, code, SessionStatus.PENDING, null, null)
-    }
 
-    override suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean = newSuspendedTransaction(Dispatchers.IO) {
-        val now = Instant.now()
-        Sessions.update({ Sessions.id eq id }) {
-            it[Sessions.status] = status
-            when (status) {
-                SessionStatus.ACTIVE -> it[Sessions.startedAt] = now
-                SessionStatus.ENDED  -> it[Sessions.endedAt] = now
-                else                 -> Unit
+    override suspend fun findLatestOpenBySupervisor(supervisorId: UUID): SessionRecord? =
+        newSuspendedTransaction(Dispatchers.IO) {
+            Sessions.selectAll()
+                .where {
+                    (Sessions.supervisorId eq supervisorId) and
+                            (Sessions.status inList listOf(SessionStatus.PENDING, SessionStatus.ACTIVE))
+                }
+                .orderBy(Sessions.createdAt to SortOrder.DESC)
+                .limit(1)
+                .singleOrNull()
+                ?.toRecord()
+        }
+
+    override suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord =
+        newSuspendedTransaction(Dispatchers.IO) {
+            val id = UUID.randomUUID()
+            val now = Instant.now()
+
+            Sessions.insert {
+                it[Sessions.id] = id
+                it[Sessions.examId] = examId
+                it[Sessions.supervisorId] = supervisorId
+                it[Sessions.code] = code
+                it[Sessions.status] = SessionStatus.PENDING
+                it[Sessions.createdAt] = now
+                it[Sessions.startedAt] = null
+                it[Sessions.endedAt] = null
             }
-        } > 0
-    }
 
-    private fun ResultRow.toRecord() = SessionRecord(
-        id           = this[Sessions.id].value,
-        examId       = this[Sessions.examId].value,
-        supervisorId = this[Sessions.supervisorId].value,
-        code         = this[Sessions.code],
-        status       = this[Sessions.status],
-        startedAt    = this[Sessions.startedAt],
-        endedAt      = this[Sessions.endedAt]
-    )
+            SessionRecord(
+                id = id,
+                examId = examId,
+                supervisorId = supervisorId,
+                code = code,
+                status = SessionStatus.PENDING,
+                createdAt = now,
+                startedAt = null,
+                endedAt = null
+            )
+        }
+
+    override suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean =
+        newSuspendedTransaction(Dispatchers.IO) {
+            val now = Instant.now()
+            Sessions.update({ Sessions.id eq id }) {
+                it[Sessions.status] = status
+                when (status) {
+                    SessionStatus.ACTIVE -> it[Sessions.startedAt] = now
+                    SessionStatus.ENDED -> it[Sessions.endedAt] = now
+                    else -> Unit
+                }
+            } > 0
+        }
 }
+
+private fun ResultRow.toRecord() = SessionRecord(
+    id = this[Sessions.id].value,
+    examId = this[Sessions.examId].value,
+    supervisorId = this[Sessions.supervisorId].value,
+    code = this[Sessions.code],
+    status = this[Sessions.status],
+    createdAt = this[Sessions.createdAt],
+    startedAt = this[Sessions.startedAt],
+    endedAt = this[Sessions.endedAt]
+)
