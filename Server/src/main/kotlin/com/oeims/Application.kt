@@ -102,8 +102,8 @@ fun Application.module() {
     val authService      = AuthService(userRepository, jwtConfig)
     val examService      = ExamService(examRepository)
     val sessionService   = SessionService(sessionRepository, examRepository, participantRepository, userRepository, sseBroadcaster)
-    val eventService     = EventService(eventRepository, participantRepository, sseBroadcaster)
-    val heartbeatService = HeartbeatService(participantRepository, sseBroadcaster, heartbeatConfig)
+    val eventService     = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
+    val heartbeatService = HeartbeatService(participantRepository, sessionRepository, sseBroadcaster, heartbeatConfig)
 
     // JWT Authentication
     configureSecurity(jwtConfig)

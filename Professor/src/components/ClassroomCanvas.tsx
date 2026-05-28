@@ -137,7 +137,12 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
                     };
                 });
             },
+
             [REALTIME_EVENTS.ParticipantStatusUpdated]: (data: unknown) => {
+                if (!sessionId) {
+                    return;
+                }
+
                 const update = data as ParticipantStatusResponse;
 
                 setParticipantsState((current) => {
