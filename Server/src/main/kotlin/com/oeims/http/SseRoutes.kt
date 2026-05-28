@@ -15,10 +15,10 @@ fun Route.sseRoutes(
     sseBroadcaster: SseBroadcaster
 ) {
     authenticate("auth-professor") {
-        sse("/events/{eventId}/listen") {
+        sse("/events/{channel}/listen") {
             val professorId = call.userId()
-            val eventId = call.parameters["eventId"] ?: return@sse close()
-            val channel = SseChannel(eventId)
+            val channelValue = call.parameters["channel"] ?: return@sse close()
+            val channel = SseChannel(channelValue)
 
             val sessionId = SseChannels.sessionId(channel) ?: return@sse close()
             val session = sessionService.getSession(sessionId)
@@ -47,7 +47,7 @@ fun Route.sseRoutes(
                         )
                     }
             } catch (_: ChannelWriteException) {
-                // silence it because client disconnected
+                // suppress because client disconnected
             }
         }
     }

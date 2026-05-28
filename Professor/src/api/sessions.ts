@@ -1,5 +1,5 @@
 import { apiFetch } from "./utils";
-import type {ParticipantResponse, SessionResponse} from "../types";
+import type {EventResponse, ParticipantResponse, SessionResponse} from "../types";
 
 export function createSession(
     examId: string,
@@ -53,6 +53,12 @@ export function getSessionParticipants(
     );
 }
 
-export function getSessionStreamEndpoint(sessionId: string): string {
-    return `/sessions/${sessionId}/stream`;
+export function getSessionEvents(sessionId: string, token: string) {
+    return apiFetch<EventResponse[]>(
+        `/sessions/${sessionId}/events`,
+        {
+            method: "GET",
+        },
+        token,
+    );
 }

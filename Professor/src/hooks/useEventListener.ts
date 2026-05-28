@@ -5,6 +5,8 @@ type EventHandlers = Record<string, (data: unknown) => void>;
 
 export const REALTIME_EVENTS = {
     ParticipantJoined: "participant.joined",
+    ParticipantStatusUpdated: "participant.status.updated",
+    ParticipantEventReceived: "participant.event.received"
 };
 
 export const REALTIME_CHANNELS = {

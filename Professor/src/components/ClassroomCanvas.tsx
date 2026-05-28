@@ -1,14 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import type { OpenedSession, ParticipantResponse, SessionResponse } from "../types";
+import type {
+    EventResponse,
+    OpenedSession,
+    ParticipantResponse, ParticipantStatusResponse,
+    SessionResponse,
+} from "../types";
 import { useAuth } from "../AuthContext";
-import { getSessionParticipants, startSession } from "../api/sessions";
+import {
+    getSessionEvents,
+    getSessionParticipants,
+    startSession,
+} from "../api/sessions";
 import {
     REALTIME_CHANNELS,
     REALTIME_EVENTS,
     useEventListener,
 } from "../hooks/useEventListener";
+import { StudentCard } from "./StudentCard";
 
 const seats = Array.from({ length: 12 }, (_, index) => index + 1);
+const maxEventsPerStudent = 10;
 
 type ClassroomCanvasProps = {
     openedSession: OpenedSession | null;
@@ -19,11 +30,26 @@ type ParticipantsState = {
     participants: ParticipantResponse[];
 };
 
+type EventsState = {
+    sessionId: string;
+    eventsByParticipantId: Record<string, EventResponse[]>;
+};
+
+type SelectedParticipantState = {
+    sessionId: string;
+    participantId: string;
+};
+
 export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
     const { auth } = useAuth();
 
     const [startedSession, setStartedSession] = useState<SessionResponse | null>(null);
     const [participantsState, setParticipantsState] = useState<ParticipantsState | null>(null);
+    const [eventsState, setEventsState] = useState<EventsState | null>(null);
+    const [hoveredParticipant, setHoveredParticipant] =
+        useState<SelectedParticipantState | null>(null);
+    const [openedParticipant, setOpenedParticipant] =
+        useState<SelectedParticipantState | null>(null);
     const [isStarting, setIsStarting] = useState(false);
     const [error, setError] = useState("");
 
@@ -43,6 +69,12 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
         participantsState && participantsState.sessionId === sessionId
             ? participantsState.participants
             : [];
+
+    const visibleParticipantId = getVisibleParticipantId(
+        sessionId,
+        openedParticipant,
+        hoveredParticipant,
+    );
 
     const canStartSession = session?.status === "PENDING";
 
@@ -66,7 +98,60 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
 
                     return {
                         sessionId,
-                        participants: addParticipantIfMissing(currentParticipants, participant),
+                        participants: addParticipantIfMissing(
+                            currentParticipants,
+                            participant,
+                        ),
+                    };
+                });
+            },
+
+            [REALTIME_EVENTS.ParticipantEventReceived]: (data: unknown) => {
+                if (!sessionId) {
+                    return;
+                }
+
+                const event = data as EventResponse;
+
+                setEventsState((current) => {
+                    const currentEventsByParticipantId =
+                        current?.sessionId === sessionId
+                            ? current.eventsByParticipantId
+                            : {};
+
+                    const currentParticipantEvents =
+                        currentEventsByParticipantId[event.participantId] ?? [];
+
+                    return {
+                        sessionId,
+                        eventsByParticipantId: {
+                            ...currentEventsByParticipantId,
+                            [event.participantId]: addEventIfMissing(
+                                currentParticipantEvents,
+                                event,
+                            ),
+                        },
+                    };
+                });
+            },
+            [REALTIME_EVENTS.ParticipantStatusUpdated]: (data: unknown) => {
+                const update = data as ParticipantStatusResponse;
+
+                setParticipantsState((current) => {
+                    if (!current || current.sessionId !== sessionId) {
+                        return current;
+                    }
+
+                    return {
+                        sessionId: current.sessionId,
+                        participants: current.participants.map((participant) =>
+                            participant.id === update.participantId
+                                ? {
+                                    ...participant,
+                                    connectionStatus: update.connectionStatus,
+                                }
+                                : participant,
+                        ),
                     };
                 });
             },
@@ -119,6 +204,51 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
         };
     }, [auth?.token, sessionId, session?.status]);
 
+    useEffect(() => {
+        const token = auth?.token;
+
+        if (!token || !sessionId || session?.status === "ENDED") {
+            return;
+        }
+
+        let ignore = false;
+
+        async function loadSessionEvents(token: string, sessionId: string) {
+            try {
+                const events = await getSessionEvents(sessionId, token);
+
+                if (!ignore) {
+                    setEventsState((current) => {
+                        const currentEventsByParticipantId =
+                            current?.sessionId === sessionId
+                                ? current.eventsByParticipantId
+                                : {};
+
+                        return {
+                            sessionId,
+                            eventsByParticipantId: mergeEventsByParticipantId(
+                                groupEventsByParticipantId(events),
+                                currentEventsByParticipantId,
+                            ),
+                        };
+                    });
+
+                    setError("");
+                }
+            } catch (error) {
+                if (!ignore && error instanceof Error) {
+                    setError(error.message);
+                }
+            }
+        }
+
+        void loadSessionEvents(token, sessionId);
+
+        return () => {
+            ignore = true;
+        };
+    }, [auth?.token, sessionId, session?.status]);
+
     async function handleStartSession() {
         if (!auth || !session) {
             return;
@@ -131,9 +261,7 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
             const started = await startSession(session.id, auth.token);
             setStartedSession(started);
         } catch (error) {
-            if (error instanceof Error) {
-                setError(error.message);
-            }
+            setError(error instanceof Error ? error.message : "Unexpected error.");
         } finally {
             setIsStarting(false);
         }
@@ -181,20 +309,82 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
                 >
                     {seats.map((seat, index) => {
                         const participant = participants[index];
+                        const isCardVisible =
+                            participant !== undefined &&
+                            visibleParticipantId === participant.id;
+                        const isPinned = isParticipantPinned(
+                            participant,
+                            sessionId,
+                            openedParticipant,
+                        );
+                        const participantEvents = getParticipantEvents(
+                            participant,
+                            sessionId,
+                            eventsState,
+                        );
 
                         return (
-                            <div key={seat} className="grid justify-items-center gap-1">
-                                <div
+                            <div
+                                key={seat}
+                                className="relative grid justify-items-center gap-1"
+                                onMouseEnter={() => {
+                                    if (!participant || !sessionId) {
+                                        return;
+                                    }
+
+                                    setHoveredParticipant({
+                                        sessionId,
+                                        participantId: participant.id,
+                                    });
+                                }}
+                                onMouseLeave={() => setHoveredParticipant(null)}
+                            >
+                                <button
+                                    type="button"
+                                    disabled={!participant}
+                                    aria-haspopup={participant ? "dialog" : undefined}
+                                    aria-expanded={
+                                        participant ? isCardVisible : undefined
+                                    }
+                                    aria-label={
+                                        participant
+                                            ? `Open details for ${participant.email}`
+                                            : `Empty seat ${seat}`
+                                    }
                                     className={`grid h-12 w-32 place-items-center rounded-md border-2 border-isel-purple font-bold ${
                                         participant
                                             ? "bg-isel-pink text-isel-purple"
                                             : "bg-isel-purple/5"
                                     }`}
+                                    onClick={() => {
+                                        if (!participant || !sessionId) {
+                                            return;
+                                        }
+
+                                        setOpenedParticipant((current) =>
+                                            current?.sessionId === sessionId &&
+                                            current.participantId === participant.id
+                                                ? null
+                                                : {
+                                                    sessionId,
+                                                    participantId: participant.id,
+                                                },
+                                        );
+                                    }}
                                 >
                                     {participant && getStudentNumber(participant.email)}
-                                </div>
+                                </button>
 
                                 <div className="h-6 w-14 rounded-b-md border-2 border-t-0 border-isel-purple bg-isel-white" />
+
+                                {participant && isCardVisible && (
+                                    <StudentCard
+                                        participant={participant}
+                                        events={participantEvents}
+                                        isPinned={isPinned}
+                                        onClose={() => setOpenedParticipant(null)}
+                                    />
+                                )}
                             </div>
                         );
                     })}
@@ -204,13 +394,66 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
     );
 }
 
+function getVisibleParticipantId(
+    sessionId: string | undefined,
+    openedParticipant: SelectedParticipantState | null,
+    hoveredParticipant: SelectedParticipantState | null,
+) {
+    if (!sessionId) {
+        return null;
+    }
+
+    if (openedParticipant && openedParticipant.sessionId === sessionId) {
+        return openedParticipant.participantId;
+    }
+
+    if (hoveredParticipant && hoveredParticipant.sessionId === sessionId) {
+        return hoveredParticipant.participantId;
+    }
+
+    return null;
+}
+
+function isParticipantPinned(
+    participant: ParticipantResponse | undefined,
+    sessionId: string | undefined,
+    openedParticipant: SelectedParticipantState | null,
+) {
+    if (!participant || !sessionId || !openedParticipant) {
+        return false;
+    }
+
+    return (
+        openedParticipant.sessionId === sessionId &&
+        openedParticipant.participantId === participant.id
+    );
+}
+
+function getParticipantEvents(
+    participant: ParticipantResponse | undefined,
+    sessionId: string | undefined,
+    eventsState: EventsState | null,
+) {
+    if (!participant || !sessionId || !eventsState) {
+        return [];
+    }
+
+    if (eventsState.sessionId !== sessionId) {
+        return [];
+    }
+
+    return eventsState.eventsByParticipantId[participant.id] ?? [];
+}
+
 function addParticipantIfMissing(
     participants: ParticipantResponse[],
     participant: ParticipantResponse,
 ) {
-    const participantIds = new Set(participants.map((item) => item.id));
+    const participantsById = new Map(
+        participants.map((participant) => [participant.id, participant]),
+    );
 
-    if (participantIds.has(participant.id)) {
+    if (participantsById.has(participant.id)) {
         return participants;
     }
 
@@ -237,6 +480,79 @@ function mergeParticipants(
     }
 
     return Array.from(participantsById.values());
+}
+
+function addEventIfMissing(events: EventResponse[], event: EventResponse) {
+    const eventsById = new Map(events.map((event) => [event.id, event]));
+
+    if (eventsById.has(event.id)) {
+        return events;
+    }
+
+    return sortEventsByNewest([event, ...events]).slice(0, maxEventsPerStudent);
+}
+
+function groupEventsByParticipantId(events: EventResponse[]) {
+    const eventsByParticipantId: Record<string, EventResponse[]> = {};
+
+    for (const event of sortEventsByNewest(events)) {
+        eventsByParticipantId[event.participantId] = [
+            ...(eventsByParticipantId[event.participantId] ?? []),
+            event,
+        ].slice(0, maxEventsPerStudent);
+    }
+
+    return eventsByParticipantId;
+}
+
+function mergeEventsByParticipantId(
+    primaryEventsByParticipantId: Record<string, EventResponse[]>,
+    fallbackEventsByParticipantId: Record<string, EventResponse[]>,
+) {
+    const eventsByParticipantId = { ...primaryEventsByParticipantId };
+
+    for (const [participantId, fallbackEvents] of Object.entries(
+        fallbackEventsByParticipantId,
+    )) {
+        const primaryEvents = eventsByParticipantId[participantId] ?? [];
+
+        eventsByParticipantId[participantId] = mergeEvents(
+            primaryEvents,
+            fallbackEvents,
+        );
+    }
+
+    return eventsByParticipantId;
+}
+
+function mergeEvents(
+    primaryEvents: EventResponse[],
+    fallbackEvents: EventResponse[],
+) {
+    const eventsById = new Map<string, EventResponse>();
+
+    for (const event of primaryEvents) {
+        eventsById.set(event.id, event);
+    }
+
+    for (const event of fallbackEvents) {
+        if (!eventsById.has(event.id)) {
+            eventsById.set(event.id, event);
+        }
+    }
+
+    return sortEventsByNewest(Array.from(eventsById.values())).slice(
+        0,
+        maxEventsPerStudent,
+    );
+}
+
+function sortEventsByNewest(events: EventResponse[]) {
+    return [...events].sort(
+        (left, right) =>
+            new Date(right.occurredAt).getTime() -
+            new Date(left.occurredAt).getTime(),
+    );
 }
 
 function getSessionStatusLabel(session?: SessionResponse) {

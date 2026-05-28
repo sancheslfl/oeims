@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { wsUrl } from '../api/utils';
-import type { EventResponse, ParticipantStatusUpdate } from '../types';
+import type { EventResponse, ParticipantStatusResponse } from '../types';
 
 interface Callbacks {
   onEvent: (event: EventResponse) => void;
-  onStatusUpdate: (update: ParticipantStatusUpdate) => void;
+  onStatusUpdate: (update: ParticipantStatusResponse) => void;
 }
 
 export function useWebSockets(
@@ -26,7 +26,7 @@ export function useWebSockets(
         if ('monitorName' in msg) {
           cbRef.current.onEvent(msg as unknown as EventResponse);
         } else if ('connectionStatus' in msg) {
-          cbRef.current.onStatusUpdate(msg as unknown as ParticipantStatusUpdate);
+          cbRef.current.onStatusUpdate(msg as unknown as ParticipantStatusResponse);
         }
       } catch {
         // ignore malformed messages

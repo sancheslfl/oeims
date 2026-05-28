@@ -8,7 +8,9 @@ value class SseChannel(val value: String)
 
 
 enum class SseEvent(val code: String) {
-    PARTICIPANT_JOINED("participant.joined")
+    PARTICIPANT_JOINED("participant.joined"),
+    PARTICIPANT_STATUS_UPDATED("participant.status.updated"),
+    PARTICIPANT_EVENT_RECEIVED("participant.event.received"),
 }
 
 object SseChannels {

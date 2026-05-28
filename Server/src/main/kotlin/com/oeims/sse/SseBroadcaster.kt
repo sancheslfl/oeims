@@ -1,33 +1,36 @@
 package com.oeims.sse
 
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import java.util.concurrent.ConcurrentHashMap
 
 data class SseMessage(
-    val channel: SseChannel,
     val event: SseEvent,
     val data: String
 )
 
 class SseBroadcaster {
-    private val messages = MutableSharedFlow<SseMessage>(
-        extraBufferCapacity = 64
-    )
+    private val channelFlows = ConcurrentHashMap<SseChannel, MutableSharedFlow<SseMessage>>()
+
+    fun subscribe(channel: SseChannel): SharedFlow<SseMessage> =
+        flowForChannel(channel).asSharedFlow()
 
     suspend fun publish(
         channel: SseChannel,
         event: SseEvent,
         data: String
     ) {
-        messages.emit(
+        channelFlows[channel]?.emit(
             SseMessage(
-                channel = channel,
                 event = event,
                 data = data
             )
         )
     }
 
-    fun subscribe(channel: SseChannel) =
-        messages.filter { it.channel == channel }
+    private fun flowForChannel(channel: SseChannel): MutableSharedFlow<SseMessage> =
+        channelFlows.getOrPut(channel) {
+            MutableSharedFlow(extraBufferCapacity = 64)
+        }
 }

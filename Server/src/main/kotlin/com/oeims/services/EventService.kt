@@ -5,16 +5,20 @@ import com.oeims.exceptions.NotFoundException
 import com.oeims.models.ids.ParticipantId
 import com.oeims.models.ids.SessionId
 import com.oeims.models.Severity
+import com.oeims.models.ids.toSessionId
 import com.oeims.repositories.EventRecord
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
-import com.oeims.websocket.IConnectionRegistry
+import com.oeims.sse.SseBroadcaster
+import com.oeims.sse.SseChannels
+import com.oeims.sse.SseEvent
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
 class EventService(
     private val eventRepository: IEventRepository,
     private val participantRepository: IParticipantRepository,
-    private val connectionRegistry: IConnectionRegistry
+    private val sseBroadcaster: SseBroadcaster
 ) {
     private val log = LoggerFactory.getLogger(EventService::class.java)
 
@@ -32,7 +36,11 @@ class EventService(
 
         log.info("[{}] [{}] {}", monitorName, severity.name, message)
 
-        connectionRegistry.broadcastEventToSession(participant.sessionId, response)
+        sseBroadcaster.publish(
+            channel = SseChannels.session(participant.sessionId.toSessionId()),
+            event = SseEvent.PARTICIPANT_EVENT_RECEIVED,
+            data = Json.encodeToString(response)
+        )
 
         return response
     }

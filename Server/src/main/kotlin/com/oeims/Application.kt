@@ -8,7 +8,6 @@ import com.oeims.plugins.configureSecurity
 import com.oeims.repositories.*
 import com.oeims.services.*
 import com.oeims.sse.SseBroadcaster
-import com.oeims.websocket.ConnectionRegistry
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -97,15 +96,14 @@ fun Application.module() {
     val heartbeatConfig = loadHeartbeatConfig()
 
     // Realtime
-    val connectionRegistry = ConnectionRegistry()
     val sseBroadcaster = SseBroadcaster()
 
     // Services
     val authService      = AuthService(userRepository, jwtConfig)
     val examService      = ExamService(examRepository)
     val sessionService   = SessionService(sessionRepository, examRepository, participantRepository, userRepository, sseBroadcaster)
-    val eventService     = EventService(eventRepository, participantRepository, connectionRegistry)
-    val heartbeatService = HeartbeatService(participantRepository, connectionRegistry, heartbeatConfig)
+    val eventService     = EventService(eventRepository, participantRepository, sseBroadcaster)
+    val heartbeatService = HeartbeatService(participantRepository, sseBroadcaster, heartbeatConfig)
 
     // JWT Authentication
     configureSecurity(jwtConfig)
@@ -115,7 +113,7 @@ fun Application.module() {
 
     // WebSocket routes
     routing {
-        webSocketRoutes(connectionRegistry, eventService, participantRepository)
+        webSocketRoutes(eventService, participantRepository)
     }
 
     // API Docs

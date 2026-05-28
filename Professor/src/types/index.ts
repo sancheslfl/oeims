@@ -51,21 +51,9 @@ export interface EventResponse {
   occurredAt: string;
 }
 
-export interface ParticipantStatusUpdate {
+export type ParticipantStatusResponse = {
   participantId: string;
-  connectionStatus: string;
-}
-
-export type Teacher = {
-  name: string;
-  email?: string;
-};
-
-export type Exam = {
-  id: string;
-  title: string;
-  description: string;
-  durationMinutes: number;
+  connectionStatus: "CONNECTED" | "DISCONNECTED" | "TIMED_OUT";
 };
 
 export type OpenedSession = {

@@ -10,7 +10,7 @@ internal sealed class HeartbeatSender(
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
 
     private readonly string _url =
-        $"{config.BaseUrl.TrimEnd('/')}/participants/{config.ParticipantId}/heartbeat";
+        $"{config.ApiBaseUrl.TrimEnd('/')}/participants/{config.ParticipantId}/heartbeat";
 
     public async Task RunAsync(CancellationToken ct)
     {
