@@ -7,6 +7,7 @@ import type {
 } from "../types";
 import { useAuth } from "../AuthContext";
 import {
+    endSession,
     getSessionEvents,
     getSessionParticipants,
     startSession,
@@ -43,7 +44,7 @@ type SelectedParticipantState = {
 export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
     const { auth } = useAuth();
 
-    const [startedSession, setStartedSession] = useState<SessionResponse | null>(null);
+    const [sessionOverride, setSessionOverride] = useState<SessionResponse | null>(null);
     const [participantsState, setParticipantsState] = useState<ParticipantsState | null>(null);
     const [eventsState, setEventsState] = useState<EventsState | null>(null);
     const [hoveredParticipant, setHoveredParticipant] =
@@ -51,18 +52,19 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
     const [openedParticipant, setOpenedParticipant] =
         useState<SelectedParticipantState | null>(null);
     const [isStarting, setIsStarting] = useState(false);
+    const [isEnding, setIsEnding] = useState(false);
     const [error, setError] = useState("");
 
     const exam = openedSession?.exam;
     const openedSessionData = openedSession?.session;
 
-    const canUseStartedSession =
-        startedSession &&
+    const canUseSessionOverride =
+        sessionOverride &&
         openedSessionData &&
-        startedSession.id === openedSessionData.id &&
-        openedSessionData.status === "PENDING";
+        sessionOverride.id === openedSessionData.id &&
+        openedSessionData.status !== "ENDED";
 
-    const session = canUseStartedSession ? startedSession : openedSessionData;
+    const session = canUseSessionOverride ? sessionOverride : openedSessionData;
     const sessionId = session?.id;
 
     const participants =
@@ -77,6 +79,7 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
     );
 
     const canStartSession = session?.status === "PENDING";
+    const canEndSession = session?.status === "ACTIVE";
 
     const eventId =
         sessionId && session?.status !== "ENDED"
@@ -259,11 +262,33 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
 
         try {
             const started = await startSession(session.id, auth.token);
-            setStartedSession(started);
+            setSessionOverride(started);
         } catch (error) {
             setError(error instanceof Error ? error.message : "Unexpected error.");
         } finally {
             setIsStarting(false);
+        }
+    }
+
+    async function handleEndSession() {
+        if (!auth || !session) {
+            return;
+        }
+
+        setError("");
+        setIsEnding(true);
+
+        try {
+            const ended = await endSession(session.id, auth.token);
+            setSessionOverride(ended);
+            setHoveredParticipant(null);
+            setOpenedParticipant(null);
+        } catch (error) {
+            if (error instanceof Error) {
+                setError(error.message);
+            }
+        } finally {
+            setIsEnding(false);
         }
     }
 
@@ -286,16 +311,29 @@ export function ClassroomCanvas({ openedSession }: ClassroomCanvasProps) {
                     )}
                 </div>
 
-                {canStartSession && (
-                    <button
-                        type="button"
-                        className="app-button"
-                        disabled={isStarting}
-                        onClick={() => void handleStartSession()}
-                    >
-                        {isStarting ? "Starting..." : "Begin session"}
-                    </button>
-                )}
+                <div className="flex gap-3">
+                    {canStartSession && (
+                        <button
+                            type="button"
+                            className="app-button"
+                            disabled={isStarting}
+                            onClick={() => void handleStartSession()}
+                        >
+                            {isStarting ? "Starting..." : "Begin session"}
+                        </button>
+                    )}
+
+                    {canEndSession && (
+                        <button
+                            type="button"
+                            className="app-button"
+                            disabled={isEnding}
+                            onClick={() => void handleEndSession()}
+                        >
+                            {isEnding ? "Ending..." : "End session"}
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="grid place-items-center gap-8">

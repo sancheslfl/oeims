@@ -40,6 +40,19 @@ export function startSession(
     );
 }
 
+export function endSession(
+    sessionId: string,
+    token: string,
+): Promise<SessionResponse> {
+    return apiFetch<SessionResponse>(
+        `/sessions/${sessionId}/end`,
+        {
+            method: "POST"
+        },
+        token,
+    );
+}
+
 export function getSessionParticipants(
     sessionId: string,
     token: string,
