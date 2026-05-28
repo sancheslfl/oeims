@@ -1,8 +1,8 @@
 import { useState } from "react";
-import type { ExamResponse, OpenedSession, SessionResponse } from "../types";
-import { useAuth } from "../AuthContext";
-import { createSession } from "../api/sessions";
-import { saveLastSessionId } from "../localStorage.ts";
+import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
+import { useAuth } from "../../AuthContext";
+import { createSession } from "../../api/sessions";
+import { saveLastSessionId } from "../../localStorage.ts";
 
 type SessionListProps = {
     exams: ExamResponse[];

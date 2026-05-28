@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
 import { useAuth } from "../AuthContext";
 import { USER_ROLES } from "../types";
-import {IselLogo} from "../components/IselLogo.tsx";
+import {IselLogo} from "../components/topbar/IselLogo.tsx";
 
 export function Login() {
   const { setAuth } = useAuth();

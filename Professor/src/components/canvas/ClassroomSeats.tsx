@@ -3,7 +3,7 @@ import type {
     EventResponse,
     ParticipantResponse,
     SessionResponse,
-} from "../types";
+} from "../../types";
 import { StudentCard } from "./StudentCard";
 
 const seats = Array.from({ length: 12 }, (_, index) => index + 1);

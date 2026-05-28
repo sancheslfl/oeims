@@ -13,6 +13,7 @@ enum class SseEvent(val code: String) {
     PARTICIPANT_EVENT_RECEIVED("participant.event.received"),
 }
 
+// TODO: Evaluate this
 object SseChannels {
     private const val SESSION_PREFIX = "session."
 

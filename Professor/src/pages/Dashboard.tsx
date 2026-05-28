@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import type { OpenedSession } from "../types";
-import { ClassroomCanvas } from "../components/ClassroomCanvas";
+import { ClassroomCanvas } from "../components/canvas/ClassroomCanvas";
 import { useAuth } from "../AuthContext";
 import {getCurrentSession} from "../api/sessions.ts";
 import {clearLastSessionId, saveLastSessionId} from "../localStorage.ts";
 import {getExam} from "../api/exams.ts";
-import {TopBar} from "../components/TopBar.tsx";
-import {Sidebar} from "../components/Sidebar.tsx";
+import {TopBar} from "../components/topbar/TopBar.tsx";
+import {Sidebar} from "../components/sidebar/Sidebar.tsx";
 
 export function Dashboard() {
     const { auth } = useAuth();
