@@ -29,7 +29,7 @@ Content-Type: application/json
 
 > {%
   client.global.set("professorToken", response.body.token);
-  client.test("Login professor → 200", function() {
+  client.test("Login professor → 200", function() {y
     client.assert(response.status === 200, "Expected 200 OK");
   });
 %}

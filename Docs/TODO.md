@@ -3,7 +3,6 @@
 ## Servidor
 
 - [ ] Corrigir o logging do servidor para incluir a identidade do utilizador (email/role) em cada request
-- [ ] Adicionar a claim de email ao JWT para facilitar o logging e rastreabilidade
 - [ ] Investigar que valor usar para `maxFrameSize` na configuração das WebSockets
 - [ ] (NEW) Alterar o campo supervisor_id para um array de IDs e suportar vários supervisor para uma sessão
 - [ ] (NEW) Permitir que contas de professores acedam a sessões ativas usando os códigos
@@ -40,3 +39,4 @@
 - [X] Resolver vulnerabilidades do ClipboardBlocker [16/5]
 - [X] Evitar o logging repetido e excessivo especialmente no NetworkMonitor e ProcessMonitor [17/5]
 - [X] Desenvolver o esqueleto da consola do professor
+- [X] Adicionar a claim de email ao JWT para facilitar o logging e rastreabilidade [29/5] (NEW)
