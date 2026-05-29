@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
     EventResponse,
     ParticipantResponse,
@@ -15,9 +15,9 @@ type ClassroomSeatsProps = {
     eventsByParticipantId: Record<string, EventResponse[]>;
 };
 
-type SelectedParticipantState = {
-    sessionId: string;
-    participantId: string;
+type PopoverElement = HTMLDivElement & {
+    showPopover: (options?: { source?: HTMLElement }) => void;
+    hidePopover: () => void;
 };
 
 export function ClassroomSeats({
@@ -26,16 +26,34 @@ export function ClassroomSeats({
                                    participants,
                                    eventsByParticipantId,
                                }: ClassroomSeatsProps) {
-    const [hoveredParticipant, setHoveredParticipant] =
-        useState<SelectedParticipantState | null>(null);
-    const [openedParticipant, setOpenedParticipant] =
-        useState<SelectedParticipantState | null>(null);
+    const popoverRefs = useRef<Record<string, PopoverElement | null>>({});
+    const [pinnedParticipantId, setPinnedParticipantId] = useState<string | null>(null);
 
     const cardsEnabled = sessionStatus !== "ENDED";
 
-    const visibleParticipantId = cardsEnabled
-        ? getVisibleParticipantId(sessionId, openedParticipant, hoveredParticipant)
-        : null;
+    function showStudentCard(participant: ParticipantResponse, source: HTMLElement) {
+        const popover = popoverRefs.current[participant.id];
+
+        if (!popover) {
+            return;
+        }
+
+        if (popover.matches(":popover-open")) {
+            popover.hidePopover();
+        }
+
+        requestAnimationFrame(() => {
+            popover.showPopover({ source });
+        });
+    }
+
+    function hideStudentCard(participant: ParticipantResponse) {
+        const popover = popoverRefs.current[participant.id];
+
+        if (popover?.matches(":popover-open")) {
+            popover.hidePopover();
+        }
+    }
 
     return (
         <div className="grid place-items-center gap-8">
@@ -49,42 +67,16 @@ export function ClassroomSeats({
             >
                 {seats.map((seat, index) => {
                     const participant = participants[index];
-
-                    const isCardVisible =
-                        participant !== undefined &&
-                        visibleParticipantId === participant.id;
-
-                    const isPinned = isParticipantPinned(
-                        participant,
-                        sessionId,
-                        openedParticipant,
-                    );
-
                     const participantEvents = participant
                         ? eventsByParticipantId[participant.id] ?? []
                         : [];
 
                     return (
-                        <div
-                            key={seat}
-                            className="relative grid justify-items-center gap-1"
-                            onMouseEnter={() => {
-                                if (!participant || !sessionId || !cardsEnabled) {
-                                    return;
-                                }
-
-                                setHoveredParticipant({
-                                    sessionId,
-                                    participantId: participant.id,
-                                });
-                            }}
-                            onMouseLeave={() => setHoveredParticipant(null)}
-                        >
+                        <div key={seat} className="grid justify-items-center gap-1">
                             <button
                                 type="button"
                                 disabled={!participant || !cardsEnabled}
                                 aria-haspopup={participant ? "dialog" : undefined}
-                                aria-expanded={participant ? isCardVisible : undefined}
                                 aria-label={
                                     participant
                                         ? `Open details for ${participant.email}`
@@ -95,20 +87,27 @@ export function ClassroomSeats({
                                         ? "bg-isel-pink text-isel-purple"
                                         : "bg-isel-purple/5"
                                 }`}
-                                onClick={() => {
+                                onMouseEnter={(event) => {
+                                    if (!participant || !sessionId || !cardsEnabled || pinnedParticipantId) {
+                                        return;
+                                    }
+
+                                    showStudentCard(participant, event.currentTarget);
+                                }}
+                                onMouseLeave={() => {
+                                    if (!participant || pinnedParticipantId) {
+                                        return;
+                                    }
+
+                                    hideStudentCard(participant);
+                                }}
+                                onClick={(event) => {
                                     if (!participant || !sessionId || !cardsEnabled) {
                                         return;
                                     }
 
-                                    setOpenedParticipant((current) =>
-                                        current?.sessionId === sessionId &&
-                                        current.participantId === participant.id
-                                            ? null
-                                            : {
-                                                sessionId,
-                                                participantId: participant.id,
-                                            },
-                                    );
+                                    setPinnedParticipantId(participant.id);
+                                    showStudentCard(participant, event.currentTarget);
                                 }}
                             >
                                 {participant && getStudentNumber(participant.email)}
@@ -116,54 +115,40 @@ export function ClassroomSeats({
 
                             <div className="h-6 w-14 rounded-b-md border-2 border-t-0 border-isel-purple bg-isel-white" />
 
-                            {participant && isCardVisible && (
-                                <StudentCard
-                                    participant={participant}
-                                    events={participantEvents}
-                                    isPinned={isPinned}
-                                    onClose={() => setOpenedParticipant(null)}
-                                />
+                            {participant && (
+                                <div
+                                    ref={(element) => {
+                                        popoverRefs.current[participant.id] =
+                                            element as PopoverElement | null;
+                                    }}
+                                    popover="auto"
+                                    role="dialog"
+                                    aria-label={`Details for ${participant.email}`}
+                                    className="m-0 w-80 max-w-[calc(100vw-1rem)] border-0 bg-transparent p-0 [inset:auto] [position-area:block-start_center]"
+                                    onToggle={(event) => {
+                                        const toggleEvent = event.nativeEvent as Event & {
+                                            newState?: string;
+                                        };
+
+                                        if (
+                                            toggleEvent.newState === "closed" &&
+                                            pinnedParticipantId === participant.id
+                                        ) {
+                                            setPinnedParticipantId(null);
+                                        }
+                                    }}
+                                >
+                                    <StudentCard
+                                        participant={participant}
+                                        events={participantEvents}
+                                    />
+                                </div>
                             )}
                         </div>
                     );
                 })}
             </div>
         </div>
-    );
-}
-
-function getVisibleParticipantId(
-    sessionId: string | undefined,
-    openedParticipant: SelectedParticipantState | null,
-    hoveredParticipant: SelectedParticipantState | null,
-) {
-    if (!sessionId) {
-        return null;
-    }
-
-    if (openedParticipant && openedParticipant.sessionId === sessionId) {
-        return openedParticipant.participantId;
-    }
-
-    if (hoveredParticipant && hoveredParticipant.sessionId === sessionId) {
-        return hoveredParticipant.participantId;
-    }
-
-    return null;
-}
-
-function isParticipantPinned(
-    participant: ParticipantResponse | undefined,
-    sessionId: string | undefined,
-    openedParticipant: SelectedParticipantState | null,
-) {
-    if (!participant || !sessionId || !openedParticipant) {
-        return false;
-    }
-
-    return (
-        openedParticipant.sessionId === sessionId &&
-        openedParticipant.participantId === participant.id
     );
 }
 
