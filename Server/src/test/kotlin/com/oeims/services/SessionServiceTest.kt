@@ -417,12 +417,13 @@ class SessionServiceTest {
     }
 
     @Test
-    fun `joinAsAdditionalSupervisor throws ConflictException when session is PENDING`() = runBlocking<Unit> {
-        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
+    fun `joinAsAdditionalSupervisor grants access to a pending session`() = runBlocking<Unit> {
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val sessionId = UUID.fromString(session.id)
 
-        assertThrows<ConflictException> {
-            runBlocking { service.joinAsAdditionalSupervisor(session.code.toSessionCode(), otherProfessorId.toProfessorId()) }
-        }
+        service.joinAsAdditionalSupervisor(session.code.toSessionCode(), otherProfessorId.toProfessorId())
+
+        assertTrue(fakeSessions.isSupervisor(sessionId, otherProfessorId))
     }
 
     @Test

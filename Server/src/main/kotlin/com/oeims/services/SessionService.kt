@@ -101,8 +101,8 @@ class SessionService(
         val session = sessionRepository.findByCode(code.value)
             ?: throw NotFoundException("Session not found")
 
-        if (session.status != SessionStatus.ACTIVE)
-            throw ConflictException("Can only join an active session")
+        if (session.status == SessionStatus.ENDED)
+            throw ConflictException("Cannot join a session that has already ended")
 
         sessionRepository.addSupervisor(session.id, professorId.value)
         return session.toResponse()
