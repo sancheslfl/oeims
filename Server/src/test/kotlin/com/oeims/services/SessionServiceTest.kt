@@ -19,6 +19,7 @@ import com.oeims.repositories.interfaces.IExamRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.repositories.interfaces.IUserRepository
+import com.oeims.sse.SseBroadcaster
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -145,7 +146,7 @@ class SessionServiceTest {
         fakeExams        = FakeExamRepository()
         fakeSessions     = FakeSessionRepository()
         fakeParticipants = FakeParticipantRepository()
-        service          = SessionService(fakeSessions, fakeExams, fakeParticipants, fakeUsers)
+        service          = SessionService(fakeSessions, fakeExams, fakeParticipants, fakeUsers, SseBroadcaster())
 
         professorId = fakeUsers.create("prof@isel.pt", UserRole.PROFESSOR, "hash").id
         studentId   = fakeUsers.create("student@alunos.isel.pt", UserRole.STUDENT, "hash").id

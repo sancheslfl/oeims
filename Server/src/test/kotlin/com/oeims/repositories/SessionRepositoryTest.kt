@@ -3,6 +3,7 @@ package com.oeims.repositories
 import com.oeims.models.Exams
 import com.oeims.models.SessionStatus
 import com.oeims.models.Sessions
+import com.oeims.models.SessionSupervisors
 import com.oeims.models.UserRole
 import com.oeims.models.Users
 import kotlinx.coroutines.runBlocking
@@ -35,7 +36,7 @@ class SessionRepositoryTest {
             url = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
             driver = "org.sqlite.JDBC"
         )
-        transaction { SchemaUtils.create(Users, Exams, Sessions) }
+        transaction { SchemaUtils.create(Users, Exams, Sessions, SessionSupervisors) }
 
         val userRepo = UserRepository()
         val examRepo = ExamRepository()
@@ -49,7 +50,7 @@ class SessionRepositoryTest {
 
     @AfterEach
     fun teardown() {
-        transaction { SchemaUtils.drop(Sessions, Exams, Users) }
+        transaction { SchemaUtils.drop(SessionSupervisors, Sessions, Exams, Users) }
         keepAlive?.close()
         keepAlive = null
     }

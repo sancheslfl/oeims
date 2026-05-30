@@ -1,6 +1,6 @@
 package com.oeims.routes
 
-import com.oeims.dto.*
+import com.oeims.models.dto.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -42,7 +42,7 @@ class ParticipantRoutesTest : BaseRouteTest() {
         val exam = jsonClient().post("/exams") {
             bearerAuth(prof.token)
             contentType(ContentType.Application.Json)
-            setBody(CreateExamRequest("Test Exam", null, 60))
+            setBody(CreateExamRequest("LEIC-AED T1 C.3.07", null, 60))
         }.body<ExamResponse>()
 
         val session = jsonClient().post("/sessions") {

@@ -1,6 +1,6 @@
 package com.oeims.routes
 
-import com.oeims.dto.*
+import com.oeims.models.dto.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.websocket.*
 import io.ktor.client.request.*
@@ -72,7 +72,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
         val exam = http.post("/exams") {
             bearerAuth(prof.token)
             contentType(ContentType.Application.Json)
-            setBody(CreateExamRequest("Test Exam", null, 60))
+            setBody(CreateExamRequest("LEIC-AED T1 C.3.07", null, 60))
         }.body<ExamResponse>()
 
         val session = http.post("/sessions") {
@@ -80,6 +80,8 @@ class WebSocketRoutesTest : BaseRouteTest() {
             contentType(ContentType.Application.Json)
             setBody(CreateSessionRequest(exam.id))
         }.body<SessionResponse>()
+
+        http.post("/sessions/${session.id}/start") { bearerAuth(prof.token) }
 
         val join = http.post("/sessions/join") {
             bearerAuth(student.token)
@@ -223,51 +225,4 @@ class WebSocketRoutesTest : BaseRouteTest() {
         assertEquals(CloseReason.Codes.VIOLATED_POLICY, receivedCloseReason?.knownReason)
     }
 
-    // ── Console channel + end-to-end broadcast ────────────────────────────────
-
-    @Test
-    fun `event sent by daemon arrives as a frame on the connected professor console`() = routeTest {
-        val ctx      = setup()
-        val wsClient = wsClient()
-        var receivedText: String? = null
-
-        // coroutineScope provides the CoroutineScope that launch requires,
-        // and suspends until every child coroutine inside it completes.
-        coroutineScope {
-
-            // 1. Professor opens the console and waits for the first incoming frame.
-            launch {
-                wsClient.webSocket("/ws/console/${ctx.sessionId}", {
-                    bearerAuth(ctx.profToken)
-                }) {
-                    val frame = incoming.receive()
-                    if (frame is Frame.Text) receivedText = frame.readText()
-                    close(CloseReason(CloseReason.Codes.NORMAL, "done"))
-                }
-            }
-
-            // 2. Wait for the server-side `flow.collect` coroutine to subscribe.
-            //    SharedFlow has no replay — the subscriber must exist before emit().
-            delay(100)
-
-            // 3. Daemon sends an event; EventService persists it and broadcasts to the flow.
-            wsClient.webSocket("/ws/daemon/${ctx.participantId}", {
-                bearerAuth(ctx.studentToken)
-            }) {
-                send(Json.encodeToString(DaemonEventMessage("ClipboardMonitor", "clipboard access", "Critical")))
-                delay(50)
-                close(CloseReason(CloseReason.Codes.NORMAL, "done"))
-            }
-
-            // coroutineScope waits here for the professor's launch block to finish
-            // before returning — no explicit join() needed.
-        }
-
-        // 4. The frame the professor received must be the serialised EventResponse.
-        assertNotNull(receivedText, "Professor console received no frame")
-        val event = Json.decodeFromString<EventResponse>(receivedText!!)
-        assertEquals("ClipboardMonitor", event.monitorName)
-        assertEquals("clipboard access", event.message)
-        assertEquals("CRITICAL", event.severity)
-    }
 }

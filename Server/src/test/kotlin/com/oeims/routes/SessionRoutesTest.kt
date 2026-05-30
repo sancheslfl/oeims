@@ -1,6 +1,6 @@
 package com.oeims.routes
 
-import com.oeims.dto.*
+import com.oeims.models.dto.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -32,7 +32,7 @@ class SessionRoutesTest : BaseRouteTest() {
     }.body()
 
     private suspend fun ApplicationTestBuilder.createExam(
-        professorToken: String, title: String = "Exam"
+        professorToken: String, title: String = "LEIC-AED T1 C.3.07"
     ): ExamResponse = jsonClient().post("/exams") {
         bearerAuth(professorToken)
         contentType(ContentType.Application.Json)
@@ -255,7 +255,7 @@ class SessionRoutesTest : BaseRouteTest() {
     fun `student joins a PENDING session by code and receives 200`() = routeTest {
         val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
         val student = register("student@isel.pt", "password123", "STUDENT")
-        val exam    = createExam(prof.token, "Algorithms")
+        val exam    = createExam(prof.token, "LEIC-AED T1 C.3.07")
         val session = createSession(prof.token, exam.id)
 
         val response = joinSession(student.token, session.code)
@@ -263,7 +263,7 @@ class SessionRoutesTest : BaseRouteTest() {
         assertEquals(HttpStatusCode.OK, response.status)
         val body = response.body<JoinSessionResponse>()
         assertEquals(session.id, body.sessionId)
-        assertEquals("Algorithms", body.examTitle)
+        assertEquals("LEIC-AED T1 C.3.07", body.examTitle)
     }
 
     @Test
@@ -282,7 +282,7 @@ class SessionRoutesTest : BaseRouteTest() {
     fun `joining with a wrong code returns 404`() = routeTest {
         val student = register("student@isel.pt", "password123", "STUDENT")
 
-        val response = joinSession(student.token, "BADCODE")
+        val response = joinSession(student.token, "XXXXXX")
 
         assertEquals(HttpStatusCode.NotFound, response.status)
     }
