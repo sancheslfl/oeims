@@ -2,7 +2,6 @@
 
 ## Servidor
 
-- [ ] Corrigir o logging do servidor para incluir a identidade do utilizador (email/role) em cada request
 - [ ] Investigar que valor usar para `maxFrameSize` na configuração das WebSockets
 - [ ] (NEW) Alterar o campo supervisor_id para um array de IDs e suportar vários supervisor para uma sessão
 - [ ] (NEW) Permitir que contas de professores acedam a sessões ativas usando os códigos
