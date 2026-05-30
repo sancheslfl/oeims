@@ -85,6 +85,8 @@ class EventServiceTest {
         override suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord =
             throw UnsupportedOperationException()
         override suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean = false
+        override suspend fun addSupervisor(sessionId: UUID, userId: UUID) {}
+        override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean = false
     }
 
     // ── Setup ─────────────────────────────────────────────────────────────────

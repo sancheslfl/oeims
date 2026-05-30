@@ -172,4 +172,89 @@ class SessionRepositoryTest {
 
         assertFalse(updated)
     }
+
+    // ── isSupervisor ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `isSupervisor returns true for the session creator`() = runBlocking {
+        val session = sessionRepository.create(examId, professorId, "SUP001")
+
+        assertTrue(sessionRepository.isSupervisor(session.id, professorId))
+    }
+
+    @Test
+    fun `isSupervisor returns false for a professor with no relation to the session`() = runBlocking {
+        val session = sessionRepository.create(examId, professorId, "SUP002")
+
+        assertFalse(sessionRepository.isSupervisor(session.id, otherProfessorId))
+    }
+
+    @Test
+    fun `isSupervisor returns true after addSupervisor is called`() = runBlocking {
+        val session = sessionRepository.create(examId, professorId, "SUP003")
+
+        sessionRepository.addSupervisor(session.id, otherProfessorId)
+
+        assertTrue(sessionRepository.isSupervisor(session.id, otherProfessorId))
+    }
+
+    @Test
+    fun `isSupervisor returns false for session that does not exist`() = runBlocking {
+        assertFalse(sessionRepository.isSupervisor(UUID.randomUUID(), professorId))
+    }
+
+    // ── addSupervisor ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `addSupervisor is idempotent when called twice for the same pair`() = runBlocking {
+        val session = sessionRepository.create(examId, professorId, "ADD001")
+        sessionRepository.addSupervisor(session.id, otherProfessorId)
+
+        // second call must not throw (composite PK would normally reject a duplicate)
+        sessionRepository.addSupervisor(session.id, otherProfessorId)
+
+        assertTrue(sessionRepository.isSupervisor(session.id, otherProfessorId))
+    }
+
+    // ── findLatestOpenBySupervisor (with access table) ────────────────────────
+
+    @Test
+    fun `findLatestOpenBySupervisor returns session when professor is the creator`() = runBlocking {
+        val session = sessionRepository.create(examId, professorId, "LAT001")
+
+        val result = sessionRepository.findLatestOpenBySupervisor(professorId)
+
+        assertNotNull(result)
+        assertEquals(session.id, result.id)
+    }
+
+    @Test
+    fun `findLatestOpenBySupervisor returns session when professor has access via session_supervisors`() = runBlocking {
+        val session = sessionRepository.create(examId, professorId, "LAT002")
+        sessionRepository.addSupervisor(session.id, otherProfessorId)
+
+        val result = sessionRepository.findLatestOpenBySupervisor(otherProfessorId)
+
+        assertNotNull(result)
+        assertEquals(session.id, result.id)
+    }
+
+    @Test
+    fun `findLatestOpenBySupervisor returns null when professor has no open sessions`() = runBlocking {
+        val result = sessionRepository.findLatestOpenBySupervisor(otherProfessorId)
+
+        assertNull(result)
+    }
+
+    @Test
+    fun `findLatestOpenBySupervisor does not return ENDED sessions even with access`() = runBlocking {
+        val session = sessionRepository.create(examId, professorId, "LAT003")
+        sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
+        sessionRepository.updateStatus(session.id, SessionStatus.ENDED)
+        sessionRepository.addSupervisor(session.id, otherProfessorId)
+
+        val result = sessionRepository.findLatestOpenBySupervisor(otherProfessorId)
+
+        assertNull(result)
+    }
 }

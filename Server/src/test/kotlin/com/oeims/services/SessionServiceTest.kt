@@ -100,6 +100,17 @@ class SessionServiceTest {
             )
             return true
         }
+
+        val supervisors = mutableMapOf<UUID, MutableSet<UUID>>()
+
+        override suspend fun addSupervisor(sessionId: UUID, userId: UUID) {
+            supervisors.getOrPut(sessionId) { mutableSetOf() }.add(userId)
+        }
+
+        override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean {
+            val session = sessions[sessionId] ?: return false
+            return session.supervisorId == userId || supervisors[sessionId]?.contains(userId) == true
+        }
     }
 
     private class FakeParticipantRepository : IParticipantRepository {
