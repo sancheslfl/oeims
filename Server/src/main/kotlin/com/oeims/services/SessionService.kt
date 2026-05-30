@@ -97,6 +97,20 @@ class SessionService(
         sessionRepository.findById(sessionId.value)?.toResponse()
             ?: throw NotFoundException("Session not found")
 
+    suspend fun joinAsAdditionalSupervisor(code: SessionCode, professorId: ProfessorId): SessionResponse {
+        val session = sessionRepository.findByCode(code.value)
+            ?: throw NotFoundException("Session not found")
+
+        if (session.status != SessionStatus.ACTIVE)
+            throw ConflictException("Can only join an active session")
+
+        sessionRepository.addSupervisor(session.id, professorId.value)
+        return session.toResponse()
+    }
+
+    suspend fun canSupervise(sessionId: SessionId, professorId: ProfessorId): Boolean =
+        sessionRepository.isSupervisor(sessionId.value, professorId.value)
+
     suspend fun getCurrentSession(professorId: ProfessorId): SessionResponse? =
         sessionRepository
             .findLatestOpenBySupervisor(professorId.value)
