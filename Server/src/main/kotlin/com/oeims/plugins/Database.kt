@@ -21,6 +21,7 @@ fun Application.configureDatabase() {
             Users,
             Exams,
             Sessions,
+            SessionSupervisors,
             Participants,
             Events
         )
