@@ -131,7 +131,7 @@ export function ClassroomSeats({
                     }, null);
 
                     const tableClassName =
-                        participant?.connectionStatus === "DISCONNECTED"
+                        participant?.connectionStatus === "DISCONNECTED" || participant?.connectionStatus === "TIMED_OUT"
                             ? "border-gray-300 bg-gray-100"
                             : tableSeverity
                                 ? tableClassBySeverity[tableSeverity]
@@ -164,7 +164,7 @@ export function ClassroomSeats({
                                             : `Empty seat ${seat}`
                                     }
                                     className={`relative z-10 grid h-12 w-32 place-items-center rounded-md border-2 font-bold transition-colors duration-300 ${
-                                        participant?.connectionStatus === "DISCONNECTED"
+                                        participant?.connectionStatus === "DISCONNECTED" || participant?.connectionStatus === "TIMED_OUT"
                                             ? "text-gray-400"
                                             : "text-isel-purple"
                                     } ${
