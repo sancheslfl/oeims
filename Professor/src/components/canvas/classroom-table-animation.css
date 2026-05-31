@@ -1,0 +1,44 @@
+.student-table-radar,
+.student-table-radar::before,
+.student-table-radar::after {
+    pointer-events: none;
+    position: absolute;
+    inset: -0.35rem;
+    z-index: 0;
+    border-radius: 0.6rem;
+    border: 2px solid var(--radar-color);
+    opacity: 0;
+    animation: student-table-radar-pulse 1s ease-out 5;
+}
+
+.student-table-radar::before,
+.student-table-radar::after {
+    content: "";
+    inset: 0;
+}
+
+.student-table-radar::before {
+    animation-delay: 160ms;
+}
+
+.student-table-radar::after {
+    animation-delay: 320ms;
+}
+
+.student-table-radar-info {
+    --radar-color: rgb(95 20 55 / 0.35);
+}
+
+.student-table-radar-warning {
+    --radar-color: rgb(250 204 21 / 0.75);
+}
+
+.student-table-radar-critical {
+    --radar-color: rgb(220 38 38 / 0.75);
+}
+
+@keyframes student-table-radar-pulse {
+    0% { opacity: 0.75; transform: scale(0.96); }
+    60% { opacity: 0.35; }
+    100% { opacity: 0; transform: scale(1.35); }
+}

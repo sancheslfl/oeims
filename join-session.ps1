@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
     Registers (or reuses) a test student, joins a session by code, and writes
-    the resulting token + participantId into Daemon/appsettings.Development.json
-    so the daemon can be started immediately.
+    the resulting token + participantId into all daemon config locations that
+    may be used by development, Release, or the published Windows Service.
 
 .PARAMETER Code
     Session code shown on the professor console (e.g. A3F9). Mandatory.
@@ -20,19 +20,36 @@
     Realtime server base URL for WebSocket connections.
     Defaults to the ApiBaseUrl host converted to ws:// and without /api.
 
+.PARAMETER TargetFramework
+    Daemon target framework used by Release output. Defaults to net8.0.
+
+.PARAMETER PublishDir
+    Published Windows Service folder. Defaults to C:\OEIMS\Client.
+
+.PARAMETER PublishDaemon
+    Publishes the daemon to PublishDir before patching config files.
+
 .EXAMPLE
     .\join-session.ps1 -Code A3F9
-    .\join-session.ps1 -Code A3F9 -Email alice@isel.pt -Password hunter2
+
+.EXAMPLE
+    .\join-session.ps1 -Code A3F9 -PublishDaemon
+
+.EXAMPLE
     .\join-session.ps1 -Code A3F9 -ApiBaseUrl http://localhost:8080/api -RealtimeBaseUrl ws://localhost:8080
 #>
 param(
     [Parameter(Mandatory)]
     [string] $Code,
 
-    [string] $Email    = "A49347@alunos.isel.pt",
+    [string] $Email = "A49347@alunos.isel.pt",
     [string] $Password = "Test1234!",
     [string] $ApiBaseUrl = "http://localhost:8080/api",
-    [string] $RealtimeBaseUrl = ""
+    [string] $RealtimeBaseUrl = "",
+    [string] $TargetFramework = "net8.0",
+    [string] $PublishDir = "C:\OEIMS\Client",
+
+    [switch] $PublishDaemon
 )
 
 $ErrorActionPreference = "Stop"
@@ -80,6 +97,71 @@ function Set-JsonProperty {
     }
 }
 
+function Set-DaemonServerConfig {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [Parameter(Mandatory)]
+        [string] $ApiBaseUrl,
+
+        [Parameter(Mandatory)]
+        [string] $RealtimeBaseUrl,
+
+        [Parameter(Mandatory)]
+        [string] $Token,
+
+        [Parameter(Mandatory)]
+        [string] $ParticipantId,
+
+        [bool] $CreateIfMissing = $false
+    )
+
+    if (-not (Test-Path $Path)) {
+        if (-not $CreateIfMissing) {
+            Write-Host "Skipping missing config: $Path" -ForegroundColor DarkGray
+            return
+        }
+
+        $directory = Split-Path $Path -Parent
+
+        if (-not (Test-Path $directory)) {
+            New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        }
+
+        $settings = [pscustomobject]@{}
+    } else {
+        $content = Get-Content $Path -Raw
+
+        if ([string]::IsNullOrWhiteSpace($content)) {
+            $settings = [pscustomobject]@{}
+        } else {
+            $settings = $content | ConvertFrom-Json
+        }
+    }
+
+    if (-not $settings.PSObject.Properties["Server"]) {
+        $settings | Add-Member -NotePropertyName "Server" -NotePropertyValue ([pscustomobject]@{})
+    }
+
+    Set-JsonProperty -Object $settings.Server -Name "Enabled" -Value $true
+    Set-JsonProperty -Object $settings.Server -Name "ApiBaseUrl" -Value $ApiBaseUrl
+    Set-JsonProperty -Object $settings.Server -Name "RealtimeBaseUrl" -Value $RealtimeBaseUrl
+    Set-JsonProperty -Object $settings.Server -Name "Token" -Value $Token
+    Set-JsonProperty -Object $settings.Server -Name "ParticipantId" -Value $ParticipantId
+
+    if ($settings.Server.PSObject.Properties["BaseUrl"]) {
+        $settings.Server.PSObject.Properties.Remove("BaseUrl")
+    }
+
+    [System.IO.File]::WriteAllText(
+        $Path,
+        ($settings | ConvertTo-Json -Depth 10)
+    )
+
+    Write-Host "Patched: $Path" -ForegroundColor Green
+}
+
 $ApiBaseUrl = $ApiBaseUrl.TrimEnd('/')
 
 if ([string]::IsNullOrWhiteSpace($RealtimeBaseUrl)) {
@@ -88,6 +170,9 @@ if ([string]::IsNullOrWhiteSpace($RealtimeBaseUrl)) {
     $RealtimeBaseUrl = $RealtimeBaseUrl.TrimEnd('/')
 }
 
+$daemonProjectDir = Join-Path $PSScriptRoot "Daemon"
+$daemonProjectPath = Join-Path $daemonProjectDir "Daemon.csproj"
+
 $jsonHeader = @{ "Content-Type" = "application/json" }
 
 Write-Host ""
@@ -95,10 +180,11 @@ Write-Host "OEIMS - student session setup" -ForegroundColor Cyan
 Write-Host "Code: $Code | Student: $Email"
 Write-Host "API base URL: $ApiBaseUrl"
 Write-Host "Realtime base URL: $RealtimeBaseUrl"
+Write-Host "Publish dir: $PublishDir"
 Write-Host ""
 
 # 1. Register
-Write-Host "[1/3] Registering student..." -NoNewline
+Write-Host "[1/4] Registering student..." -NoNewline
 try {
     $body = [ordered]@{
         email = $Email
@@ -118,7 +204,7 @@ try {
 }
 
 # 2. Login
-Write-Host "[2/3] Logging in..." -NoNewline
+Write-Host "[2/4] Logging in..." -NoNewline
 $body = [ordered]@{
     email = $Email
     password = $Password
@@ -134,7 +220,7 @@ $token = $auth.token
 Write-Host " ok." -ForegroundColor Green
 
 # 3. Join session
-Write-Host "[3/3] Joining session '$Code'..." -NoNewline
+Write-Host "[3/4] Joining session '$Code'..." -NoNewline
 $authHeaders = @{
     "Content-Type" = "application/json"
     "Authorization" = "Bearer $token"
@@ -154,37 +240,72 @@ Write-Host " joined." -ForegroundColor Green
 Write-Host "   Exam:     $($join.examTitle)" -ForegroundColor DarkGray
 Write-Host "   Duration: $($join.durationMins) min" -ForegroundColor DarkGray
 
-# 4. Patch Daemon/appsettings.Development.json
-$settingsPath = Join-Path $PSScriptRoot "Daemon\appsettings.Development.json"
-$settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+# 4. Publish and patch configs
+Write-Host "[4/4] Updating daemon configuration..." -ForegroundColor Cyan
 
-if (-not $settings.PSObject.Properties["Server"]) {
-    $settings | Add-Member -NotePropertyName "Server" -NotePropertyValue ([pscustomobject]@{})
+if ($PublishDaemon) {
+    Write-Host "Publishing daemon to $PublishDir..." -ForegroundColor Yellow
+
+    dotnet publish $daemonProjectPath `
+        -c Release `
+        -o $PublishDir `
+        --self-contained false
+
+    Write-Host "Published daemon." -ForegroundColor Green
 }
 
-Set-JsonProperty -Object $settings.Server -Name "Enabled" -Value $true
-Set-JsonProperty -Object $settings.Server -Name "ApiBaseUrl" -Value $ApiBaseUrl
-Set-JsonProperty -Object $settings.Server -Name "RealtimeBaseUrl" -Value $RealtimeBaseUrl
-Set-JsonProperty -Object $settings.Server -Name "Token" -Value $token
-Set-JsonProperty -Object $settings.Server -Name "ParticipantId" -Value $join.participantId
+$configTargets = @(
+    @{
+        Path = Join-Path $daemonProjectDir "appsettings.json"
+        CreateIfMissing = $false
+    },
+    @{
+        Path = Join-Path $daemonProjectDir "appsettings.Development.json"
+        CreateIfMissing = $false
+    },
+    @{
+        Path = Join-Path $daemonProjectDir "bin\Release\$TargetFramework\appsettings.json"
+        CreateIfMissing = $false
+    },
+    @{
+        Path = Join-Path $daemonProjectDir "bin\Release\$TargetFramework\appsettings.Development.json"
+        CreateIfMissing = $false
+    },
+    @{
+        Path = Join-Path $PublishDir "appsettings.json"
+        CreateIfMissing = $true
+    },
+    @{
+        Path = Join-Path $PublishDir "appsettings.Development.json"
+        CreateIfMissing = $true
+    }
+)
 
-# Remove old BaseUrl to avoid accidentally using the wrong path later.
-if ($settings.Server.PSObject.Properties["BaseUrl"]) {
-    $settings.Server.PSObject.Properties.Remove("BaseUrl")
+foreach ($target in $configTargets) {
+    Set-DaemonServerConfig `
+        -Path $target.Path `
+        -ApiBaseUrl $ApiBaseUrl `
+        -RealtimeBaseUrl $RealtimeBaseUrl `
+        -Token $token `
+        -ParticipantId $join.participantId `
+        -CreateIfMissing $target.CreateIfMissing
 }
-
-$updated = $settings | ConvertTo-Json -Depth 10
-[System.IO.File]::WriteAllText($settingsPath, $updated)
 
 Write-Host ""
-Write-Host "appsettings.Development.json patched." -ForegroundColor Cyan
+Write-Host "Daemon configuration patched." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  ApiBaseUrl      : $ApiBaseUrl"
 Write-Host "  RealtimeBaseUrl : $RealtimeBaseUrl"
-Write-Host "  Token           : $token"
+Write-Host "  TokenLength     : $($token.Length)"
 Write-Host "  ParticipantId   : $($join.participantId)"
 Write-Host "  SessionId       : $($join.sessionId)"
 Write-Host ""
-Write-Host "Start the daemon:" -ForegroundColor Yellow
-Write-Host "  cd Daemon; dotnet run" -ForegroundColor Yellow
+Write-Host "If using Visual Studio Release:" -ForegroundColor Yellow
+Write-Host "  Run the daemon again after this script patched the Release output." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "If using the Windows Service:" -ForegroundColor Yellow
+Write-Host "  Restart-Service OEIMS" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Or publish + patch in one command:" -ForegroundColor Yellow
+Write-Host "  .\join-session.ps1 -Code $Code -PublishDaemon" -ForegroundColor Yellow
 Write-Host ""

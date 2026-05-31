@@ -19,11 +19,11 @@
 
 ## Consola do Professor
 
-- [ ] Redesenhar o student card para mostrar as infrações inline com scroll em vez de tooltip flutuante (resolve o bug de hover)
 - [ ] Adicionar filtro/arquivo para ocultar exames e sessões terminadas
 - [ ] Adicionar opção de eliminar ou arquivar exames
 - [ ] Criar um campo para a sala no formulário de criação de exame em vez de estar explicito no título
 - [ ] Usar reducer hook no componente Dashboard e Login que tem bastantes estados
+- [ ] Adicionar integração de OAuth 2.0
 
 ## Documentação
 
@@ -40,3 +40,4 @@
 - [X] Resolver vulnerabilidades do ClipboardBlocker [16/5]
 - [X] Evitar o logging repetido e excessivo especialmente no NetworkMonitor e ProcessMonitor [17/5]
 - [X] Desenvolver o esqueleto da consola do professor
+- [X] Redesenhar o student card para mostrar as infrações inline com scroll em vez de tooltip flutuante (resolve o bug de hover) [27/5]

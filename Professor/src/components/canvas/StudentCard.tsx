@@ -72,13 +72,9 @@ function EventList({ events }: EventListProps) {
                     No events received yet.
                 </p>
             ) : (
-                <div className="max-h-52 min-h-0 overflow-y-auto overscroll-contain pr-1">
-                    {events.map((event, index) => (
-                        <EventItem
-                            key={event.id}
-                            event={event}
-                            isMostRecent={index === 0}
-                        />
+                <div className="max-h-52 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain pr-1 scrollbar-none [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {events.map((event) => (
+                        <EventItem key={event.id} event={event} />
                     ))}
                 </div>
             )}
@@ -88,23 +84,16 @@ function EventList({ events }: EventListProps) {
 
 type EventItemProps = {
     event: EventResponse;
-    isMostRecent: boolean;
 };
 
-function EventItem({ event, isMostRecent }: EventItemProps) {
+function EventItem({ event }: EventItemProps) {
     return (
-        <div className="flex gap-2 border-b border-isel-purple/10 py-1.5 last:border-b-0">
+        <div className="flex min-w-0 gap-2 border-b border-isel-brown/10 py-1.5 last:border-b-0">
             <SeverityDot severity={event.severity} />
 
-            <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                    <p
-                        className={
-                            isMostRecent
-                                ? "truncate text-xs font-bold text-isel-purple"
-                                : "truncate text-[0.68rem] font-bold text-isel-purple/75"
-                        }
-                    >
+            <div className="min-w-0 flex-1 overflow-x-hidden">
+                <div className="flex min-w-0 items-baseline justify-between gap-2">
+                    <p className="min-w-0 text-xs font-semibold leading-snug text-isel-purple wrap-anywhere">
                         {event.monitorName}
                     </p>
 
@@ -113,13 +102,7 @@ function EventItem({ event, isMostRecent }: EventItemProps) {
                     </time>
                 </div>
 
-                <p
-                    className={
-                        isMostRecent
-                            ? "mt-0.5 text-xs font-semibold leading-snug text-isel-purple/85"
-                            : "mt-0.5 text-[0.68rem] font-medium leading-snug text-isel-purple/60"
-                    }
-                >
+                <p className="mt-0.5 text-[0.7rem] font-medium leading-snug text-isel-purple/75 wrap-anywhere">
                     {event.message}
                 </p>
             </div>
@@ -132,25 +115,20 @@ type SeverityDotProps = {
 };
 
 function SeverityDot({ severity }: SeverityDotProps) {
+    const severityClassBySeverity = {
+        INFO: "severity-info",
+        WARNING: "severity-warning",
+        CRITICAL: "severity-critical",
+    } satisfies Record<EventResponse["severity"], string>;
+
+    const severityClass = severityClassBySeverity[severity];
+
     return (
         <span
-            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${getSeverityColorClass(
-                severity,
-            )}`}
+            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full bg-(--severity-color) ${severityClass}`}
             aria-label={severity}
         />
     );
-}
-
-function getSeverityColorClass(severity: EventResponse["severity"]) {
-    switch (severity) {
-        case "INFO":
-            return "bg-isel-purple/25";
-        case "WARNING":
-            return "bg-yellow-400";
-        case "CRITICAL":
-            return "bg-red-600";
-    }
 }
 
 function getStudentInitials(email: string) {
