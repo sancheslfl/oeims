@@ -25,6 +25,9 @@
 - [ ] Reestruturar a secção Introdução e começar com a secção do Enquadramento ou Requisitos Funcionais **(3º prioridade)**
 - [ ] Refazer os diagramas com menos ligações e melhor layout **(3º prioridade)**
 - [ ] Analisar o código do repositório
+- [ ] (NEW) Fazer pdf info
+- [ ] (NEW) Fazer Cartaz
+- [ ] (NEW) Fazer enquadramento/requisitos funcionais e arquitetura da solução (Relatório final)
 
 ## Dúvidas
 
@@ -40,3 +43,4 @@
 - [X] (NEW) Alterar o campo supervisor_id para um array de IDs e suportar vários supervisor para uma sessão [30/5] 
 - [X] (NEW) Permitir que contas de professores acedam a sessões ativas usando os códigos [30/5] 
 - [X] (NEW) Adicionar verificação de que o daemon está ligado (CONNECTED) antes de considerar o estudante pronto na sessão [31/5]
+- [X] (NEW) Indicador visual de timeout do daemon [31/5]
