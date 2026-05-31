@@ -62,7 +62,7 @@ class ParticipantRepository : IParticipantRepository {
                 it[Participants.id] = id
                 it[Participants.sessionId] = sessionId
                 it[Participants.userId] = userId
-                it[Participants.connectionStatus] = ConnectionStatus.CONNECTED
+                it[Participants.connectionStatus] = ConnectionStatus.DISCONNECTED
                 it[Participants.lastHeartbeat] = null
                 it[Participants.joinedAt] = now
             }

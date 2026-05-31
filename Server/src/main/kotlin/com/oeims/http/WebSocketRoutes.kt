@@ -2,7 +2,6 @@ package com.oeims.http
 
 import com.oeims.models.dto.DaemonEventMessage
 import com.oeims.models.dto.toDomainSeverity
-import com.oeims.models.ConnectionStatus
 import com.oeims.models.ids.toParticipantId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.services.EventService
@@ -37,8 +36,6 @@ fun Route.webSocketRoutes(
                 ?.payload?.getClaim("email")?.asString()
             val mdc = if (email != null) mapOf("user-email" to email) else emptyMap()
 
-            participantRepository.updateConnectionStatus(participantId, ConnectionStatus.CONNECTED)
-
             withContext(MDCContext(mdc)) {
                 try {
                     for (frame in incoming) {
@@ -70,8 +67,6 @@ fun Route.webSocketRoutes(
                     application.log.debug("Daemon disconnected: {} — {}", participantId, closeReason.await())
                 } catch (e: Throwable) {
                     application.log.warn("Daemon WebSocket error for $participantId", e)
-                } finally {
-                    participantRepository.updateConnectionStatus(participantId, ConnectionStatus.DISCONNECTED)
                 }
             }
         }

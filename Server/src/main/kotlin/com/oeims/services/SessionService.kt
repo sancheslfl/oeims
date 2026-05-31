@@ -3,10 +3,12 @@ package com.oeims.services
 import com.oeims.exceptions.ConflictException
 import com.oeims.exceptions.ForbiddenException
 import com.oeims.exceptions.NotFoundException
+import com.oeims.models.ConnectionStatus
 import com.oeims.models.SessionCode
 import com.oeims.models.SessionStatus
 import com.oeims.models.dto.JoinSessionResponse
 import com.oeims.models.dto.ParticipantResponse
+import com.oeims.models.dto.ParticipantStatusUpdate
 import com.oeims.models.dto.SessionResponse
 import com.oeims.models.ids.*
 import com.oeims.models.toSessionCode
@@ -129,6 +131,14 @@ class SessionService(
         if (participant.userId != userId.value)
             throw ForbiddenException("You do not own this participant")
         participantRepository.updateHeartbeat(participantId.value)
+
+        if (participant.connectionStatus != ConnectionStatus.CONNECTED) {
+            sseBroadcaster.publish(
+                channel = SseChannels.session(participant.sessionId.toSessionId()),
+                event   = SseEvent.PARTICIPANT_STATUS_UPDATED,
+                data    = Json.encodeToString(ParticipantStatusUpdate(participant.id.toString(), "CONNECTED"))
+            )
+        }
     }
 
     private suspend fun generateUniqueCode(): SessionCode {

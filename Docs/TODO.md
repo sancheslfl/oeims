@@ -10,7 +10,6 @@
 - [ ] Investigar como tornar os monitores mais robustos
 - [ ] Investigar a performance do daemon como serviço do Windows principalmente ao parar
 - [ ] Corrigir o problema em que o serviço não interceta nem termina processos proibidos
-- [ ] Adicionar verificação de que o daemon está ligado (CONNECTED) antes de considerar o estudante pronto na sessão
 
 ## Consola do Professor
 
@@ -18,8 +17,8 @@
 - [ ] Adicionar opção de eliminar ou arquivar exames
 - [ ] Criar um campo para a sala no formulário de criação de exame em vez de estar explicito no título
 - [ ] Usar reducer hook no componente Dashboard e Login que tem bastantes estados
-- [ ] Adicionar integração de OAuth 2.0
-- [ ] Adicionar flow para professores acederem a sessões através do código
+- [ ] (NEW) Adicionar integração de OAuth 2.0
+- [ ] (NEW) Adicionar flow para professores acederem a sessões através do código
 
 ## Documentação
 
@@ -40,3 +39,4 @@
 - [X] (NEW) Adicionar a claim de email ao JWT para facilitar o logging e rastreabilidade [29/5] 
 - [X] (NEW) Alterar o campo supervisor_id para um array de IDs e suportar vários supervisor para uma sessão [30/5] 
 - [X] (NEW) Permitir que contas de professores acedam a sessões ativas usando os códigos [30/5] 
+- [X] (NEW) Adicionar verificação de que o daemon está ligado (CONNECTED) antes de considerar o estudante pronto na sessão [31/5]
