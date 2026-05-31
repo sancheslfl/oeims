@@ -29,6 +29,7 @@ function ClassroomCanvasContent({ title }: ClassroomCanvasContentProps) {
     const {
         participants,
         eventsByParticipantId,
+        severityFlash,
         error: realtimeError,
     } = useCanvasRealtimeData(auth?.token, session);
 
@@ -44,6 +45,7 @@ function ClassroomCanvasContent({ title }: ClassroomCanvasContentProps) {
                 sessionStatus={session?.status}
                 participants={participants}
                 eventsByParticipantId={eventsByParticipantId}
+                severityFlash={severityFlash}
             />
         </div>
     );
