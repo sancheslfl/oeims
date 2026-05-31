@@ -24,6 +24,7 @@
 - [ ] Criar um campo para a sala no formulário de criação de exame em vez de estar explicito no título
 - [ ] Usar reducer hook no componente Dashboard e Login que tem bastantes estados
 - [ ] Adicionar integração de OAuth 2.0
+- [ ] Redirecionar para login quando utilizador tem token expirado
 
 ## Documentação
 
