@@ -113,6 +113,9 @@ class SessionService(
     suspend fun canSupervise(sessionId: SessionId, professorId: ProfessorId): Boolean =
         sessionRepository.isSupervisor(sessionId.value, professorId.value)
 
+    suspend fun getActiveSessions(): List<SessionResponse> =
+        sessionRepository.findAllActive().map { it.toResponse() }
+
     suspend fun getCurrentSession(professorId: ProfessorId): SessionResponse? =
         sessionRepository
             .findLatestOpenBySupervisor(professorId.value)
