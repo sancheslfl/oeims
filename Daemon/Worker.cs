@@ -18,6 +18,11 @@ namespace Daemon
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            logger.LogWarning(
+                "[Config] Server BaseUrl={BaseUrl}, ParticipantId={ParticipantId}, Token={Token}",
+                serverConfig.ApiBaseUrl,
+                serverConfig.ParticipantId,
+                serverConfig.Token);
             foreach (var mitigator in _mitigators)
             {
                 mitigator.Apply();
