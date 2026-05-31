@@ -112,6 +112,11 @@ class SessionServiceTest {
             val session = sessions[sessionId] ?: return false
             return session.supervisorId == userId || supervisors[sessionId]?.contains(userId) == true
         }
+
+        override suspend fun findAllActive(): List<SessionRecord> {
+            val open = listOf(SessionStatus.PENDING, SessionStatus.ACTIVE)
+            return sessions.values.filter { it.status in open }
+        }
     }
 
     private class FakeParticipantRepository : IParticipantRepository {

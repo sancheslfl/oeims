@@ -13,4 +13,5 @@ interface ISessionRepository {
     suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean
     suspend fun addSupervisor(sessionId: UUID, userId: UUID)
     suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean
+    suspend fun findAllActive(): List<SessionRecord>
 }
