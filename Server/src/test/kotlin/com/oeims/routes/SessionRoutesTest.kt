@@ -1,6 +1,6 @@
 package com.oeims.routes
 
-import com.oeims.dto.*
+import com.oeims.models.dto.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -32,7 +32,7 @@ class SessionRoutesTest : BaseRouteTest() {
     }.body()
 
     private suspend fun ApplicationTestBuilder.createExam(
-        professorToken: String, title: String = "Exam"
+        professorToken: String, title: String = "LEIC-AED T1 C.3.07"
     ): ExamResponse = jsonClient().post("/exams") {
         bearerAuth(professorToken)
         contentType(ContentType.Application.Json)
@@ -59,6 +59,14 @@ class SessionRoutesTest : BaseRouteTest() {
         studentToken: String, code: String
     ) = jsonClient().post("/sessions/join") {
         bearerAuth(studentToken)
+        contentType(ContentType.Application.Json)
+        setBody(JoinSessionRequest(code))
+    }
+
+    private suspend fun ApplicationTestBuilder.joinAsAdditionalSupervisor(
+        professorToken: String, code: String
+    ) = jsonClient().post("/sessions/join-as-supervisor") {
+        bearerAuth(professorToken)
         contentType(ContentType.Application.Json)
         setBody(JoinSessionRequest(code))
     }
@@ -255,7 +263,7 @@ class SessionRoutesTest : BaseRouteTest() {
     fun `student joins a PENDING session by code and receives 200`() = routeTest {
         val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
         val student = register("student@isel.pt", "password123", "STUDENT")
-        val exam    = createExam(prof.token, "Algorithms")
+        val exam    = createExam(prof.token, "LEIC-AED T1 C.3.07")
         val session = createSession(prof.token, exam.id)
 
         val response = joinSession(student.token, session.code)
@@ -263,7 +271,7 @@ class SessionRoutesTest : BaseRouteTest() {
         assertEquals(HttpStatusCode.OK, response.status)
         val body = response.body<JoinSessionResponse>()
         assertEquals(session.id, body.sessionId)
-        assertEquals("Algorithms", body.examTitle)
+        assertEquals("LEIC-AED T1 C.3.07", body.examTitle)
     }
 
     @Test
@@ -282,7 +290,7 @@ class SessionRoutesTest : BaseRouteTest() {
     fun `joining with a wrong code returns 404`() = routeTest {
         val student = register("student@isel.pt", "password123", "STUDENT")
 
-        val response = joinSession(student.token, "BADCODE")
+        val response = joinSession(student.token, "XXXXXX")
 
         assertEquals(HttpStatusCode.NotFound, response.status)
     }
@@ -324,6 +332,69 @@ class SessionRoutesTest : BaseRouteTest() {
         val session = createSession(prof.token, createExam(prof.token).id)
 
         val response = jsonClient().post("/sessions/join") {
+            contentType(ContentType.Application.Json)
+            setBody(JoinSessionRequest(session.code))
+        }
+
+        assertEquals(HttpStatusCode.Forbidden, response.status)
+    }
+
+    // ── POST /sessions/join-as-supervisor ────────────────────────────────────
+
+    @Test
+    fun `professor joins an active session as additional supervisor and receives 200`() = routeTest {
+        val prof1   = register("prof1@isel.pt", "password123", "PROFESSOR")
+        val prof2   = register("prof2@isel.pt", "password123", "PROFESSOR")
+        val session = createSession(prof1.token, createExam(prof1.token).id)
+        startSession(prof1.token, session.id)
+
+        val response = joinAsAdditionalSupervisor(prof2.token, session.code)
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(session.id, response.body<SessionResponse>().id)
+    }
+
+    @Test
+    fun `joining as supervisor with a wrong code returns 404`() = routeTest {
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
+
+        val response = joinAsAdditionalSupervisor(prof.token, "XXXXXX")
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+    }
+
+    @Test
+    fun `professor joins a PENDING session as supervisor and receives 200`() = routeTest {
+        val prof1   = register("prof1@isel.pt", "password123", "PROFESSOR")
+        val prof2   = register("prof2@isel.pt", "password123", "PROFESSOR")
+        val session = createSession(prof1.token, createExam(prof1.token).id)
+
+        val response = joinAsAdditionalSupervisor(prof2.token, session.code)
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(session.id, response.body<SessionResponse>().id)
+    }
+
+    @Test
+    fun `joining an ENDED session as supervisor returns 409`() = routeTest {
+        val prof1   = register("prof1@isel.pt", "password123", "PROFESSOR")
+        val prof2   = register("prof2@isel.pt", "password123", "PROFESSOR")
+        val session = createSession(prof1.token, createExam(prof1.token).id)
+        startSession(prof1.token, session.id)
+        endSession(prof1.token, session.id)
+
+        val response = joinAsAdditionalSupervisor(prof2.token, session.code)
+
+        assertEquals(HttpStatusCode.Conflict, response.status)
+    }
+
+    @Test
+    fun `joining as supervisor without a token returns 403`() = routeTest {
+        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val session = createSession(prof.token, createExam(prof.token).id)
+        startSession(prof.token, session.id)
+
+        val response = jsonClient().post("/sessions/join-as-supervisor") {
             contentType(ContentType.Application.Json)
             setBody(JoinSessionRequest(session.code))
         }

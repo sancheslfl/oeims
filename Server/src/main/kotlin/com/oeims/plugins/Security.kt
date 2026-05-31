@@ -28,8 +28,9 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
                 val role = credential.payload.getClaim("role").asString()
+                val email = credential.payload.getClaim("email").asString()
 
-                if (userId != null && role != null) {
+                if (userId != null && role != null && email != null) {
                     JWTPrincipal(credential.payload)
                 } else {
                     null
@@ -50,8 +51,9 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
                 val role = credential.payload.getClaim("role").asString()
+                val email = credential.payload.getClaim("email").asString()
 
-                if (userId != null && role == "PROFESSOR") {
+                if (userId != null && role == "PROFESSOR" && email != null) {
                     JWTPrincipal(credential.payload)
                 } else {
                     null
@@ -72,8 +74,9 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
             validate { credential ->
                 val userId = credential.payload.getClaim("userId").asString()
                 val role = credential.payload.getClaim("role").asString()
+                val email = credential.payload.getClaim("email").asString()
 
-                if (userId != null && role == "STUDENT") {
+                if (userId != null && role == "STUDENT" && email != null) {
                     JWTPrincipal(credential.payload)
                 } else {
                     null

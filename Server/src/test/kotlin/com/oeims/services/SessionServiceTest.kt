@@ -19,6 +19,7 @@ import com.oeims.repositories.interfaces.IExamRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.repositories.interfaces.IUserRepository
+import com.oeims.sse.SseBroadcaster
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.assertThrows
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -99,6 +101,17 @@ class SessionServiceTest {
             )
             return true
         }
+
+        val supervisors = mutableMapOf<UUID, MutableSet<UUID>>()
+
+        override suspend fun addSupervisor(sessionId: UUID, userId: UUID) {
+            supervisors.getOrPut(sessionId) { mutableSetOf() }.add(userId)
+        }
+
+        override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean {
+            val session = sessions[sessionId] ?: return false
+            return session.supervisorId == userId || supervisors[sessionId]?.contains(userId) == true
+        }
     }
 
     private class FakeParticipantRepository : IParticipantRepository {
@@ -136,6 +149,7 @@ class SessionServiceTest {
     private lateinit var service: SessionService
 
     private lateinit var professorId: UUID
+    private lateinit var otherProfessorId: UUID
     private lateinit var studentId: UUID
     private lateinit var examId: UUID
 
@@ -145,11 +159,12 @@ class SessionServiceTest {
         fakeExams        = FakeExamRepository()
         fakeSessions     = FakeSessionRepository()
         fakeParticipants = FakeParticipantRepository()
-        service          = SessionService(fakeSessions, fakeExams, fakeParticipants, fakeUsers)
+        service          = SessionService(fakeSessions, fakeExams, fakeParticipants, fakeUsers, SseBroadcaster())
 
-        professorId = fakeUsers.create("prof@isel.pt", UserRole.PROFESSOR, "hash").id
-        studentId   = fakeUsers.create("student@alunos.isel.pt", UserRole.STUDENT, "hash").id
-        examId      = fakeExams.create(professorId, "Networks", null, 90).id
+        professorId      = fakeUsers.create("prof@isel.pt", UserRole.PROFESSOR, "hash").id
+        otherProfessorId = fakeUsers.create("prof2@isel.pt", UserRole.PROFESSOR, "hash").id
+        studentId        = fakeUsers.create("student@alunos.isel.pt", UserRole.STUDENT, "hash").id
+        examId           = fakeExams.create(professorId, "Networks", null, 90).id
     }
 
     // ── createSession ─────────────────────────────────────────────────────────
@@ -368,5 +383,84 @@ class SessionServiceTest {
         assertThrows<NotFoundException> {
             runBlocking { service.getParticipants(UUID.randomUUID().toSessionId()) }
         }
+    }
+
+    // ── joinAsAdditionalSupervisor ────────────────────────────────────────────
+
+    @Test
+    fun `joinAsAdditionalSupervisor grants access to an active session`() = runBlocking<Unit> {
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val sessionId = UUID.fromString(session.id)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
+
+        service.joinAsAdditionalSupervisor(session.code.toSessionCode(), otherProfessorId.toProfessorId())
+
+        assertTrue(fakeSessions.isSupervisor(sessionId, otherProfessorId))
+    }
+
+    @Test
+    fun `joinAsAdditionalSupervisor returns the session response`() = runBlocking {
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val sessionId = UUID.fromString(session.id)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
+
+        val result = service.joinAsAdditionalSupervisor(session.code.toSessionCode(), otherProfessorId.toProfessorId())
+
+        assertEquals(session.id, result.id)
+    }
+
+    @Test
+    fun `joinAsAdditionalSupervisor throws NotFoundException when code does not exist`() {
+        assertThrows<NotFoundException> {
+            runBlocking { service.joinAsAdditionalSupervisor("XXXXXX".toSessionCode(), otherProfessorId.toProfessorId()) }
+        }
+    }
+
+    @Test
+    fun `joinAsAdditionalSupervisor grants access to a pending session`() = runBlocking<Unit> {
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val sessionId = UUID.fromString(session.id)
+
+        service.joinAsAdditionalSupervisor(session.code.toSessionCode(), otherProfessorId.toProfessorId())
+
+        assertTrue(fakeSessions.isSupervisor(sessionId, otherProfessorId))
+    }
+
+    @Test
+    fun `joinAsAdditionalSupervisor throws ConflictException when session is ENDED`() = runBlocking<Unit> {
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val sessionId = UUID.fromString(session.id)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
+        service.endSession(sessionId.toSessionId(), professorId.toProfessorId())
+
+        assertThrows<ConflictException> {
+            runBlocking { service.joinAsAdditionalSupervisor(session.code.toSessionCode(), otherProfessorId.toProfessorId()) }
+        }
+    }
+
+    // ── canSupervise ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `canSupervise returns true for the session creator`() = runBlocking {
+        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
+
+        assertTrue(service.canSupervise(UUID.fromString(session.id).toSessionId(), professorId.toProfessorId()))
+    }
+
+    @Test
+    fun `canSupervise returns false for an unrelated professor`() = runBlocking {
+        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
+
+        assertFalse(service.canSupervise(UUID.fromString(session.id).toSessionId(), otherProfessorId.toProfessorId()))
+    }
+
+    @Test
+    fun `canSupervise returns true after joinAsAdditionalSupervisor`() = runBlocking<Unit> {
+        val session   = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val sessionId = UUID.fromString(session.id)
+        service.startSession(sessionId.toSessionId(), professorId.toProfessorId())
+        service.joinAsAdditionalSupervisor(session.code.toSessionCode(), otherProfessorId.toProfessorId())
+
+        assertTrue(service.canSupervise(sessionId.toSessionId(), otherProfessorId.toProfessorId()))
     }
 }

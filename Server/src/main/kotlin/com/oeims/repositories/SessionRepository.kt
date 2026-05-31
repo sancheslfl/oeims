@@ -1,6 +1,7 @@
 package com.oeims.repositories
 
 import com.oeims.models.SessionStatus
+import com.oeims.models.SessionSupervisors
 import com.oeims.models.Sessions
 import com.oeims.repositories.interfaces.ISessionRepository
 import kotlinx.coroutines.Dispatchers
@@ -8,6 +9,8 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.insertIgnore
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import org.jetbrains.exposed.sql.update
@@ -50,10 +53,18 @@ class SessionRepository : ISessionRepository {
 
     override suspend fun findLatestOpenBySupervisor(supervisorId: UUID): SessionRecord? =
         newSuspendedTransaction(Dispatchers.IO) {
+            val openStatuses = listOf(SessionStatus.PENDING, SessionStatus.ACTIVE)
+
+            val accessibleIds = SessionSupervisors
+                .selectAll()
+                .where { SessionSupervisors.userId eq supervisorId }
+                .map { it[SessionSupervisors.sessionId].value }
+                .toSet()
+
             Sessions.selectAll()
                 .where {
-                    (Sessions.supervisorId eq supervisorId) and
-                            (Sessions.status inList listOf(SessionStatus.PENDING, SessionStatus.ACTIVE))
+                    (Sessions.status inList openStatuses) and
+                    ((Sessions.supervisorId eq supervisorId) or (Sessions.id inList accessibleIds))
                 }
                 .orderBy(Sessions.createdAt to SortOrder.DESC)
                 .limit(1)
@@ -100,6 +111,30 @@ class SessionRepository : ISessionRepository {
                     else -> Unit
                 }
             } > 0
+        }
+
+    override suspend fun addSupervisor(sessionId: UUID, userId: UUID): Unit =
+        newSuspendedTransaction(Dispatchers.IO) {
+            SessionSupervisors.insertIgnore {
+                it[SessionSupervisors.sessionId] = sessionId
+                it[SessionSupervisors.userId]    = userId
+            }
+        }
+
+    override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean =
+        newSuspendedTransaction(Dispatchers.IO) {
+            val isCreator = Sessions.selectAll()
+                .where { (Sessions.id eq sessionId) and (Sessions.supervisorId eq userId) }
+                .count() > 0
+
+            val hasAccess = SessionSupervisors.selectAll()
+                .where {
+                    (SessionSupervisors.sessionId eq sessionId) and
+                    (SessionSupervisors.userId eq userId)
+                }
+                .count() > 0
+
+            isCreator || hasAccess
         }
 }
 

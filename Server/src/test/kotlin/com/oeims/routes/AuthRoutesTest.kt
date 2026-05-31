@@ -1,8 +1,8 @@
 package com.oeims.routes
 
-import com.oeims.dto.AuthResponse
-import com.oeims.dto.LoginRequest
-import com.oeims.dto.RegisterRequest
+import com.oeims.models.dto.AuthResponse
+import com.oeims.models.dto.LoginRequest
+import com.oeims.models.dto.RegisterRequest
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText

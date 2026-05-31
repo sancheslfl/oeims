@@ -1,5 +1,6 @@
 package com.oeims.http
 
+import com.oeims.models.ids.toProfessorId
 import com.oeims.services.SessionService
 import com.oeims.sse.SseBroadcaster
 import com.oeims.sse.SseChannel
@@ -21,9 +22,8 @@ fun Route.sseRoutes(
             val channel = SseChannel(channelValue)
 
             val sessionId = SseChannels.sessionId(channel) ?: return@sse close()
-            val session = sessionService.getSession(sessionId)
 
-            if (session.supervisorId != professorId.toString()) {
+            if (!sessionService.canSupervise(sessionId, professorId.toProfessorId())) {
                 close()
                 return@sse
             }

@@ -31,6 +31,14 @@ fun Route.sessionRoutes(
             call.respond(HttpStatusCode.Created, response)
         }
 
+        // POST /sessions/join-as-supervisor - professor joins an active session by code
+        post("/sessions/join-as-supervisor") {
+            val professorId = call.userId()
+            val req = call.receive<JoinSessionRequest>()
+            val response = sessionService.joinAsAdditionalSupervisor(req.code.toSessionCode(), professorId.toProfessorId())
+            call.respond(HttpStatusCode.OK, response)
+        }
+
         // GET /sessions/current - latest pending or active session for professor
         get("/sessions/current") {
             val professorId = call.userId()
