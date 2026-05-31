@@ -15,6 +15,12 @@ type EventsState = {
     eventsByParticipantId: Record<string, EventResponse[]>;
 };
 
+export type SeverityFlash = {
+    animationKey: number;
+    participantId: string;
+    severity: EventResponse["severity"];
+};
+
 export function useCanvasRealtimeData(
     token: string | undefined,
     session: SessionResponse | undefined,
@@ -22,6 +28,7 @@ export function useCanvasRealtimeData(
     const [participantsState, setParticipantsState] = useState<ParticipantsState | null>(null);
     const [eventsState, setEventsState] = useState<EventsState | null>(null);
     const [error, setError] = useState("");
+    const [severityFlash, setSeverityFlash] = useState<SeverityFlash | null>(null);
 
     const sessionId = session?.id;
     const sessionStatus = session?.status;
@@ -91,6 +98,12 @@ export function useCanvasRealtimeData(
                         },
                     };
                 });
+
+                setSeverityFlash((current) => ({
+                    animationKey: current ? current.animationKey + 1 : 1,
+                    participantId: event.participantId,
+                    severity: event.severity,
+                }));
             },
 
             [REALTIME_EVENTS.ParticipantStatusUpdated]: (data: unknown) => {
@@ -212,6 +225,7 @@ export function useCanvasRealtimeData(
         participants,
         eventsByParticipantId,
         error,
+        severityFlash
     };
 }
 

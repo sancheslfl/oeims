@@ -1,11 +1,16 @@
 @import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+@import "./animations.css";
 
 @theme {
   --color-isel-red: #ff3c28;
   --color-isel-purple: #5f1437;
   --color-isel-pink: #ffd2f5;
   --color-isel-white: #ffffff;
+
+  --color-severity-info: #5f1437;
+  --color-severity-warning: #facc15;
+  --color-severity-critical: #dc2626;
 }
 
 @layer base {
@@ -29,6 +34,25 @@
 
   button {
     cursor: pointer;
+  }
+}
+
+@layer utilities {
+  .severity-info {
+    --severity-color: var(--color-severity-info);
+  }
+
+  .severity-warning {
+    --severity-color: var(--color-severity-warning);
+  }
+
+  .severity-critical {
+    --severity-color: var(--color-severity-critical);
+  }
+
+  .severity-surface {
+    border-color: color-mix(in srgb, var(--severity-color) 80%, transparent);
+    background-color: color-mix(in srgb, var(--severity-color) 18%, transparent);
   }
 }
 
