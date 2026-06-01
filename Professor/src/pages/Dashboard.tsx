@@ -59,6 +59,7 @@ export function Dashboard() {
                 <Sidebar
                     openedSession={openedSession}
                     onOpenSession={setOpenedSession}
+                    onCloseSession={() => setOpenedSession(null)}
                 />
 
                 <section

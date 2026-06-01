@@ -1,22 +1,32 @@
-import { useEffect, useState } from "react";
-import type { ExamResponse, OpenedSession } from "../../types";
+import { useEffect, useRef, useState } from "react";
+import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
 import { useAuth } from "../../AuthContext";
 import { getExams } from "../../api/exams";
+import { getActiveSessions } from "../../api/sessions";
 import { CreateExamForm } from "./CreateExamForm";
 import { SessionList } from "./SessionList";
 
 type SidebarProps = {
     openedSession: OpenedSession | null;
     onOpenSession: (openedSession: OpenedSession) => void;
+    onCloseSession: () => void;
 };
 
-export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
+export function Sidebar({ openedSession, onOpenSession, onCloseSession }: SidebarProps) {
     const { auth } = useAuth();
 
     const [isOpen, setIsOpen] = useState(true);
     const [exams, setExams] = useState<ExamResponse[]>([]);
+    const [activeSessions, setActiveSessions] = useState<SessionResponse[]>([]);
     const [isLoadingExams, setIsLoadingExams] = useState(false);
     const [error, setError] = useState("");
+
+    const openedSessionRef = useRef(openedSession);
+    const onOpenSessionRef = useRef(onOpenSession);
+    const onCloseSessionRef = useRef(onCloseSession);
+    openedSessionRef.current = openedSession;
+    onOpenSessionRef.current = onOpenSession;
+    onCloseSessionRef.current = onCloseSession;
 
     useEffect(() => {
         const token = auth?.token;
@@ -25,15 +35,19 @@ export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
 
         let ignore = false;
 
-        async function loadExams(token: string) {
+        async function loadData(token: string) {
             setError("");
             setIsLoadingExams(true);
 
             try {
-                const loadedExams = await getExams(token);
+                const [loadedExams, loadedActiveSessions] = await Promise.all([
+                    getExams(token),
+                    getActiveSessions(token),
+                ]);
 
                 if (!ignore) {
                     setExams(loadedExams);
+                    setActiveSessions(loadedActiveSessions);
                 }
             } catch (error) {
                 if (!ignore && error instanceof Error) {
@@ -46,10 +60,27 @@ export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
             }
         }
 
-        void loadExams(token);
+        void loadData(token);
+
+        const interval = setInterval(() => {
+            getActiveSessions(token).then((sessions) => {
+                if (ignore) return;
+                setActiveSessions(sessions);
+                const current = openedSessionRef.current;
+                if (current) {
+                    const updated = sessions.find((s) => s.id === current.session.id);
+                    if (!updated) {
+                        onCloseSessionRef.current();
+                    } else if (updated.status !== current.session.status) {
+                        onOpenSessionRef.current({ ...current, session: updated });
+                    }
+                }
+            }).catch(() => {});
+        }, 3_000);
 
         return () => {
             ignore = true;
+            clearInterval(interval);
         };
     }, [auth?.token]);
 
@@ -85,6 +116,7 @@ export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
 
                         <SessionList
                             exams={exams}
+                            activeSessions={activeSessions}
                             isLoading={isLoadingExams}
                             openedSession={openedSession}
                             onOpenSession={onOpenSession}
