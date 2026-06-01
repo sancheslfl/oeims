@@ -18,7 +18,7 @@
 - [ ] Criar um campo para a sala no formulário de criação de exame em vez de estar explicito no título
 - [ ] Usar reducer hook no componente Dashboard e Login que tem bastantes estados
 - [ ] (NEW) Adicionar integração de OAuth 2.0
-- [ ] (NEW) Adicionar flow para professores acederem a sessões através do código
+- [ ] (NEW) Adicionar flow para professores acederem a sessões através do código (SSE)
 
 ## Documentação
 
@@ -44,3 +44,4 @@
 - [X] (NEW) Permitir que contas de professores acedam a sessões ativas usando os códigos [30/5] 
 - [X] (NEW) Adicionar verificação de que o daemon está ligado (CONNECTED) antes de considerar o estudante pronto na sessão [31/5]
 - [X] (NEW) Indicador visual de timeout do daemon [31/5]
+- [X] (NEW) Adicionar flow para professores acederem a sessões através do código (Polling) [31/5]
