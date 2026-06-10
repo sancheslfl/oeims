@@ -25,6 +25,7 @@
 - [ ] Usar reducer hook no componente Dashboard e Login que tem bastantes estados
 - [ ] Adicionar integração de OAuth 2.0
 - [ ] Redirecionar para login quando utilizador tem token expirado
+- [ ] Sinalizar e guardar alunos que tiveram atualizações nos eventos e não foram visto pelo professor
 
 ## Documentação
 
@@ -33,7 +34,9 @@
 - [ ] Analisar o código do repositório
 
 ## Dúvidas
-
+- Tornar o 4º parágrafo do capítulo Problem Description mais completo? Com o quê?
+- Quando existe duas referências da mesma fonte, devemos referir as páginas e se sim, como?
+- Manter o ênfase do Background Service e Consola do professor?
 
 ## Concluído
 

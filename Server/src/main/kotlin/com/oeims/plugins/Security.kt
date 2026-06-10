@@ -10,8 +10,6 @@ import io.ktor.http.auth.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
-import io.ktor.server.request.httpMethod
-import io.ktor.server.request.uri
 import io.ktor.server.response.*
 
 fun Application.configureSecurity(jwtConfig: JwtConfig) {

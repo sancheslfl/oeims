@@ -18,11 +18,6 @@ namespace Daemon
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            logger.LogWarning(
-                "[Config] Server BaseUrl={BaseUrl}, ParticipantId={ParticipantId}, Token={Token}",
-                serverConfig.ApiBaseUrl,
-                serverConfig.ParticipantId,
-                serverConfig.Token);
             foreach (var mitigator in _mitigators)
             {
                 mitigator.Apply();
@@ -32,11 +27,21 @@ namespace Daemon
             var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
             await networkMonitor.StartPreExamAsync(OnLocalEvent, stoppingToken);
 
+            var tasks = new List<Task>();
+
             if (serverConfig.ShouldConnect)
             {
                 logger.LogInformation("Connecting to server...");
-                _ = wsClient.RunAsync(stoppingToken);
-                _ = heartbeatSender.RunAsync(stoppingToken);
+
+                tasks.Add(RunComponentAsync(
+                    "WebSocket client",
+                    wsClient.RunAsync,
+                    stoppingToken));
+
+                tasks.Add(RunComponentAsync(
+                    "Heartbeat sender",
+                    heartbeatSender.RunAsync,
+                    stoppingToken));
             }
             else if (!serverConfig.Enabled)
             {
@@ -50,7 +55,36 @@ namespace Daemon
                     "Set Server:ApiBaseUrl, Server:RealtimeBaseUrl, Server:Token and Server:ParticipantId in appsettings.json.");
             }
 
-            await Task.WhenAll(_monitors.Select(m => m.StartAsync(OnEvent, stoppingToken)));
+            tasks.AddRange(_monitors.Select(monitor => RunComponentAsync(
+                monitor.Name,
+                ct => monitor.StartAsync(OnEvent, ct),
+                stoppingToken)));
+
+            await Task.WhenAll(tasks);
+        }
+
+        private async Task RunComponentAsync(
+            string name,
+            Func<CancellationToken, Task> runAsync,
+            CancellationToken ct)
+        {
+            try
+            {
+                logger.LogInformation("Starting component: {name}", name);
+
+                await runAsync(ct);
+
+                logger.LogInformation("Component stopped: {name}", name);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                logger.LogInformation("Component cancelled: {name}", name);
+            }
+            catch (Exception ex)
+            {
+                logger.LogCritical(ex, "Component failed: {name}", name);
+                throw;
+            }
         }
 
         private Task OnLocalEvent(MonitorEvent e)
@@ -74,12 +108,15 @@ namespace Daemon
                 case Severity.Info:
                     logger.LogInformation("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
+
                 case Severity.Warning:
                     logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
+
                 case Severity.Critical:
                     logger.LogCritical("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
+
                 default:
                     logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
                     break;
