@@ -17,7 +17,7 @@ object Sessions : UUIDTable("sessions") {
 }
 
 // Additional professors granted access to a session by its creator.
-// The creator is always in Sessions.supervisorId — this table only holds extra supervisors.
+// The creator is always in Sessions.supervisorId. This table only holds extra supervisors.
 object SessionSupervisors : Table("session_supervisors") {
     val sessionId = reference("session_id", Sessions)
     val userId    = reference("user_id", Users)

@@ -121,6 +121,14 @@ class SessionRepository : ISessionRepository {
             }
         }
 
+    override suspend fun findAllActive(): List<SessionRecord> =
+        newSuspendedTransaction(Dispatchers.IO) {
+            val openStatuses = listOf(SessionStatus.PENDING, SessionStatus.ACTIVE)
+            Sessions.selectAll()
+                .where { Sessions.status inList openStatuses }
+                .map { it.toRecord() }
+        }
+
     override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean =
         newSuspendedTransaction(Dispatchers.IO) {
             val isCreator = Sessions.selectAll()

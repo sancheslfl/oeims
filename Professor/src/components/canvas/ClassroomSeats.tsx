@@ -130,9 +130,12 @@ export function ClassroomSeats({
                             : currentSeverity;
                     }, null);
 
-                    const tableClassName = tableSeverity
-                        ? tableClassBySeverity[tableSeverity]
-                        : "border-isel-purple bg-isel-pink";
+                    const tableClassName =
+                        participant?.connectionStatus === "DISCONNECTED" || participant?.connectionStatus === "TIMED_OUT"
+                            ? "border-gray-300 bg-gray-100"
+                            : tableSeverity
+                                ? tableClassBySeverity[tableSeverity]
+                                : "border-isel-purple bg-isel-pink";
 
                     const pulse =
                         participant &&
@@ -160,7 +163,11 @@ export function ClassroomSeats({
                                             ? `Open details for ${participant.email}`
                                             : `Empty seat ${seat}`
                                     }
-                                    className={`relative z-10 grid h-12 w-32 place-items-center rounded-md border-2 font-bold text-isel-purple transition-colors duration-300 ${
+                                    className={`relative z-10 grid h-12 w-32 place-items-center rounded-md border-2 font-bold transition-colors duration-300 ${
+                                        participant?.connectionStatus === "DISCONNECTED" || participant?.connectionStatus === "TIMED_OUT"
+                                            ? "text-gray-400"
+                                            : "text-isel-purple"
+                                    } ${
                                         participant
                                             ? tableClassName
                                             : "border-isel-purple bg-isel-purple/5"

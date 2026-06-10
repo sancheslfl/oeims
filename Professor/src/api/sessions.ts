@@ -66,6 +66,28 @@ export function getSessionParticipants(
     );
 }
 
+export function getActiveSessions(token: string): Promise<SessionResponse[]> {
+    return apiFetch<SessionResponse[]>(
+        "/sessions/active",
+        { method: "GET" },
+        token,
+    );
+}
+
+export function joinSessionAsSupervisor(
+    code: string,
+    token: string,
+): Promise<SessionResponse> {
+    return apiFetch<SessionResponse>(
+        "/sessions/join-as-supervisor",
+        {
+            method: "POST",
+            body: JSON.stringify({ code }),
+        },
+        token,
+    );
+}
+
 export function getSessionEvents(sessionId: string, token: string) {
     return apiFetch<EventResponse[]>(
         `/sessions/${sessionId}/events`,

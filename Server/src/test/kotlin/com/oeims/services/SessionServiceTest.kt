@@ -112,6 +112,11 @@ class SessionServiceTest {
             val session = sessions[sessionId] ?: return false
             return session.supervisorId == userId || supervisors[sessionId]?.contains(userId) == true
         }
+
+        override suspend fun findAllActive(): List<SessionRecord> {
+            val open = listOf(SessionStatus.PENDING, SessionStatus.ACTIVE)
+            return sessions.values.filter { it.status in open }
+        }
     }
 
     private class FakeParticipantRepository : IParticipantRepository {
@@ -462,5 +467,32 @@ class SessionServiceTest {
         service.joinAsAdditionalSupervisor(session.code.toSessionCode(), otherProfessorId.toProfessorId())
 
         assertTrue(service.canSupervise(sessionId.toSessionId(), otherProfessorId.toProfessorId()))
+    }
+
+    // ── getActiveSessions ─────────────────────────────────────────────────────
+
+    @Test
+    fun `getActiveSessions returns PENDING and ACTIVE sessions`() = runBlocking {
+        val s1 = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val s2 = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        service.startSession(UUID.fromString(s2.id).toSessionId(), professorId.toProfessorId())
+
+        val result = service.getActiveSessions()
+
+        assertEquals(2, result.size)
+        assertTrue(result.any { it.id == s1.id })
+        assertTrue(result.any { it.id == s2.id })
+    }
+
+    @Test
+    fun `getActiveSessions excludes ENDED sessions`() = runBlocking {
+        val session = service.createSession(professorId.toProfessorId(), examId.toExamId())
+        val sessionId = UUID.fromString(session.id).toSessionId()
+        service.startSession(sessionId, professorId.toProfessorId())
+        service.endSession(sessionId, professorId.toProfessorId())
+
+        val result = service.getActiveSessions()
+
+        assertTrue(result.isEmpty())
     }
 }

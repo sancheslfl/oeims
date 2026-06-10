@@ -173,6 +173,32 @@ class SessionRepositoryTest {
         assertFalse(updated)
     }
 
+    // ── findAllActive ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `findAllActive returns PENDING and ACTIVE sessions`() = runBlocking {
+        val s1 = sessionRepository.create(examId, professorId, "ACT001")
+        val s2 = sessionRepository.create(examId, professorId, "ACT002")
+        sessionRepository.updateStatus(s2.id, SessionStatus.ACTIVE)
+
+        val result = sessionRepository.findAllActive()
+
+        assertEquals(2, result.size)
+        assertTrue(result.any { it.id == s1.id })
+        assertTrue(result.any { it.id == s2.id })
+    }
+
+    @Test
+    fun `findAllActive excludes ENDED sessions`() = runBlocking {
+        val session = sessionRepository.create(examId, professorId, "END001")
+        sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
+        sessionRepository.updateStatus(session.id, SessionStatus.ENDED)
+
+        val result = sessionRepository.findAllActive()
+
+        assertTrue(result.isEmpty())
+    }
+
     // ── isSupervisor ──────────────────────────────────────────────────────────
 
     @Test

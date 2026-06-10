@@ -87,6 +87,7 @@ class EventServiceTest {
         override suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean = false
         override suspend fun addSupervisor(sessionId: UUID, userId: UUID) {}
         override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean = false
+        override suspend fun findAllActive(): List<SessionRecord> = emptyList()
     }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
