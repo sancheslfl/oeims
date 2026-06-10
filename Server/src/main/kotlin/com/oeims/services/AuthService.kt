@@ -31,7 +31,7 @@ class AuthService(
         val user = userRepository.create(email.address, userRole, hash)
 
         return AuthResponse(
-            token  = issueToken(user.id.toUserId(), user.role.name),
+            token  = issueToken(user.id.toUserId(), user.role.name, user.email),
             userId = user.id.toString(),
             email  = user.email,
             role   = user.role.name
@@ -46,19 +46,20 @@ class AuthService(
             throw UnauthorizedException("Invalid credentials")
 
         return AuthResponse(
-            token  = issueToken(user.id.toUserId(), user.role.name),
+            token  = issueToken(user.id.toUserId(), user.role.name, user.email),
             userId = user.id.toString(),
             email  = user.email,
             role   = user.role.name
         )
     }
 
-    private fun issueToken(userId: UserId, role: String): String =
+    private fun issueToken(userId: UserId, role: String, email: String): String =
         JWT.create()
             .withIssuer(jwtConfig.issuer)
             .withAudience(jwtConfig.audience)
             .withClaim("userId", userId.value.toString())
             .withClaim("role", role)
+            .withClaim("email", email)
             .withExpiresAt(Date(System.currentTimeMillis() + jwtConfig.expirationMs))
             .sign(Algorithm.HMAC256(jwtConfig.secret))
 }

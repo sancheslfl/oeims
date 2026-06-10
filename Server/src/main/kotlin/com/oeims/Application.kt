@@ -14,6 +14,11 @@ import io.ktor.server.application.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.callid.*
+import com.auth0.jwt.JWT
+import com.oeims.http.AUTH_COOKIE_NAME
+import io.ktor.http.auth.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
@@ -61,6 +66,15 @@ fun Application.module() {
     install(CallLogging) {
         level = Level.INFO
         callIdMdc("call-id")
+        mdc("user-email") { call ->
+            val token = call.request.parseAuthorizationHeader()
+                ?.let { (it as? HttpAuthHeader.Single)?.blob }
+                ?: call.request.queryParameters["token"]
+                ?: call.request.cookies[AUTH_COOKIE_NAME]
+            token?.let { raw ->
+                try { JWT.decode(raw).getClaim("email").asString() } catch (_: Exception) { null }
+            }
+        }
     }
 
     // Rate limiting

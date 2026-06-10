@@ -11,4 +11,6 @@ interface ISessionRepository {
     suspend fun findLatestOpenBySupervisor(supervisorId: UUID): SessionRecord?
     suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord
     suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean
+    suspend fun addSupervisor(sessionId: UUID, userId: UUID)
+    suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean
 }

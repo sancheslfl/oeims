@@ -43,6 +43,7 @@ abstract class BaseRouteTest {
         /** Configuration shared by all route tests. */
         val testConfig = MapApplicationConfig(
             "database.path"         to DB_URL,
+            "app.api.base-path"     to "",
             "jwt.secret"            to "test-secret-key-long-enough",
             "jwt.issuer"            to "oeims",
             "jwt.audience"          to "oeims-users",
@@ -61,8 +62,8 @@ abstract class BaseRouteTest {
     @BeforeEach
     fun resetDatabase() {
         transaction {
-            SchemaUtils.drop(Events, Participants, Sessions, Exams, Users)
-            SchemaUtils.create(Users, Exams, Sessions, Participants, Events)
+            SchemaUtils.drop(Events, Participants, SessionSupervisors, Sessions, Exams, Users)
+            SchemaUtils.create(Users, Exams, Sessions, SessionSupervisors, Participants, Events)
         }
     }
 

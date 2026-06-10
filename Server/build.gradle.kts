@@ -53,6 +53,7 @@ dependencies {
 
     // Logging
     implementation("ch.qos.logback:logback-classic:$logback_version")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.1")
 
     // Testing
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
