@@ -264,6 +264,10 @@ $configTargets = @(
         CreateIfMissing = $false
     },
     @{
+        Path = Join-Path $daemonProjectDir "appsettings.Production.json"
+        CreateIfMissing = $false
+    },
+    @{
         Path = Join-Path $daemonProjectDir "bin\Release\$TargetFramework\appsettings.json"
         CreateIfMissing = $false
     },
@@ -272,11 +276,19 @@ $configTargets = @(
         CreateIfMissing = $false
     },
     @{
+        Path = Join-Path $daemonProjectDir "bin\Release\$TargetFramework\appsettings.Production.json"
+        CreateIfMissing = $false
+    },
+    @{
         Path = Join-Path $PublishDir "appsettings.json"
         CreateIfMissing = $true
     },
     @{
         Path = Join-Path $PublishDir "appsettings.Development.json"
+        CreateIfMissing = $true
+    },
+    @{
+        Path = Join-Path $PublishDir "appsettings.Production.json"
         CreateIfMissing = $true
     }
 )
@@ -304,7 +316,7 @@ Write-Host "If using Visual Studio Release:" -ForegroundColor Yellow
 Write-Host "  Run the daemon again after this script patched the Release output." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "If using the Windows Service:" -ForegroundColor Yellow
-Write-Host "  Restart-Service OEIMS" -ForegroundColor Yellow
+Write-Host "  Restart-Service oeims" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Or publish + patch in one command:" -ForegroundColor Yellow
 Write-Host "  .\join-session.ps1 -Code $Code -PublishDaemon" -ForegroundColor Yellow

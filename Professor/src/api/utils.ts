@@ -1,5 +1,4 @@
 export const API_URL = import.meta.env.VITE_API_URL;
-const WEBSOCKETS_URL = import.meta.env.VITE_WS_URL;
 
 type ApiErrorResponse = {
   error: string;
@@ -49,10 +48,6 @@ async function getApiErrorMessage(res: Response): Promise<string> {
   }
 
   return `It seems a strange error occurred. Please try again later.`;
-}
-
-export function wsUrl(path: string, token: string): string {
-  return `${WEBSOCKETS_URL}${path}?token=${encodeURIComponent(token)}`;
 }
 
 export function createEventSource(eventId: string): EventSource {
