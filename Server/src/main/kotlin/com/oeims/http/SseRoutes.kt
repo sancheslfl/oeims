@@ -22,11 +22,13 @@ fun Route.sseRoutes(
             val channelValue = call.parameters["channel"] ?: return@sse close()
             val channel = SseChannel(channelValue)
 
-            val sessionId = SseChannels.sessionId(channel) ?: return@sse close()
+            if (channel != SseChannels.sessions()) {
+                val sessionId = SseChannels.sessionId(channel) ?: return@sse close()
 
-            if (!sessionService.canSupervise(sessionId, professorId.toProfessorId())) {
-                close()
-                return@sse
+                if (!sessionService.canSupervise(sessionId, professorId.toProfessorId())) {
+                    close()
+                    return@sse
+                }
             }
 
             try {

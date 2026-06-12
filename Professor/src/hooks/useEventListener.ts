@@ -6,11 +6,14 @@ type EventHandlers = Record<string, (data: unknown) => void>;
 export const REALTIME_EVENTS = {
     ParticipantJoined: "participant.joined",
     ParticipantStatusUpdated: "participant.status.updated",
-    ParticipantEventReceived: "participant.event.received"
+    ParticipantEventReceived: "participant.event.received",
+    SessionCreated: "session.created",
+    SessionStatusUpdated: "session.status.updated",
 };
 
 export const REALTIME_CHANNELS = {
     session: (sessionId: string) => `session.${sessionId}`,
+    sessions: "sessions",
 };
 
 export function useEventListener(

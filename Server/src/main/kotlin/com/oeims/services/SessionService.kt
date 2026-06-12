@@ -37,9 +37,17 @@ class SessionService(
             ?: throw NotFoundException("Exam not found")
 
         val code = generateUniqueCode()
-        return sessionRepository
+        val response = sessionRepository
             .create(examId.value, professorId.value, code.value)
             .toResponse()
+
+        sseBroadcaster.publish(
+            channel = SseChannels.sessions(),
+            event = SseEvent.SESSION_CREATED,
+            data = Json.encodeToString(response)
+        )
+
+        return response
     }
 
     suspend fun startSession(sessionId: SessionId, professorId: ProfessorId): SessionResponse {
@@ -53,7 +61,15 @@ class SessionService(
             throw ConflictException("Only a pending session can be started")
 
         sessionRepository.updateStatus(sessionId.value, SessionStatus.ACTIVE)
-        return session.copy(status = SessionStatus.ACTIVE, startedAt = Instant.now()).toResponse()
+        val response = session.copy(status = SessionStatus.ACTIVE, startedAt = Instant.now()).toResponse()
+
+        sseBroadcaster.publish(
+            channel = SseChannels.sessions(),
+            event = SseEvent.SESSION_STATUS_UPDATED,
+            data = Json.encodeToString(response)
+        )
+
+        return response
     }
 
     suspend fun endSession(sessionId: SessionId, professorId: ProfessorId): SessionResponse {
@@ -67,7 +83,15 @@ class SessionService(
             throw ConflictException("Only an active session can be ended")
 
         sessionRepository.updateStatus(sessionId.value, SessionStatus.ENDED)
-        return session.copy(status = SessionStatus.ENDED, endedAt = Instant.now()).toResponse()
+        val response = session.copy(status = SessionStatus.ENDED, endedAt = Instant.now()).toResponse()
+
+        sseBroadcaster.publish(
+            channel = SseChannels.sessions(),
+            event = SseEvent.SESSION_STATUS_UPDATED,
+            data = Json.encodeToString(response)
+        )
+
+        return response
     }
 
     suspend fun joinSession(code: SessionCode, studentId: StudentId): JoinSessionResponse {

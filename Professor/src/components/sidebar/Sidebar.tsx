@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
 import { useAuth } from "../../AuthContext";
 import { getExams } from "../../api/exams";
 import { getActiveSessions } from "../../api/sessions";
 import { CreateExamForm } from "./CreateExamForm";
 import { SessionList } from "./SessionList";
+import { REALTIME_CHANNELS, REALTIME_EVENTS, useEventListener } from "../../hooks/useEventListener";
 
 type SidebarProps = {
     openedSession: OpenedSession | null;
@@ -62,27 +63,38 @@ export function Sidebar({ openedSession, onOpenSession, onCloseSession }: Sideba
 
         void loadData(token);
 
-        const interval = setInterval(() => {
-            getActiveSessions(token).then((sessions) => {
-                if (ignore) return;
-                setActiveSessions(sessions);
-                const current = openedSessionRef.current;
-                if (current) {
-                    const updated = sessions.find((s) => s.id === current.session.id);
-                    if (!updated) {
-                        onCloseSessionRef.current();
-                    } else if (updated.status !== current.session.status) {
-                        onOpenSessionRef.current({ ...current, session: updated });
-                    }
-                }
-            }).catch(() => {});
-        }, 3_000);
-
         return () => {
             ignore = true;
-            clearInterval(interval);
         };
     }, [auth?.token]);
+
+    const sseHandlers = useMemo(() => ({
+        [REALTIME_EVENTS.SessionCreated]: (data: unknown) => {
+            const session = data as SessionResponse;
+            setActiveSessions((current) =>
+                current.some((s) => s.id === session.id) ? current : [...current, session],
+            );
+        },
+        [REALTIME_EVENTS.SessionStatusUpdated]: (data: unknown) => {
+            const session = data as SessionResponse;
+            setActiveSessions((current) => {
+                if (session.status === "ENDED") {
+                    return current.filter((s) => s.id !== session.id);
+                }
+                return current.map((s) => (s.id === session.id ? session : s));
+            });
+            const opened = openedSessionRef.current;
+            if (opened?.session.id === session.id) {
+                if (session.status === "ENDED") {
+                    onCloseSessionRef.current();
+                } else {
+                    onOpenSessionRef.current({ ...opened, session });
+                }
+            }
+        },
+    }), []);
+
+    useEventListener(auth ? REALTIME_CHANNELS.sessions : null, sseHandlers);
 
     function handleExamCreated(exam: ExamResponse) {
         setExams((current) => [exam, ...current]);
