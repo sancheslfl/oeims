@@ -1,5 +1,5 @@
-﻿using OEIMS.Sentinel.Service.Domain;
-using OEIMS.Sentinel.Service.Domain.Platform;
+﻿using Contracts;
+using OEIMS.Sentinel.Agent.Domain;
 
 namespace OEIMS.Sentinel.Agent.Monitors;
 
