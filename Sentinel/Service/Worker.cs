@@ -1,6 +1,8 @@
 using Contracts;
+using Contracts.Ipc;
+using OEIMS.Sentinel.Service.Connections.Agent;
+using OEIMS.Sentinel.Service.Connections.Server;
 using OEIMS.Sentinel.Service.Monitors;
-using OEIMS.Sentinel.Service.ServerConnection;
 
 namespace OEIMS.Sentinel.Service
 {
@@ -8,7 +10,8 @@ namespace OEIMS.Sentinel.Service
         IEnumerable<IMonitor> monitors,
         IEnumerable<IMitigator> mitigators,
         ServerConfig serverConfig,
-        DaemonWebSocketClient wsClient,
+        ServiceWebSocketClient wsClient,
+        AgentPipeServer agentPipeServer,
         HeartbeatSender heartbeatSender,
         ILogger<Worker> logger
         ) : BackgroundService
@@ -35,18 +38,23 @@ namespace OEIMS.Sentinel.Service
 
                 tasks.Add(RunComponentAsync(
                     "WebSocket client",
-                    wsClient.RunAsync,
+                    wsClient.StartAsync,
+                    stoppingToken));
+
+                tasks.Add(RunComponentAsync(
+                    "Agent pipe server",
+                    ct => agentPipeServer.StartAsync(OnAgentMessage, ct),
                     stoppingToken));
 
                 tasks.Add(RunComponentAsync(
                     "Heartbeat sender",
-                    heartbeatSender.RunAsync,
+                    heartbeatSender.StartAsync,
                     stoppingToken));
             }
             else if (!serverConfig.Enabled)
             {
                 logger.LogWarning(
-                    "Disabled by configuration - running without server connection.");
+                    "Disabled server connection by configuration.");
             }
             else
             {
@@ -99,6 +107,30 @@ namespace OEIMS.Sentinel.Service
 
             if (serverConfig.ShouldConnect)
                 await wsClient.SendEventAsync(e, CancellationToken.None);
+        }
+
+        private async Task OnAgentMessage(AgentPipeMessage message)
+        {
+            switch (message.Type)
+            {
+                case AgentMessageType.Heartbeat:
+                    logger.LogInformation("Agent heartbeat received at {sentAt}", message.SentAt);
+                    break;
+
+                case AgentMessageType.Event:
+                    if (message.Event is null)
+                    {
+                        logger.LogWarning("Agent event message ignored because Event was null.");
+                        return;
+                    }
+
+                    await OnEvent(message.Event);
+                    break;
+
+                default:
+                    logger.LogWarning("Unknown Agent pipe message type: {type}", message.Type);
+                    break;
+            }
         }
 
         private void Log(MonitorEvent e)

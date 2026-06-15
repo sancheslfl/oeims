@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
 
-namespace OEIMS.Sentinel.Service.ServerConnection;
+namespace OEIMS.Sentinel.Service.Connections.Server;
 
 internal sealed class HeartbeatSender(
     ServerConfig config,
@@ -12,7 +12,7 @@ internal sealed class HeartbeatSender(
     private readonly string _url =
         $"{config.ApiBaseUrl.TrimEnd('/')}/participants/{config.ParticipantId}/heartbeat";
 
-    public async Task RunAsync(CancellationToken ct)
+    public async Task StartAsync(CancellationToken ct)
     {
         logger.LogInformation("[Heartbeat] Starting — {Url} every {Seconds}s",
             _url, Interval.TotalSeconds);

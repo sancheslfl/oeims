@@ -1,4 +1,4 @@
-namespace OEIMS.Sentinel.Service.ServerConnection;
+namespace OEIMS.Sentinel.Service.Connections.Server;
 
 internal sealed class ServerConfig
 {

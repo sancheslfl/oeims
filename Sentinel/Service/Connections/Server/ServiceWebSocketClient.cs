@@ -3,18 +3,18 @@ using System.Text;
 using System.Text.Json;
 using Contracts;
 
-namespace OEIMS.Sentinel.Service.ServerConnection;
+namespace OEIMS.Sentinel.Service.Connections.Server;
 
-internal sealed class DaemonWebSocketClient(
+internal sealed class ServiceWebSocketClient(
     ServerConfig config,
-    ILogger<DaemonWebSocketClient> logger) : IAsyncDisposable
+    ILogger<ServiceWebSocketClient> logger) : IAsyncDisposable
 {
     private ClientWebSocket? _ws;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly Uri _uri =
         new($"{config.RealtimeBaseUrl.TrimEnd('/')}/ws/daemon/{config.ParticipantId}");
 
-    public async Task RunAsync(CancellationToken ct)
+    public async Task StartAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {

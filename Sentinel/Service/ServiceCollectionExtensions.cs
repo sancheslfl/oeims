@@ -1,8 +1,9 @@
 ﻿using Contracts;
+using OEIMS.Sentinel.Service.Connections.Agent;
+using OEIMS.Sentinel.Service.Connections.Server;
 using OEIMS.Sentinel.Service.Mitigators;
 using OEIMS.Sentinel.Service.Monitors;
 using OEIMS.Sentinel.Service.Platform.Windows;
-using OEIMS.Sentinel.Service.ServerConnection;
 
 namespace OEIMS.Sentinel.Service;
 
@@ -26,13 +27,15 @@ internal static class ServiceCollectionExtensions
 
             services.AddWindowsPlatform();
 
+            services.AddSingleton<AgentPipeServer>();
+
             services.AddMonitors();
             services.AddMitigators();
 
             services.AddSingleton(GetApplicationConfig(configuration));
             services.AddSingleton(GetServerConfig(configuration));
 
-            services.AddSingleton<DaemonWebSocketClient>();
+            services.AddSingleton<ServiceWebSocketClient>();
             services.AddHttpClient<HeartbeatSender>();
 
             services.AddHostedService<Worker>();

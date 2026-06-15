@@ -1,10 +1,12 @@
 using Contracts;
+using OEIMS.Sentinel.Agent.Ipc;
 
 namespace OEIMS.Sentinel.Agent;
 
 internal sealed class Worker(
     IEnumerable<IMonitor> monitors,
     IEnumerable<IMitigator> mitigators,
+    AgentPipeClient pipeClient,
     ILogger<Worker> logger
 ) : BackgroundService
 {
@@ -21,22 +23,29 @@ internal sealed class Worker(
             logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
         }
 
-        var tasks = _monitors
-            .Select(monitor => RunComponentAsync(
-                monitor.Name,
-                ct => monitor.StartAsync(OnEvent, ct),
-                stoppingToken))
-            .ToList();
-
-        if (tasks.Count == 0)
+        var tasks = new List<Task>
         {
-            logger.LogWarning("No agent monitors registered.");
+            RunComponentAsync(
+                "Agent heartbeat",
+                SendHeartbeatLoopAsync,
+                stoppingToken)
+        };
 
-            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
-            return;
-        }
+        tasks.AddRange(_monitors.Select(monitor => RunComponentAsync(
+            monitor.Name,
+            ct => monitor.StartAsync(OnEvent, ct),
+            stoppingToken)));
 
         await Task.WhenAll(tasks);
+    }
+
+    private async Task SendHeartbeatLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await pipeClient.SendHeartbeatAsync(ct);
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
     }
 
     private async Task RunComponentAsync(
@@ -67,6 +76,7 @@ internal sealed class Worker(
     {
         Log(e);
 
+        await pipeClient.SendEventAsync(e, CancellationToken.None);
     }
 
     private void Log(MonitorEvent e)
@@ -89,6 +99,12 @@ internal sealed class Worker(
                 logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
                 break;
         }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        await base.StopAsync(cancellationToken);
+        await pipeClient.DisposeAsync();
     }
 
     public override void Dispose()
