@@ -1,43 +1,15 @@
 <#
 .SYNOPSIS
-    Registers (or reuses) a test student, joins a session by code, and writes
-    the resulting token + participantId into all daemon config locations that
-    may be used by development, Release, or the published Windows Service.
-
-.PARAMETER Code
-    Session code shown on the professor console (e.g. A3F9). Mandatory.
-
-.PARAMETER Email
-    Student email to register/login with. Defaults to A49347@alunos.isel.pt.
-
-.PARAMETER Password
-    Student password. Defaults to Test1234!
-
-.PARAMETER ApiBaseUrl
-    REST API base URL. Defaults to http://localhost:8080/api.
-
-.PARAMETER RealtimeBaseUrl
-    Realtime server base URL for WebSocket connections.
-    Defaults to the ApiBaseUrl host converted to ws:// and without /api.
-
-.PARAMETER TargetFramework
-    Daemon target framework used by Release output. Defaults to net8.0.
-
-.PARAMETER PublishDir
-    Published Windows Service folder. Defaults to C:\OEIMS\Client.
-
-.PARAMETER PublishDaemon
-    Publishes the daemon to PublishDir before patching config files.
+    Registers/logs in a test student, joins a session by code,
+    and writes token + participantId into Sentinel Service config.
 
 .EXAMPLE
     .\join-session.ps1 -Code A3F9
 
 .EXAMPLE
-    .\join-session.ps1 -Code A3F9 -PublishDaemon
-
-.EXAMPLE
-    .\join-session.ps1 -Code A3F9 -ApiBaseUrl http://localhost:8080/api -RealtimeBaseUrl ws://localhost:8080
+    .\join-session.ps1 -Code A3F9 -PublishService
 #>
+
 param(
     [Parameter(Mandatory)]
     [string] $Code,
@@ -46,10 +18,11 @@ param(
     [string] $Password = "Test1234!",
     [string] $ApiBaseUrl = "http://localhost:8080/api",
     [string] $RealtimeBaseUrl = "",
-    [string] $TargetFramework = "net8.0",
+
+    # Installed Windows Service folder
     [string] $PublishDir = "C:\OEIMS\Client",
 
-    [switch] $PublishDaemon
+    [switch] $PublishService
 )
 
 $ErrorActionPreference = "Stop"
@@ -77,6 +50,24 @@ function Get-RealtimeBaseUrl {
     return $baseUrl
 }
 
+function Find-ServiceProjectDir {
+    $candidates = @(
+        (Join-Path $PSScriptRoot "Sentinel\Service"),
+        (Join-Path $PSScriptRoot "Service"),
+        $PSScriptRoot
+    )
+
+    foreach ($candidate in $candidates) {
+        $projectPath = Join-Path $candidate "Service.csproj"
+
+        if (Test-Path $projectPath) {
+            return $candidate
+        }
+    }
+
+    throw "Could not find Service.csproj. Put this script in PROJ/, Sentinel/, or Sentinel/Service/."
+}
+
 function Set-JsonProperty {
     param(
         [Parameter(Mandatory)]
@@ -97,7 +88,7 @@ function Set-JsonProperty {
     }
 }
 
-function Set-DaemonServerConfig {
+function Set-ServiceServerConfig {
     param(
         [Parameter(Mandatory)]
         [string] $Path,
@@ -112,25 +103,16 @@ function Set-DaemonServerConfig {
         [string] $Token,
 
         [Parameter(Mandatory)]
-        [string] $ParticipantId,
-
-        [bool] $CreateIfMissing = $false
+        [string] $ParticipantId
     )
 
-    if (-not (Test-Path $Path)) {
-        if (-not $CreateIfMissing) {
-            Write-Host "Skipping missing config: $Path" -ForegroundColor DarkGray
-            return
-        }
+    $directory = Split-Path $Path -Parent
 
-        $directory = Split-Path $Path -Parent
+    if (-not (Test-Path $directory)) {
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
 
-        if (-not (Test-Path $directory)) {
-            New-Item -ItemType Directory -Path $directory -Force | Out-Null
-        }
-
-        $settings = [pscustomobject]@{}
-    } else {
+    if (Test-Path $Path) {
         $content = Get-Content $Path -Raw
 
         if ([string]::IsNullOrWhiteSpace($content)) {
@@ -138,6 +120,8 @@ function Set-DaemonServerConfig {
         } else {
             $settings = $content | ConvertFrom-Json
         }
+    } else {
+        $settings = [pscustomobject]@{}
     }
 
     if (-not $settings.PSObject.Properties["Server"]) {
@@ -170,20 +154,28 @@ if ([string]::IsNullOrWhiteSpace($RealtimeBaseUrl)) {
     $RealtimeBaseUrl = $RealtimeBaseUrl.TrimEnd('/')
 }
 
-$daemonProjectDir = Join-Path $PSScriptRoot "Daemon"
-$daemonProjectPath = Join-Path $daemonProjectDir "Daemon.csproj"
+$serviceProjectDir = Find-ServiceProjectDir
+$serviceProjectPath = Join-Path $serviceProjectDir "Service.csproj"
 
-$jsonHeader = @{ "Content-Type" = "application/json" }
+$jsonHeader = @{
+    "Content-Type" = "application/json"
+}
 
 Write-Host ""
-Write-Host "OEIMS - student session setup" -ForegroundColor Cyan
+Write-Host "OEIMS - Sentinel session setup" -ForegroundColor Cyan
 Write-Host "Code: $Code | Student: $Email"
 Write-Host "API base URL: $ApiBaseUrl"
 Write-Host "Realtime base URL: $RealtimeBaseUrl"
-Write-Host "Publish dir: $PublishDir"
+Write-Host "Visual Studio config dir: $serviceProjectDir"
+
+if ($PublishService) {
+    Write-Host "Windows Service config dir: $PublishDir"
+} else {
+    Write-Host "Windows Service config dir: skipped because -PublishService was not used" -ForegroundColor DarkGray
+}
+
 Write-Host ""
 
-# 1. Register
 Write-Host "[1/4] Registering student..." -NoNewline
 try {
     $body = [ordered]@{
@@ -203,7 +195,6 @@ try {
     Write-Host " already registered." -ForegroundColor DarkGray
 }
 
-# 2. Login
 Write-Host "[2/4] Logging in..." -NoNewline
 $body = [ordered]@{
     email = $Email
@@ -219,7 +210,6 @@ $auth = Invoke-RestMethod `
 $token = $auth.token
 Write-Host " ok." -ForegroundColor Green
 
-# 3. Join session
 Write-Host "[3/4] Joining session '$Code'..." -NoNewline
 $authHeaders = @{
     "Content-Type" = "application/json"
@@ -240,71 +230,46 @@ Write-Host " joined." -ForegroundColor Green
 Write-Host "   Exam:     $($join.examTitle)" -ForegroundColor DarkGray
 Write-Host "   Duration: $($join.durationMins) min" -ForegroundColor DarkGray
 
-# 4. Publish and patch configs
-Write-Host "[4/4] Updating daemon configuration..." -ForegroundColor Cyan
+Write-Host "[4/4] Updating Sentinel Service configuration..." -ForegroundColor Cyan
 
-if ($PublishDaemon) {
-    Write-Host "Publishing daemon to $PublishDir..." -ForegroundColor Yellow
+if ($PublishService) {
+    Write-Host "Publishing service to $PublishDir..." -ForegroundColor Yellow
 
-    dotnet publish $daemonProjectPath `
+    dotnet publish $serviceProjectPath `
         -c Release `
         -o $PublishDir `
         --self-contained false
 
-    Write-Host "Published daemon." -ForegroundColor Green
+    Write-Host "Published service." -ForegroundColor Green
 }
 
 $configTargets = @(
-    @{
-        Path = Join-Path $daemonProjectDir "appsettings.json"
-        CreateIfMissing = $false
-    },
-    @{
-        Path = Join-Path $daemonProjectDir "appsettings.Development.json"
-        CreateIfMissing = $false
-    },
-    @{
-        Path = Join-Path $daemonProjectDir "appsettings.Production.json"
-        CreateIfMissing = $false
-    },
-    @{
-        Path = Join-Path $daemonProjectDir "bin\Release\$TargetFramework\appsettings.json"
-        CreateIfMissing = $false
-    },
-    @{
-        Path = Join-Path $daemonProjectDir "bin\Release\$TargetFramework\appsettings.Development.json"
-        CreateIfMissing = $false
-    },
-    @{
-        Path = Join-Path $daemonProjectDir "bin\Release\$TargetFramework\appsettings.Production.json"
-        CreateIfMissing = $false
-    },
-    @{
-        Path = Join-Path $PublishDir "appsettings.json"
-        CreateIfMissing = $true
-    },
-    @{
-        Path = Join-Path $PublishDir "appsettings.Development.json"
-        CreateIfMissing = $true
-    },
-    @{
-        Path = Join-Path $PublishDir "appsettings.Production.json"
-        CreateIfMissing = $true
-    }
+    # Visual Studio/source config
+    (Join-Path $serviceProjectDir "appsettings.json"),
+    (Join-Path $serviceProjectDir "appsettings.Development.json"),
+    (Join-Path $serviceProjectDir "appsettings.Production.json")
 )
 
-foreach ($target in $configTargets) {
-    Set-DaemonServerConfig `
-        -Path $target.Path `
+if ($PublishService) {
+    # Installed Windows Service config
+    $configTargets += @(
+        (Join-Path $PublishDir "appsettings.json"),
+        (Join-Path $PublishDir "appsettings.Development.json"),
+        (Join-Path $PublishDir "appsettings.Production.json")
+    )
+}
+
+foreach ($path in $configTargets) {
+    Set-ServiceServerConfig `
+        -Path $path `
         -ApiBaseUrl $ApiBaseUrl `
         -RealtimeBaseUrl $RealtimeBaseUrl `
         -Token $token `
-        -ParticipantId $join.participantId `
-        -CreateIfMissing $target.CreateIfMissing
+        -ParticipantId $join.participantId
 }
 
 Write-Host ""
-Write-Host "Daemon configuration patched." -ForegroundColor Cyan
+Write-Host "Sentinel Service configuration patched." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  ApiBaseUrl      : $ApiBaseUrl"
 Write-Host "  RealtimeBaseUrl : $RealtimeBaseUrl"
@@ -312,12 +277,21 @@ Write-Host "  TokenLength     : $($token.Length)"
 Write-Host "  ParticipantId   : $($join.participantId)"
 Write-Host "  SessionId       : $($join.sessionId)"
 Write-Host ""
-Write-Host "If using Visual Studio Release:" -ForegroundColor Yellow
-Write-Host "  Run the daemon again after this script patched the Release output." -ForegroundColor Yellow
+
+Write-Host "For Visual Studio:" -ForegroundColor Yellow
+Write-Host "  Run Service again after this script patches the source config." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "If using the Windows Service:" -ForegroundColor Yellow
-Write-Host "  Restart-Service oeims" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "Or publish + patch in one command:" -ForegroundColor Yellow
-Write-Host "  .\join-session.ps1 -Code $Code -PublishDaemon" -ForegroundColor Yellow
+
+if ($PublishService) {
+    Write-Host "For Windows Service:" -ForegroundColor Yellow
+    Write-Host "  Restart-Service oeims" -ForegroundColor Yellow
+    Write-Host ""
+} else {
+    Write-Host "For Windows Service:" -ForegroundColor DarkGray
+    Write-Host "  Not patched. Use -PublishService when you want to publish and patch C:\OEIMS\Client." -ForegroundColor DarkGray
+    Write-Host ""
+}
+
+Write-Host "Publish + patch in one command:" -ForegroundColor Yellow
+Write-Host "  .\join-session.ps1 -Code $Code -PublishService" -ForegroundColor Yellow
 Write-Host ""
