@@ -42,8 +42,17 @@
 - [X] Desenvolver o esqueleto da consola do professor
 - [X] Organizar estrutura da implementação do ClipboardBlocker a nível da plataforma
 - [X] Redesenhar o student card para mostrar as infrações inline com scroll em vez de tooltip flutuante (resolve o bug de hover) [27/5]
+- [X] Adicionar a claim de email ao JWT para facilitar o logging e rastreabilidade [29/5] 
+- [X] Alterar o campo supervisor_id para um array de IDs e suportar vários supervisor para uma sessão [30/5] 
+- [X] Permitir que contas de professores acedam a sessões ativas usando os códigos [30/5] 
+- [X] Adicionar verificação de que o daemon está ligado (CONNECTED) antes de considerar o estudante pronto na sessão [31/5]
+- [X] Indicador visual de timeout do daemon [31/5]
+- [X] Adicionar flow para professores acederem a sessões através do código (Polling) [31/5]
+- [X] (NEW) Fazer pdf info
+- [X] (NEW) Fazer Cartaz
+- [X] (NEW) Fazer enquadramento/requisitos funcionais e arquitetura da solução (Relatório final)
 - [X] Suportar vários supervisor para uma sessão [1/6]
 - [X] Reestruturar a secção Introdução e começar com a secção do Enquadramento ou Requisitos Funcionais [5/6]
 - [X] Permitir que contas de professores acedam a sessões ativas usando os códigos
 - [X] Redirecionar para login quando utilizador tem token expirado [13/6]
-
+- [X] (NEW) Adicionar flow para professores acederem a sessões através do código (SSE) [12/6]

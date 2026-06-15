@@ -1,22 +1,33 @@
-import { useEffect, useState } from "react";
-import type { ExamResponse, OpenedSession } from "../../types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
 import { useAuth } from "../../AuthContext";
 import { getExams } from "../../api/exams";
+import { getActiveSessions } from "../../api/sessions";
 import { CreateExamForm } from "./CreateExamForm";
 import { SessionList } from "./SessionList";
+import { REALTIME_CHANNELS, REALTIME_EVENTS, useEventListener } from "../../hooks/useEventListener";
 
 type SidebarProps = {
     openedSession: OpenedSession | null;
     onOpenSession: (openedSession: OpenedSession) => void;
+    onCloseSession: () => void;
 };
 
-export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
+export function Sidebar({ openedSession, onOpenSession, onCloseSession }: SidebarProps) {
     const { auth } = useAuth();
 
     const [isOpen, setIsOpen] = useState(true);
     const [exams, setExams] = useState<ExamResponse[]>([]);
+    const [activeSessions, setActiveSessions] = useState<SessionResponse[]>([]);
     const [isLoadingExams, setIsLoadingExams] = useState(false);
     const [error, setError] = useState("");
+
+    const openedSessionRef = useRef(openedSession);
+    const onOpenSessionRef = useRef(onOpenSession);
+    const onCloseSessionRef = useRef(onCloseSession);
+    openedSessionRef.current = openedSession;
+    onOpenSessionRef.current = onOpenSession;
+    onCloseSessionRef.current = onCloseSession;
 
     useEffect(() => {
         const token = auth?.token;
@@ -25,15 +36,19 @@ export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
 
         let ignore = false;
 
-        async function loadExams(token: string) {
+        async function loadData(token: string) {
             setError("");
             setIsLoadingExams(true);
 
             try {
-                const loadedExams = await getExams(token);
+                const [loadedExams, loadedActiveSessions] = await Promise.all([
+                    getExams(token),
+                    getActiveSessions(token),
+                ]);
 
                 if (!ignore) {
                     setExams(loadedExams);
+                    setActiveSessions(loadedActiveSessions);
                 }
             } catch (error) {
                 if (!ignore && error instanceof Error) {
@@ -46,12 +61,40 @@ export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
             }
         }
 
-        void loadExams(token);
+        void loadData(token);
 
         return () => {
             ignore = true;
         };
     }, [auth?.token]);
+
+    const sseHandlers = useMemo(() => ({
+        [REALTIME_EVENTS.SessionCreated]: (data: unknown) => {
+            const session = data as SessionResponse;
+            setActiveSessions((current) =>
+                current.some((s) => s.id === session.id) ? current : [...current, session],
+            );
+        },
+        [REALTIME_EVENTS.SessionStatusUpdated]: (data: unknown) => {
+            const session = data as SessionResponse;
+            setActiveSessions((current) => {
+                if (session.status === "ENDED") {
+                    return current.filter((s) => s.id !== session.id);
+                }
+                return current.map((s) => (s.id === session.id ? session : s));
+            });
+            const opened = openedSessionRef.current;
+            if (opened?.session.id === session.id) {
+                if (session.status === "ENDED") {
+                    onCloseSessionRef.current();
+                } else {
+                    onOpenSessionRef.current({ ...opened, session });
+                }
+            }
+        },
+    }), []);
+
+    useEventListener(auth ? REALTIME_CHANNELS.sessions : null, sseHandlers);
 
     function handleExamCreated(exam: ExamResponse) {
         setExams((current) => [exam, ...current]);
@@ -85,6 +128,7 @@ export function Sidebar({ openedSession, onOpenSession }: SidebarProps) {
 
                         <SessionList
                             exams={exams}
+                            activeSessions={activeSessions}
                             isLoading={isLoadingExams}
                             openedSession={openedSession}
                             onOpenSession={onOpenSession}

@@ -8,6 +8,7 @@ import io.ktor.server.testing.*
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * HTTP-layer tests for the session lifecycle:
@@ -335,6 +336,45 @@ class SessionRoutesTest : BaseRouteTest() {
             contentType(ContentType.Application.Json)
             setBody(JoinSessionRequest(session.code))
         }
+
+        assertEquals(HttpStatusCode.Forbidden, response.status)
+    }
+
+    // ── GET /sessions/active ──────────────────────────────────────────────────
+
+    @Test
+    fun `professor fetches active sessions and sees PENDING and ACTIVE ones`() = routeTest {
+        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val exam    = createExam(prof.token)
+        val s1      = createSession(prof.token, exam.id)
+        val s2      = createSession(prof.token, exam.id)
+        startSession(prof.token, s2.id)
+
+        val response = jsonClient().get("/sessions/active") { bearerAuth(prof.token) }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.body<List<SessionResponse>>()
+        assertEquals(2, body.size)
+        assertTrue(body.any { it.id == s1.id })
+        assertTrue(body.any { it.id == s2.id })
+    }
+
+    @Test
+    fun `active sessions does not include ENDED sessions`() = routeTest {
+        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val session = createSession(prof.token, createExam(prof.token).id)
+        startSession(prof.token, session.id)
+        endSession(prof.token, session.id)
+
+        val response = jsonClient().get("/sessions/active") { bearerAuth(prof.token) }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(emptyList<SessionResponse>(), response.body<List<SessionResponse>>())
+    }
+
+    @Test
+    fun `fetching active sessions without a token returns 403`() = routeTest {
+        val response = jsonClient().get("/sessions/active")
 
         assertEquals(HttpStatusCode.Forbidden, response.status)
     }

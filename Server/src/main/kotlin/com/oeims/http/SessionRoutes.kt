@@ -39,6 +39,12 @@ fun Route.sessionRoutes(
             call.respond(HttpStatusCode.OK, response)
         }
 
+        // GET /sessions/active - all currently open sessions
+        get("/sessions/active") {
+            val response = sessionService.getActiveSessions()
+            call.respond(HttpStatusCode.OK, response)
+        }
+
         // GET /sessions/current - latest pending or active session for professor
         get("/sessions/current") {
             val professorId = call.userId()
