@@ -4,7 +4,7 @@ import com.oeims.exceptions.ValidationException
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
-import java.util.UUID
+import java.util.*
 
 // Extract the authenticated user's UUID from the JWT principal.
 fun ApplicationCall.userId(): UUID {

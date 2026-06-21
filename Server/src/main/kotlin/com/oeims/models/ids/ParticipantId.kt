@@ -1,6 +1,6 @@
 package com.oeims.models.ids
 
-import java.util.UUID
+import java.util.*
 
 @JvmInline
 value class ParticipantId(val value: UUID)

@@ -5,14 +5,10 @@ import com.oeims.models.Participants
 import com.oeims.models.Severity
 import com.oeims.repositories.interfaces.IEventRepository
 import kotlinx.coroutines.Dispatchers
-import org.jetbrains.exposed.sql.JoinType
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 data class EventRecord(
     val id: UUID,
@@ -25,7 +21,12 @@ data class EventRecord(
 
 class EventRepository : IEventRepository {
 
-    override suspend fun create(participantId: UUID, monitorName: String, message: String, severity: Severity): EventRecord = newSuspendedTransaction(Dispatchers.IO) {
+    override suspend fun create(
+        participantId: UUID,
+        monitorName: String,
+        message: String,
+        severity: Severity
+    ): EventRecord = newSuspendedTransaction(Dispatchers.IO) {
         val id = UUID.randomUUID()
         val now = Instant.now()
         Events.insert {
@@ -39,12 +40,13 @@ class EventRepository : IEventRepository {
         EventRecord(id, participantId, monitorName, message, severity, now)
     }
 
-    override suspend fun findByParticipant(participantId: UUID): List<EventRecord> = newSuspendedTransaction(Dispatchers.IO) {
-        Events.selectAll()
-            .where { Events.participantId eq participantId }
-            .orderBy(Events.occurredAt, SortOrder.ASC)
-            .map { it.toRecord() }
-    }
+    override suspend fun findByParticipant(participantId: UUID): List<EventRecord> =
+        newSuspendedTransaction(Dispatchers.IO) {
+            Events.selectAll()
+                .where { Events.participantId eq participantId }
+                .orderBy(Events.occurredAt, SortOrder.ASC)
+                .map { it.toRecord() }
+        }
 
     // Fetch the full event timeline for a session (all participants).
     override suspend fun findBySession(sessionId: UUID): List<EventRecord> = newSuspendedTransaction(Dispatchers.IO) {
@@ -56,11 +58,11 @@ class EventRepository : IEventRepository {
     }
 
     private fun ResultRow.toRecord() = EventRecord(
-        id            = this[Events.id].value,
+        id = this[Events.id].value,
         participantId = this[Events.participantId].value,
-        monitorName   = this[Events.monitorName],
-        message       = this[Events.message],
-        severity      = this[Events.severity],
-        occurredAt    = this[Events.occurredAt]
+        monitorName = this[Events.monitorName],
+        message = this[Events.message],
+        severity = this[Events.severity],
+        occurredAt = this[Events.occurredAt]
     )
 }

@@ -9,7 +9,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 data class UserRecord(
     val id: UUID,
@@ -35,18 +35,19 @@ class UserRepository : IUserRepository {
             ?.toRecord()
     }
 
-    override suspend fun create(email: String, role: UserRole, passwordHash: String): UserRecord = newSuspendedTransaction(Dispatchers.IO) {
-        val id = UUID.randomUUID()
-        val now = Instant.now()
-        Users.insert {
-            it[Users.id] = id
-            it[Users.email] = email
-            it[Users.role] = role
-            it[Users.passwordHash] = passwordHash
-            it[Users.createdAt] = now
+    override suspend fun create(email: String, role: UserRole, passwordHash: String): UserRecord =
+        newSuspendedTransaction(Dispatchers.IO) {
+            val id = UUID.randomUUID()
+            val now = Instant.now()
+            Users.insert {
+                it[Users.id] = id
+                it[Users.email] = email
+                it[Users.role] = role
+                it[Users.passwordHash] = passwordHash
+                it[Users.createdAt] = now
+            }
+            UserRecord(id, email, role, passwordHash, now)
         }
-        UserRecord(id, email, role, passwordHash, now)
-    }
 
     override suspend fun existsByEmail(email: String): Boolean = newSuspendedTransaction(Dispatchers.IO) {
         Users.selectAll()
@@ -55,10 +56,10 @@ class UserRepository : IUserRepository {
     }
 
     private fun ResultRow.toRecord() = UserRecord(
-        id           = this[Users.id].value,
-        email        = this[Users.email],
-        role         = this[Users.role],
+        id = this[Users.id].value,
+        email = this[Users.email],
+        role = this[Users.role],
         passwordHash = this[Users.passwordHash],
-        createdAt    = this[Users.createdAt]
+        createdAt = this[Users.createdAt]
     )
 }

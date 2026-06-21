@@ -1,11 +1,11 @@
 package com.oeims.services
 
-import com.oeims.models.dto.EventResponse
 import com.oeims.exceptions.NotFoundException
 import com.oeims.models.SessionStatus
+import com.oeims.models.Severity
+import com.oeims.models.dto.EventResponse
 import com.oeims.models.ids.ParticipantId
 import com.oeims.models.ids.SessionId
-import com.oeims.models.Severity
 import com.oeims.models.ids.toSessionId
 import com.oeims.repositories.EventRecord
 import com.oeims.repositories.interfaces.IEventRepository

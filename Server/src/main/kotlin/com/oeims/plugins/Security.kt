@@ -1,10 +1,8 @@
 package com.oeims.plugins
 
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
 import com.oeims.http.AUTH_COOKIE_NAME
 import com.oeims.models.dto.ErrorResponse
-import com.oeims.services.JwtConfig
+import com.oeims.services.JwtSettings
 import io.ktor.http.*
 import io.ktor.http.auth.*
 import io.ktor.server.application.*
@@ -12,15 +10,11 @@ import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
 
-fun Application.configureSecurity(jwtConfig: JwtConfig) {
-    val verifier = JWT
-        .require(Algorithm.HMAC256(jwtConfig.secret))
-        .withIssuer(jwtConfig.issuer)
-        .withAudience(jwtConfig.audience)
-        .build()
+fun Application.configureSecurity(jwtSettings: JwtSettings) {
+    val verifier = jwtSettings.verifier
 
     install(Authentication) {
-        jwtWithCookie("auth-jwt", jwtConfig) {
+        jwtWithCookie("auth-jwt", jwtSettings) {
             this.verifier(verifier)
 
             validate { credential ->
@@ -43,7 +37,7 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
             }
         }
 
-        jwtWithCookie("auth-professor", jwtConfig) {
+        jwtWithCookie("auth-professor", jwtSettings) {
             this.verifier(verifier)
 
             validate { credential ->
@@ -66,7 +60,7 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
             }
         }
 
-        jwtWithCookie("auth-student", jwtConfig) {
+        jwtWithCookie("auth-student", jwtSettings) {
             this.verifier(verifier)
 
             validate { credential ->
@@ -93,11 +87,11 @@ fun Application.configureSecurity(jwtConfig: JwtConfig) {
 
 private fun AuthenticationConfig.jwtWithCookie(
     name: String,
-    jwtConfig: JwtConfig,
+    jwtSettings: JwtSettings,
     configure: JWTAuthenticationProvider.Config.() -> Unit
 ) {
     jwt(name) {
-        realm = jwtConfig.realm
+        realm = jwtSettings.realm
 
         authHeader { call ->
             call.request.parseAuthorizationHeader()

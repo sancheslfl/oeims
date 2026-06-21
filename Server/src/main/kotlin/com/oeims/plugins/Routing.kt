@@ -44,8 +44,8 @@ fun Application.configureRouting(
     }
 
     val basePath = environment.config
-    .propertyOrNull("app.api.base-path")
-    ?.getString()
+        .propertyOrNull("app.api.base-path")
+        ?.getString()
         ?: throw IllegalStateException("API base path is not configured in config file")
 
     routing {

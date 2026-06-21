@@ -10,11 +10,18 @@ app:
     base-path: "/api"
 
 jwt:
-  secret: "change-me-before-production"
+  secret: "$JWT_SECRET"
   issuer: "oeims"
-  audience: "oeims-users"
-  realm: "OEIMS"
-  expiration-ms: 86400000
+
+  auth:
+    audience: "oeims"
+    realm: "oeims"
+    expiration-ms: 3600000
+
+  session-join:
+    audience: "oeims:session-join"
+    realm: "oeims"
+    expiration-ms: 600000
 
 database:
   path: "./oeims.db"

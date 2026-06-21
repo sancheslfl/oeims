@@ -10,11 +10,11 @@ Content-Type: application/json
 }
 
 > {%
-  client.global.set("professorToken", response.body.token);
-  client.global.set("professorId", response.body.userId);
-  client.test("Register professor → 201", function() {
-    client.assert(response.status === 201, "Expected 201 Created");
-  });
+    client.global.set("professorToken", response.body.token);
+    client.global.set("professorId", response.body.userId);
+    client.test("Register professor → 201", function () {
+        client.assert(response.status === 201, "Expected 201 Created");
+    });
 %}
 
 
@@ -28,10 +28,11 @@ Content-Type: application/json
 }
 
 > {%
-  client.global.set("professorToken", response.body.token);
-  client.test("Login professor → 200", function() {y
-    client.assert(response.status === 200, "Expected 200 OK");
-  });
+    client.global.set("professorToken", response.body.token);
+    client.test("Login professor → 200", function () {
+        y
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
 %}
 
 ### 3. Create exam
@@ -46,10 +47,10 @@ Authorization: Bearer {{professorToken}}
 }
 
 > {%
-  client.global.set("examId", response.body.id);
-  client.test("Create exam → 201", function() {
-    client.assert(response.status === 201, "Expected 201 Created");
-  });
+    client.global.set("examId", response.body.id);
+    client.test("Create exam → 201", function () {
+        client.assert(response.status === 201, "Expected 201 Created");
+    });
 %}
 
 ### 4. Create session — server returns a 6-character join code
@@ -62,12 +63,12 @@ Authorization: Bearer {{professorToken}}
 }
 
 > {%
-  client.global.set("sessionId", response.body.id);
-  client.global.set("sessionCode", response.body.code);
-  client.test("Create session → 201 PENDING", function() {
-    client.assert(response.status === 201, "Expected 201 Created");
-    client.assert(response.body.status === "PENDING", "Expected PENDING status");
-  });
+    client.global.set("sessionId", response.body.id);
+    client.global.set("sessionCode", response.body.code);
+    client.test("Create session → 201 PENDING", function () {
+        client.assert(response.status === 201, "Expected 201 Created");
+        client.assert(response.body.status === "PENDING", "Expected PENDING status");
+    });
 %}
 
 ### 5. Start session
@@ -75,10 +76,10 @@ POST {{baseUrl}}/sessions/{{sessionId}}/start
 Authorization: Bearer {{professorToken}}
 
 > {%
-  client.test("Start session → 200 ACTIVE", function() {
-    client.assert(response.status === 200, "Expected 200 OK");
-    client.assert(response.body.status === "ACTIVE", "Expected ACTIVE status");
-  });
+    client.test("Start session → 200 ACTIVE", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+        client.assert(response.body.status === "ACTIVE", "Expected ACTIVE status");
+    });
 %}
 
 ### 6. Register student
@@ -92,10 +93,10 @@ Content-Type: application/json
 }
 
 > {%
-  client.global.set("studentToken", response.body.token);
-  client.test("Register student → 201", function() {
-    client.assert(response.status === 201, "Expected 201 Created");
-  });
+    client.global.set("studentToken", response.body.token);
+    client.test("Register student → 201", function () {
+        client.assert(response.status === 201, "Expected 201 Created");
+    });
 %}
 
 ### 7. Student joins session using the 6-character code
@@ -108,10 +109,10 @@ Authorization: Bearer {{studentToken}}
 }
 
 > {%
-  client.global.set("participantId", response.body.participantId);
-  client.test("Join session → 200", function() {
-    client.assert(response.status === 200, "Expected 200 OK");
-  });
+    client.global.set("participantId", response.body.participantId);
+    client.test("Join session → 200", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
 %}
 
 ### 8. Student sends heartbeat — server responds 204 No Content
@@ -119,9 +120,9 @@ POST {{baseUrl}}/participants/{{participantId}}/heartbeat
 Authorization: Bearer {{studentToken}}
 
 > {%
-  client.test("Heartbeat → 204 No Content", function() {
-    client.assert(response.status === 204, "Expected 204 No Content");
-  });
+    client.test("Heartbeat → 204 No Content", function () {
+        client.assert(response.status === 204, "Expected 204 No Content");
+    });
 %}
 
 ### 9. Professor ends the session
@@ -129,10 +130,10 @@ POST {{baseUrl}}/sessions/{{sessionId}}/end
 Authorization: Bearer {{professorToken}}
 
 > {%
-  client.test("End session → 200 ENDED", function() {
-    client.assert(response.status === 200, "Expected 200 OK");
-    client.assert(response.body.status === "ENDED", "Expected ENDED status");
-  });
+    client.test("End session → 200 ENDED", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+        client.assert(response.body.status === "ENDED", "Expected ENDED status");
+    });
 %}
 
 ### 10. Professor queries session participants

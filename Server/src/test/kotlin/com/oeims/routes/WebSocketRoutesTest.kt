@@ -7,14 +7,11 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 /**
  * WebSocket-layer tests for the two channels:
@@ -46,9 +43,9 @@ class WebSocketRoutesTest : BaseRouteTest() {
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     private data class Ctx(
-        val profToken:     String,
-        val studentToken:  String,
-        val sessionId:     String,
+        val profToken: String,
+        val studentToken: String,
+        val sessionId: String,
         val participantId: String
     )
 
@@ -96,7 +93,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
 
     @Test
     fun `valid daemon frame is persisted and returned by the events endpoint`() = routeTest {
-        val ctx  = setup()
+        val ctx = setup()
         val http = jsonClient()
 
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
@@ -119,7 +116,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
 
     @Test
     fun `malformed daemon frame is silently dropped and connection stays open`() = routeTest {
-        val ctx  = setup()
+        val ctx = setup()
         val http = jsonClient()
 
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
@@ -144,7 +141,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
 
     @Test
     fun `daemon frame with unknown severity is dropped and connection stays open`() = routeTest {
-        val ctx  = setup()
+        val ctx = setup()
         val http = jsonClient()
 
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
@@ -168,15 +165,15 @@ class WebSocketRoutesTest : BaseRouteTest() {
 
     @Test
     fun `multiple valid daemon frames all produce persisted events`() = routeTest {
-        val ctx  = setup()
+        val ctx = setup()
         val http = jsonClient()
 
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(DaemonEventMessage("FocusMonitor",     "lost focus",       "Info")))
+            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "lost focus", "Info")))
             send(Json.encodeToString(DaemonEventMessage("ClipboardMonitor", "clipboard access", "Warning")))
-            send(Json.encodeToString(DaemonEventMessage("ProcessMonitor",   "unknown process",  "Critical")))
+            send(Json.encodeToString(DaemonEventMessage("ProcessMonitor", "unknown process", "Critical")))
             delay(50)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }

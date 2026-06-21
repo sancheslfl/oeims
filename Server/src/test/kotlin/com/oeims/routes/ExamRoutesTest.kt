@@ -43,8 +43,8 @@ class ExamRoutesTest : BaseRouteTest() {
 
     private suspend fun ApplicationTestBuilder.createExam(
         professorToken: String,
-        title: String       = TITLE_A,
-        durationMins: Int   = 90,
+        title: String = TITLE_A,
+        durationMins: Int = 90,
         description: String? = null
     ): ExamResponse = jsonClient().post("/exams") {
         bearerAuth(professorToken)
@@ -56,7 +56,7 @@ class ExamRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor creates an exam and receives 201 with ExamResponse`() = routeTest {
-        val prof   = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val client = jsonClient()
 
         val response = client.post("/exams") {
@@ -88,7 +88,7 @@ class ExamRoutesTest : BaseRouteTest() {
     @Test
     fun `student token cannot create an exam and receives 403`() = routeTest {
         val student = register("student@isel.pt", "password123", "STUDENT")
-        val client  = jsonClient()
+        val client = jsonClient()
 
         val response = client.post("/exams") {
             bearerAuth(student.token)
@@ -151,7 +151,7 @@ class ExamRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor fetches an exam by id and receives the correct exam`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val created = createExam(prof.token, TITLE_C, 100)
 
         val response = jsonClient().get("/exams/${created.id}") { bearerAuth(prof.token) }

@@ -1,26 +1,18 @@
 package com.oeims.repositories
 
-import com.oeims.models.ConnectionStatus
-import com.oeims.models.Participants
-import com.oeims.models.SessionStatus
-import com.oeims.models.Sessions
-import com.oeims.models.Users
+import com.oeims.exceptions.NotFoundException
+import com.oeims.models.*
 import com.oeims.repositories.interfaces.IParticipantRepository
 import kotlinx.coroutines.Dispatchers
-import org.jetbrains.exposed.sql.JoinType
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.update
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 data class ParticipantRecord(
     val id: UUID,
     val sessionId: UUID,
-    val userId: UUID,
+    val userId: UUID?,
     val email: String,
     val connectionStatus: ConnectionStatus,
     val lastHeartbeat: Instant?,
@@ -29,57 +21,108 @@ data class ParticipantRecord(
 
 class ParticipantRepository : IParticipantRepository {
 
-    override suspend fun findById(id: UUID): ParticipantRecord? = newSuspendedTransaction(Dispatchers.IO) {
-        Participants.join(Users, JoinType.INNER, Participants.userId, Users.id)
-            .selectAll()
-            .where { Participants.id eq id }
-            .singleOrNull()
-            ?.toRecord()
-    }
-
-    override suspend fun findBySession(sessionId: UUID): List<ParticipantRecord> =
+    override suspend fun findById(id: UUID): ParticipantRecord? =
         newSuspendedTransaction(Dispatchers.IO) {
-            Participants.join(Users, JoinType.INNER, Participants.userId, Users.id)
-                .selectAll()
-                .where { Participants.sessionId eq sessionId }
-                .map { it.toRecord() }
-        }
-
-    override suspend fun findByUserAndSession(userId: UUID, sessionId: UUID): ParticipantRecord? =
-        newSuspendedTransaction(Dispatchers.IO) {
-            Participants.join(Users, JoinType.INNER, Participants.userId, Users.id)
-                .selectAll()
-                .where { (Participants.userId eq userId) and (Participants.sessionId eq sessionId) }
+            Participants.selectAll()
+                .where { Participants.id eq id }
                 .singleOrNull()
                 ?.toRecord()
         }
 
-    override suspend fun create(sessionId: UUID, userId: UUID): ParticipantRecord =
+    override suspend fun findBySession(sessionId: UUID): List<ParticipantRecord> =
+        newSuspendedTransaction(Dispatchers.IO) {
+            Participants.selectAll()
+                .where { Participants.sessionId eq sessionId }
+                .map { it.toRecord() }
+        }
+
+    suspend fun findByUserAndSession(userId: UUID, sessionId: UUID): ParticipantRecord? =
+        newSuspendedTransaction(Dispatchers.IO) {
+            Participants.selectAll()
+                .where {
+                    (Participants.userId eq userId) and
+                            (Participants.sessionId eq sessionId)
+                }
+                .singleOrNull()
+                ?.toRecord()
+        }
+
+    override suspend fun findByEmailAndSession(email: String, sessionId: UUID): ParticipantRecord? =
+        newSuspendedTransaction(Dispatchers.IO) {
+            Participants.selectAll()
+                .where {
+                    (Participants.email eq email) and
+                            (Participants.sessionId eq sessionId)
+                }
+                .singleOrNull()
+                ?.toRecord()
+        }
+
+    suspend fun create(sessionId: UUID, userId: UUID): ParticipantRecord =
         newSuspendedTransaction(Dispatchers.IO) {
             val id = UUID.randomUUID()
             val now = Instant.now()
+
+            val email = Users.selectAll()
+                .where { Users.id eq userId }
+                .singleOrNull()
+                ?.get(Users.email)
+                ?: throw NotFoundException("User not found")
+
             Participants.insert {
                 it[Participants.id] = id
                 it[Participants.sessionId] = sessionId
                 it[Participants.userId] = userId
+                it[Participants.email] = email
                 it[Participants.connectionStatus] = ConnectionStatus.DISCONNECTED
                 it[Participants.lastHeartbeat] = null
                 it[Participants.joinedAt] = now
             }
-            // Re-fetch with email join — runs in the same transaction
-            Participants.join(Users, JoinType.INNER, Participants.userId, Users.id)
-                .selectAll()
-                .where { Participants.id eq id }
-                .single()
-                .toRecord()
+
+            ParticipantRecord(
+                id = id,
+                sessionId = sessionId,
+                userId = userId,
+                email = email,
+                connectionStatus = ConnectionStatus.DISCONNECTED,
+                lastHeartbeat = null,
+                joinedAt = now
+            )
         }
 
-    override suspend fun updateHeartbeat(id: UUID): Boolean = newSuspendedTransaction(Dispatchers.IO) {
-        Participants.update({ Participants.id eq id }) {
-            it[Participants.lastHeartbeat] = Instant.now()
-            it[Participants.connectionStatus] = ConnectionStatus.CONNECTED
-        } > 0
-    }
+    override suspend fun create(sessionId: UUID, email: String): ParticipantRecord =
+        newSuspendedTransaction(Dispatchers.IO) {
+            val id = UUID.randomUUID()
+            val now = Instant.now()
+
+            Participants.insert {
+                it[Participants.id] = id
+                it[Participants.sessionId] = sessionId
+                it[Participants.userId] = null
+                it[Participants.email] = email
+                it[Participants.connectionStatus] = ConnectionStatus.DISCONNECTED
+                it[Participants.lastHeartbeat] = null
+                it[Participants.joinedAt] = now
+            }
+
+            ParticipantRecord(
+                id = id,
+                sessionId = sessionId,
+                userId = null,
+                email = email,
+                connectionStatus = ConnectionStatus.DISCONNECTED,
+                lastHeartbeat = null,
+                joinedAt = now
+            )
+        }
+
+    override suspend fun updateHeartbeat(id: UUID): Boolean =
+        newSuspendedTransaction(Dispatchers.IO) {
+            Participants.update({ Participants.id eq id }) {
+                it[Participants.lastHeartbeat] = Instant.now()
+                it[Participants.connectionStatus] = ConnectionStatus.CONNECTED
+            } > 0
+        }
 
     override suspend fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean =
         newSuspendedTransaction(Dispatchers.IO) {
@@ -88,10 +131,9 @@ class ParticipantRepository : IParticipantRepository {
             } > 0
         }
 
-    override suspend fun markTimedOut(threshold: Instant): List<ParticipantRecord> =
+    override suspend fun updateTimedOut(threshold: Instant): List<ParticipantRecord> =
         newSuspendedTransaction(Dispatchers.IO) {
             val candidates = Participants
-                .join(Users, JoinType.INNER, Participants.userId, Users.id)
                 .join(Sessions, JoinType.INNER, Participants.sessionId, Sessions.id)
                 .selectAll()
                 .where {
@@ -102,11 +144,7 @@ class ParticipantRepository : IParticipantRepository {
                 .map { it.toRecord() }
 
             if (candidates.isNotEmpty()) {
-                val candidateIds = candidates.map { it.id }
-
-                Participants.update({
-                    Participants.id inList candidateIds
-                }) {
+                Participants.update({ Participants.id inList candidates.map { it.id } }) {
                     it[connectionStatus] = ConnectionStatus.TIMED_OUT
                 }
             }
@@ -117,8 +155,8 @@ class ParticipantRepository : IParticipantRepository {
     private fun ResultRow.toRecord() = ParticipantRecord(
         id = this[Participants.id].value,
         sessionId = this[Participants.sessionId].value,
-        userId = this[Participants.userId].value,
-        email = this[Users.email],
+        userId = this[Participants.userId]?.value,
+        email = this[Participants.email],
         connectionStatus = this[Participants.connectionStatus],
         lastHeartbeat = this[Participants.lastHeartbeat],
         joinedAt = this[Participants.joinedAt]

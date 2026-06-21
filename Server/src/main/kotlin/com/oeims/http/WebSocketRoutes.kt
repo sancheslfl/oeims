@@ -5,7 +5,7 @@ import com.oeims.models.dto.toDomainSeverity
 import com.oeims.models.ids.toParticipantId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.services.EventService
-import io.ktor.server.application.log
+import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.routing.*
@@ -24,7 +24,7 @@ fun Route.webSocketRoutes(
     authenticate("auth-student") {
         webSocket("/ws/daemon/{participantId}") {
             val authenticatedUserId = call.userId()
-            val participantId       = call.uuidParam("participantId")
+            val participantId = call.uuidParam("participantId")
 
             val participant = participantRepository.findById(participantId)
                 ?: return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Participant not found"))
@@ -41,7 +41,7 @@ fun Route.webSocketRoutes(
                     for (frame in incoming) {
                         if (frame is Frame.Text) {
                             try {
-                                val msg      = Json.decodeFromString<DaemonEventMessage>(frame.readText())
+                                val msg = Json.decodeFromString<DaemonEventMessage>(frame.readText())
                                 val severity = msg.severity.toDomainSeverity()
 
                                 if (severity == null) {
@@ -49,9 +49,9 @@ fun Route.webSocketRoutes(
                                 } else {
                                     eventService.handleEvent(
                                         participantId = participant.id.toParticipantId(),
-                                        monitorName   = msg.monitorName,
-                                        message       = msg.message,
-                                        severity      = severity
+                                        monitorName = msg.monitorName,
+                                        message = msg.message,
+                                        severity = severity
                                     )
                                 }
                             } catch (e: SerializationException) {

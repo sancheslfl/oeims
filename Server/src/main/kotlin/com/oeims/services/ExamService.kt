@@ -1,10 +1,10 @@
 package com.oeims.services
 
-import com.oeims.models.dto.ExamResponse
 import com.oeims.exceptions.NotFoundException
 import com.oeims.exceptions.ValidationException
-import com.oeims.models.ids.ExamId
 import com.oeims.models.ExamTitle
+import com.oeims.models.dto.ExamResponse
+import com.oeims.models.ids.ExamId
 import com.oeims.models.ids.ProfessorId
 import com.oeims.repositories.ExamRecord
 import com.oeims.repositories.interfaces.IExamRepository
@@ -14,7 +14,12 @@ class ExamService(
 ) {
 
     // TODO: Maybe use Instant for time related params
-    suspend fun createExam(professorId: ProfessorId, title: ExamTitle, description: String?, durationMins: Int): ExamResponse {
+    suspend fun createExam(
+        professorId: ProfessorId,
+        title: ExamTitle,
+        description: String?,
+        durationMins: Int
+    ): ExamResponse {
         if (durationMins <= 0)
             throw ValidationException("Duration must be greater than 0")
 
@@ -35,11 +40,11 @@ class ExamService(
             ?: throw NotFoundException("Exam not found")
 
     private fun ExamRecord.toResponse() = ExamResponse(
-        id           = id.toString(),
-        createdBy    = createdBy.toString(),
-        title        = title,
-        description  = description,
+        id = id.toString(),
+        createdBy = createdBy.toString(),
+        title = title,
+        description = description,
         durationMins = durationMins,
-        createdAt    = createdAt.toString()
+        createdAt = createdAt.toString()
     )
 }

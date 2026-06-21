@@ -33,8 +33,8 @@ data class ParticipantStatusUpdate(
 // Maps the daemon's PascalCase severity to the server's uppercase enum.
 // Returns null for unrecognised values so the call site can log and drop the frame.
 fun String.toDomainSeverity(): Severity? = when (this) {
-    "Info"     -> Severity.INFO
-    "Warning"  -> Severity.WARNING
+    "Info" -> Severity.INFO
+    "Warning" -> Severity.WARNING
     "Critical" -> Severity.CRITICAL
-    else       -> null
+    else -> null
 }

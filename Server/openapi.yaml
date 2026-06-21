@@ -3,14 +3,14 @@ openapi: 3.0.3
 info:
   title: OEIMS API
   description: |
-    REST API for the **Online Exam Integrity Monitoring System**.
+    REST API for the **Online Exam Integrity Monitoring System** (OEIMS).
 
     Obtain a token from `/auth/login` and click **Authorize** to authenticate.
 
     | Role | Access |
     |---|---|
     | `PROFESSOR` | Manage exams, sessions, view participants and events |
-    | `STUDENT` | Join sessions and send heartbeats |
+    | `STUDENT` | Existing student account role; session joining uses email verification |
   version: 1.0.0
 
 servers:
@@ -23,9 +23,9 @@ tags:
   - name: Exams
     description: Create and query exams. **Professor** role required.
   - name: Sessions
-    description: Manage the exam session lifecycle — create, start, end, join.
+    description: Manage the exam session lifecycle and email-verified participant join flow.
   - name: Participants
-    description: Participant heartbeat. **Student** role required.
+    description: Participant heartbeat used by the Sentinel runtime.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Security
@@ -54,7 +54,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
-      description: Token valid but role not permitted.
+      description: Token valid but role not permitted, or action not allowed.
       content:
         application/json:
           schema:
@@ -165,11 +165,15 @@ components:
 
     CreateSessionRequest:
       type: object
-      required: [examId]
+      required: [examId, allowedEmailDomain]
       properties:
         examId:
           type: string
           format: uuid
+        allowedEmailDomain:
+          type: string
+          example: '@isel.pt'
+          description: Only emails ending with this domain are allowed to join the session.
 
     SessionResponse:
       type: object
@@ -189,6 +193,9 @@ components:
           maxLength: 6
           example: AB12CD
           description: 6-character join code shared with students.
+        allowedEmailDomain:
+          type: string
+          example: '@isel.pt'
         status:
           type: string
           enum: [PENDING, ACTIVE, ENDED]
@@ -201,17 +208,31 @@ components:
           format: date-time
           nullable: true
 
-    JoinSessionRequest:
+    EmailJoinRequest:
       type: object
-      required: [code]
+      required: [email]
       properties:
-        code:
+        email:
           type: string
-          minLength: 6
-          maxLength: 6
-          example: AB12CD
+          format: email
+          example: student@isel.pt
 
-    JoinSessionResponse:
+    EmailJoinResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Verification email sent
+
+    VerifyJoinRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: Email verification JWT token received from the join verification link.
+
+    VerifyJoinResponse:
       type: object
       properties:
         participantId:
@@ -220,10 +241,12 @@ components:
         sessionId:
           type: string
           format: uuid
-        examTitle:
+        email:
           type: string
-        durationMins:
-          type: integer
+          format: email
+        status:
+          type: string
+          enum: [CONNECTED, DISCONNECTED, TIMED_OUT]
 
     ParticipantResponse:
       type: object
@@ -237,6 +260,8 @@ components:
         userId:
           type: string
           format: uuid
+          nullable: true
+          description: User account ID when the participant is linked to a registered user. Email-verified participants may not have one.
         email:
           type: string
           format: email
@@ -333,6 +358,8 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -436,6 +463,7 @@ paths:
       summary: Create session
       description: |
         Create a new exam session. The server generates a unique 6-character join code.
+        The request defines the allowed email domain for student verification.
         The session starts in `PENDING` status.
       operationId: createSession
       security:
@@ -466,7 +494,7 @@ paths:
 
   /sessions/current:
     get:
-      tags: [ Sessions ]
+      tags: [Sessions]
       summary: Get current session
       description: |
         Return the authenticated professor's latest non-ended session.
@@ -477,7 +505,7 @@ paths:
         If the professor has no current session, the response is `204 No Content`.
       operationId: getCurrentSession
       security:
-        - bearerAuth: [ ]
+        - bearerAuth: []
       responses:
         '200':
           description: Current session found.
@@ -494,33 +522,74 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /sessions/join:
+  /sessions/{code}/join:
     post:
       tags: [Sessions]
-      summary: Join session
+      summary: Request session join
       description: |
-        Student joins an `ACTIVE` session using the 6-character code.
-        If the student has already joined, the existing participant record is returned (idempotent).
-      operationId: joinSession
-      security:
-        - bearerAuth: []
+        Request access to a session using an email address.
+
+        The email must belong to the session's allowed domain.
+        If accepted, the backend creates a temporary join authorization and sends/logs a verification link.
+      operationId: requestSessionJoin
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: 6-character session join code.
+          schema:
+            type: string
+            minLength: 6
+            maxLength: 6
+            example: AB12CD
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/JoinSessionRequest'
+              $ref: '#/components/schemas/EmailJoinRequest'
       responses:
-        '200':
-          description: Joined successfully.
+        '202':
+          description: Join request accepted. Verification email sent or logged.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JoinSessionResponse'
+                $ref: '#/components/schemas/EmailJoinResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /sessions/join/verify:
+    post:
+      tags: [Sessions]
+      summary: Verify session join
+      description: |
+        Verify the temporary email join token.
+
+        A valid, unused token creates or returns the participant for the session.
+      operationId: verifySessionJoin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyJoinRequest'
+      responses:
+        '200':
+          description: Join token verified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyJoinResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -713,7 +782,7 @@ paths:
       summary: Heartbeat
       description: |
         Update the participant's last heartbeat timestamp.
-        The daemon calls this endpoint periodically.
+        The Sentinel runtime calls this endpoint periodically.
         If heartbeats stop arriving, the participant is eventually marked as `TIMED_OUT`.
       operationId: heartbeat
       security:
@@ -722,7 +791,7 @@ paths:
         - name: id
           in: path
           required: true
-          description: Participant ID returned by `/sessions/join`.
+          description: Participant ID returned by `/sessions/join/verify`.
           schema:
             type: string
             format: uuid

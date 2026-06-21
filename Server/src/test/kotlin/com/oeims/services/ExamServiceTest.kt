@@ -12,7 +12,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -28,8 +28,15 @@ class ExamServiceTest {
         override suspend fun findById(id: UUID): ExamRecord? = exams.find { it.id == id }
         override suspend fun findAll(): List<ExamRecord> = exams.toList()
         override suspend fun findByTitle(title: String): List<ExamRecord> = exams.filter { it.title == title }
-        override suspend fun findByProfessor(professorId: UUID): List<ExamRecord> = exams.filter { it.createdBy == professorId }
-        override suspend fun create(createdBy: UUID, title: String, description: String?, durationMins: Int): ExamRecord {
+        override suspend fun findByProfessor(professorId: UUID): List<ExamRecord> =
+            exams.filter { it.createdBy == professorId }
+
+        override suspend fun create(
+            createdBy: UUID,
+            title: String,
+            description: String?,
+            durationMins: Int
+        ): ExamRecord {
             val record = ExamRecord(UUID.randomUUID(), createdBy, title, description, durationMins, Instant.now())
             exams.add(record)
             return record
@@ -45,7 +52,7 @@ class ExamServiceTest {
     @BeforeEach
     fun setup() {
         fakeRepo = FakeExamRepository()
-        service  = ExamService(fakeRepo)
+        service = ExamService(fakeRepo)
     }
 
     companion object {
@@ -132,7 +139,7 @@ class ExamServiceTest {
     fun `getAllExams returns all exams`() = runBlocking {
         val other = UUID.randomUUID()
         service.createExam(professorId.toProfessorId(), TITLE_A, null, 60)
-        service.createExam(other.toProfessorId(),       TITLE_B, null, 60)
+        service.createExam(other.toProfessorId(), TITLE_B, null, 60)
 
         val results = service.getAllExams()
 

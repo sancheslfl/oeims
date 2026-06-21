@@ -6,9 +6,15 @@ import org.jetbrains.exposed.sql.javatime.timestamp
 enum class ConnectionStatus { CONNECTED, DISCONNECTED, TIMED_OUT }
 
 object Participants : UUIDTable("participants") {
-    val sessionId        = reference("session_id", Sessions)
-    val userId           = reference("user_id", Users)
+    val sessionId = reference("session_id", Sessions)
+    val userId = reference("user_id", Users).nullable()
+    val email = varchar("email", 254)
     val connectionStatus = enumerationByName("connection_status", 16, ConnectionStatus::class)
-    val lastHeartbeat    = timestamp("last_heartbeat").nullable()
-    val joinedAt         = timestamp("joined_at")
+    val lastHeartbeat = timestamp("last_heartbeat").nullable()
+    val joinedAt = timestamp("joined_at")
+
+    init {
+        uniqueIndex("participants_session_email_index", sessionId, email)
+        uniqueIndex("participants_session_user_index", sessionId, userId)
+    }
 }

@@ -13,7 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.time.Instant
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.toKotlinDuration
 
 class HeartbeatService(
     private val participantRepository: IParticipantRepository,
@@ -25,15 +25,15 @@ class HeartbeatService(
     fun start(scope: CoroutineScope) {
         scope.launch {
             while (true) {
-                delay(config.intervalMs.milliseconds)
+                delay(config.interval.toKotlinDuration())
                 checkHeartbeats()
             }
         }
     }
 
     private suspend fun checkHeartbeats() {
-        val threshold = Instant.now().minusMillis(config.timeoutMs)
-        val timedOut = participantRepository.markTimedOut(threshold)
+        val threshold = Instant.now() - config.timeout
+        val timedOut = participantRepository.updateTimedOut(threshold)
 
         timedOut.forEach { participant ->
             val session = sessionRepository.findById(participant.sessionId)
