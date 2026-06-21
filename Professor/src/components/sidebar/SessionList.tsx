@@ -1,9 +1,16 @@
-import { type SubmitEventHandler, useState } from "react";
-import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
-import { useAuth } from "../../AuthContext";
-import { createSession, joinSessionAsSupervisor } from "../../api/sessions";
-import { getExam } from "../../api/exams";
-import { saveLastSessionId } from "../../localStorage.ts";
+import {
+    type SubmitEventHandler,
+    useEffect,
+    useRef,
+    useState,
+} from "react";
+import type {ExamResponse, OpenedSession, SessionResponse} from "../../types";
+import {useAuth} from "../../AuthContext";
+import {createSession, joinSessionAsSupervisor} from "../../api/sessions";
+import {getExam} from "../../api/exams";
+import {saveLastSessionId} from "../../localStorage.ts";
+
+const STUDENT_SESSION_PATH = "/student/join";
 
 type SessionListProps = {
     exams: ExamResponse[];
@@ -29,7 +36,7 @@ function ExamCard({
                       allowedEmailDomain,
                       onOpenSession,
                   }: ExamCardProps) {
-    const { auth } = useAuth();
+    const {auth} = useAuth();
 
     const ownActiveSession =
         activeSession?.supervisorId === auth?.id ? activeSession : undefined;
@@ -45,6 +52,14 @@ function ExamCard({
     const [showJoinInput, setShowJoinInput] = useState(false);
 
     const [error, setError] = useState("");
+    const [copyAnimationKey, setCopyAnimationKey] = useState(0);
+    const copyFeedbackTimeoutRef = useRef<number | undefined>(undefined);
+
+    useEffect(() => {
+        return () => {
+            window.clearTimeout(copyFeedbackTimeoutRef.current);
+        };
+    }, []);
 
     const openSession = session?.status !== "ENDED" ? session : undefined;
     const hasActiveSession = Boolean(activeSession) && !openSession;
@@ -57,7 +72,7 @@ function ExamCard({
 
         if (openSession) {
             setIsExpanded(true);
-            onOpenSession({ exam, session: openSession });
+            onOpenSession({exam, session: openSession});
             return;
         }
 
@@ -70,20 +85,33 @@ function ExamCard({
             const createdSession = await createSession(
                 exam.id,
                 allowedEmailDomain,
-                auth.token
+                auth.token,
             );
 
             setSession(createdSession);
             setIsExpanded(true);
             saveLastSessionId(auth.id, createdSession.id);
 
-            onOpenSession({ exam, session: createdSession });
+            onOpenSession({exam, session: createdSession});
         } catch (error) {
             if (error instanceof Error) {
                 setError(error.message);
             }
         } finally {
             setIsCreatingSession(false);
+        }
+    }
+
+    async function handleCopyStudentLink(session: SessionResponse) {
+        setError("");
+
+        try {
+            await copyToClipboard(buildStudentSessionLink(session.code));
+            setCopyAnimationKey((current) => current + 1);
+        } catch (error) {
+            if (error instanceof Error) {
+                setError(error.message);
+            }
         }
     }
 
@@ -103,7 +131,7 @@ function ExamCard({
             const joinedExam = await getExam(joinedSession.examId, auth.token);
 
             saveLastSessionId(auth.id, joinedSession.id);
-            onOpenSession({ exam: joinedExam, session: joinedSession });
+            onOpenSession({exam: joinedExam, session: joinedSession});
         } catch (error) {
             if (error instanceof Error) {
                 setError(error.message);
@@ -210,9 +238,45 @@ function ExamCard({
                         Session code
                     </span>
 
-                    <p className="mt-1 text-2xl font-bold text-isel-red">
-                        {openSession.code}
-                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                        <p className="text-2xl font-bold text-isel-red">
+                            {openSession.code}
+                        </p>
+
+                        <button
+                            type="button"
+                            aria-label="Copy student session link"
+                            title="Copy student session link"
+                            onClick={() => handleCopyStudentLink(openSession)}
+                            className="grid h-8 w-8 place-items-center rounded-md border-2 border-isel-purple bg-isel-white text-isel-purple transition-colors hover:border-isel-red hover:text-isel-red"
+                        >
+                        <span
+                            key={copyAnimationKey}
+                            aria-hidden="true"
+                            className="grid h-4 w-4 place-items-center"
+                        >
+                            <span
+                                className={`col-start-1 row-start-1 ${
+                                    copyAnimationKey > 0
+                                        ? "animate-[copy-session-link-hide_2s_ease_both]"
+                                        : ""
+                                }`}
+                            >
+                                <LinkIcon />
+                            </span>
+
+                            <span
+                                className={`col-start-1 row-start-1 opacity-0 ${
+                                    copyAnimationKey > 0
+                                        ? "animate-[copy-session-link-check_2s_ease_both]"
+                                        : ""
+                                }`}
+                            >
+                                <CheckIcon />
+                            </span>
+                        </span>
+                        </button>
+                    </div>
                 </div>
             )}
         </article>
@@ -270,6 +334,22 @@ export function SessionList({
     );
 }
 
+function buildStudentSessionLink(code: string) {
+    const url = new URL(STUDENT_SESSION_PATH, window.location.origin);
+    url.searchParams.set("code", code);
+    return url.toString();
+}
+
+async function copyToClipboard(value: string) {
+    if (!window.isSecureContext || !navigator.clipboard) {
+        throw new Error(
+            "Could not copy the student link. Clipboard access requires HTTPS or localhost.",
+        );
+    }
+
+    await navigator.clipboard.writeText(value);
+}
+
 function getSessionButtonLabel(
     session: SessionResponse | undefined,
     isExpanded: boolean,
@@ -284,4 +364,39 @@ function getSessionButtonLabel(
     }
 
     return isExpanded ? "Hide code" : "Show code";
+}
+
+function LinkIcon() {
+    return (
+        <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93"/>
+            <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13 19.07"/>
+        </svg>
+    );
+}
+
+function CheckIcon() {
+    return (
+        <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M20 6 9 17l-5-5"/>
+        </svg>
+    );
 }

@@ -2,6 +2,7 @@ import {createBrowserRouter, RouterProvider} from 'react-router-dom'
 import {Dashboard} from "./pages/Dashboard.tsx";
 import {AuthProvider, AuthRequire} from "./AuthContext.tsx";
 import {Login} from "./pages/Login.tsx";
+import {SessionVerification} from "./pages/student/SessionVerification.tsx";
 
 
 
@@ -18,6 +19,10 @@ const app = createBrowserRouter([
             </AuthRequire>
             ),
     },
+    {
+        path: "/student/join",
+        element: <SessionVerification/>
+    }
     /*{
         path: "*",
         element: <NotFound/>

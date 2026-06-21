@@ -1,5 +1,10 @@
 import { apiFetch } from "./utils";
-import type {EventResponse, ParticipantResponse, SessionResponse} from "../types";
+import type {
+    EventResponse,
+    ParticipantResponse,
+    SessionResponse,
+    StudentAuth,
+} from "../types";
 
 export function createSession(
     examId: string,
@@ -48,7 +53,7 @@ export function endSession(
     return apiFetch<SessionResponse>(
         `/sessions/${sessionId}/end`,
         {
-            method: "POST"
+            method: "POST",
         },
         token,
     );
@@ -86,6 +91,19 @@ export function joinSessionAsSupervisor(
             body: JSON.stringify({ code }),
         },
         token,
+    );
+}
+
+export function verifySessionParticipant(
+    code: string,
+    email: string,
+): Promise<StudentAuth> {
+    return apiFetch<StudentAuth>(
+        "/sessions/participants/verification",
+        {
+            method: "POST",
+            body: JSON.stringify({ code, email }),
+        },
     );
 }
 
