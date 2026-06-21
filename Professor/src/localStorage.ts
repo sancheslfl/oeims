@@ -1,4 +1,5 @@
 const LAST_SESSION_KEY_PREFIX = "oeims:last-session:";
+const SETTINGS_KEY_PREFIX = "oeims:professor-settings:";
 
 export function saveLastSessionId(userId: string, sessionId: string) {
     localStorage.setItem(getLastSessionKey(userId), sessionId);
@@ -10,4 +11,28 @@ export function clearLastSessionId(userId: string) {
 
 function getLastSessionKey(userId: string) {
     return `${LAST_SESSION_KEY_PREFIX}${userId}`;
+}
+
+function getSettingsKey(professorId: string) {
+    return `${SETTINGS_KEY_PREFIX}${professorId}`;
+}
+
+export function loadAllowedEmailDomain(professorId: string | undefined) {
+    if (!professorId) return "";
+
+    try {
+        return localStorage.getItem(getSettingsKey(professorId));
+    } catch {
+        return "";
+    }
+}
+
+export function saveAllowedEmailDomain(
+    professorId: string,
+    allowedEmailDomain: string,
+) {
+    localStorage.setItem(
+        getSettingsKey(professorId),
+        allowedEmailDomain,
+    );
 }

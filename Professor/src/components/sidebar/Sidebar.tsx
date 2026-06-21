@@ -1,15 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
+import { useState } from "react";
 import { useAuth } from "../../AuthContext";
-import { getExams } from "../../api/exams";
-import { getActiveSessions } from "../../api/sessions";
-import { CreateExamForm } from "./CreateExamForm";
-import { SessionList } from "./SessionList";
-import {
-    REALTIME_CHANNELS,
-    REALTIME_EVENTS,
-    useEventListener,
-} from "../../hooks/useEventListener";
+import type { OpenedSession } from "../../types";
+import { ExamsView } from "./ExamsView";
+import { SettingsView } from "./SettingsView";
 
 type SidebarProps = {
     openedSession: OpenedSession | null;
@@ -19,200 +12,23 @@ type SidebarProps = {
 
 type SidebarView = "exams" | "settings";
 
-type SettingsMessage = {
-    type: "success" | "error";
-    text: string;
-};
-
-type Auth = ReturnType<typeof useAuth>["auth"];
-
-function professorSettingsKey(professorId: string) {
-    return `oeims:professor-settings:${professorId}`;
-}
-
-function normalizeAllowedEmailDomain(value: string) {
-    return value.trim().replace(/^@+/, "").toLowerCase();
-}
-
-function loadAllowedEmailDomain(professorId: string | undefined) {
-    if (!professorId) return "";
-
-    try {
-        return localStorage.getItem(professorSettingsKey(professorId)) ?? "";
-    } catch {
-        return "";
-    }
-}
-
-function saveAllowedEmailDomain(
-    professorId: string,
-    allowedEmailDomain: string,
-) {
-    localStorage.setItem(
-        professorSettingsKey(professorId),
-        allowedEmailDomain,
-    );
-}
-
 export function Sidebar(props: SidebarProps) {
     const { auth } = useAuth();
 
-    return (
-        <SidebarContent
-            key={auth?.id ?? "anonymous"}
-            auth={auth}
-            {...props}
-        />
-    );
+    if (!auth) {
+        return null;
+    }
+
+    return <SidebarContent key={auth.id} {...props} />;
 }
 
-type SidebarContentProps = SidebarProps & {
-    auth: Auth;
-};
-
 function SidebarContent({
-                            auth,
                             openedSession,
                             onOpenSession,
                             onCloseSession,
-                        }: SidebarContentProps) {
-    const professorId = auth?.id;
-
+                        }: SidebarProps) {
     const [isOpen, setIsOpen] = useState(true);
     const [sidebarView, setSidebarView] = useState<SidebarView>("exams");
-    const [allowedEmailDomain, setAllowedEmailDomain] = useState(() =>
-        loadAllowedEmailDomain(professorId),
-    );
-    const [settingsMessage, setSettingsMessage] =
-        useState<SettingsMessage | null>(null);
-    const [exams, setExams] = useState<ExamResponse[]>([]);
-    const [activeSessions, setActiveSessions] = useState<SessionResponse[]>([]);
-    const [isLoadingExams, setIsLoadingExams] = useState(false);
-    const [error, setError] = useState("");
-
-    useEffect(() => {
-        const token = auth?.token;
-
-        if (!token) return;
-
-        let ignore = false;
-
-        async function loadData(token: string) {
-            setError("");
-            setIsLoadingExams(true);
-
-            try {
-                const [loadedExams, loadedActiveSessions] = await Promise.all([
-                    getExams(token),
-                    getActiveSessions(token),
-                ]);
-
-                if (!ignore) {
-                    setExams(loadedExams);
-                    setActiveSessions(loadedActiveSessions);
-                }
-            } catch (error) {
-                if (!ignore && error instanceof Error) {
-                    setError(error.message);
-                }
-            } finally {
-                if (!ignore) {
-                    setIsLoadingExams(false);
-                }
-            }
-        }
-
-        void loadData(token);
-
-        return () => {
-            ignore = true;
-        };
-    }, [auth?.token]);
-
-    const sseHandlers = useMemo(
-        () => ({
-            [REALTIME_EVENTS.SessionCreated]: (data: unknown) => {
-                const session = data as SessionResponse;
-
-                setActiveSessions((current) =>
-                    current.some((s) => s.id === session.id)
-                        ? current
-                        : [...current, session],
-                );
-            },
-
-            [REALTIME_EVENTS.SessionStatusUpdated]: (data: unknown) => {
-                const session = data as SessionResponse;
-
-                setActiveSessions((current) => {
-                    if (session.status === "ENDED") {
-                        return current.filter((s) => s.id !== session.id);
-                    }
-
-                    return current.map((s) =>
-                        s.id === session.id ? session : s,
-                    );
-                });
-
-                if (openedSession?.session.id !== session.id) {
-                    return;
-                }
-
-                if (session.status === "ENDED") {
-                    onCloseSession();
-                    return;
-                }
-
-                onOpenSession({ ...openedSession, session });
-            },
-        }),
-        [openedSession, onOpenSession, onCloseSession],
-    );
-
-    useEventListener(auth ? REALTIME_CHANNELS.sessions : null, sseHandlers);
-
-    function handleExamCreated(exam: ExamResponse) {
-        setExams((current) => [exam, ...current]);
-    }
-
-    function handleAllowedEmailDomainChange(value: string) {
-        const normalizedValue = normalizeAllowedEmailDomain(value);
-        setAllowedEmailDomain(normalizedValue);
-
-        if (!professorId) {
-            setSettingsMessage({
-                type: "error",
-                text: "Login is required before saving settings.",
-            });
-            return;
-        }
-
-        try {
-            saveAllowedEmailDomain(professorId, normalizedValue);
-
-            setSettingsMessage(
-                normalizedValue
-                    ? {
-                        type: "success",
-                        text: "Settings saved.",
-                    }
-                    : {
-                        type: "error",
-                        text: "Allowed email domain is empty.",
-                    },
-            );
-        } catch {
-            setSettingsMessage({
-                type: "error",
-                text: "Could not save settings in this browser.",
-            });
-        }
-    }
-
-    function handleSidebarViewChange(view: SidebarView) {
-        setSidebarView(view);
-        setSettingsMessage(null);
-    }
 
     return (
         <aside
@@ -233,40 +49,19 @@ function SidebarContent({
                 <>
                     <SidebarViewToggle
                         value={sidebarView}
-                        onChange={handleSidebarViewChange}
+                        onChange={setSidebarView}
                     />
 
                     <div className="sidebar-scroll h-full min-h-0 overflow-y-auto">
                         <div className="grid gap-8 p-6">
-                            {error && (
-                                <p className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
-                                    {error}
-                                </p>
-                            )}
-
                             {sidebarView === "exams" ? (
-                                <>
-                                    <CreateExamForm
-                                        onExamCreated={handleExamCreated}
-                                    />
-
-                                    <SessionList
-                                        exams={exams}
-                                        activeSessions={activeSessions}
-                                        isLoading={isLoadingExams}
-                                        openedSession={openedSession}
-                                        allowedEmailDomain={allowedEmailDomain}
-                                        onOpenSession={onOpenSession}
-                                    />
-                                </>
-                            ) : (
-                                <SidebarSettings
-                                    allowedEmailDomain={allowedEmailDomain}
-                                    message={settingsMessage}
-                                    onAllowedEmailDomainChange={
-                                        handleAllowedEmailDomainChange
-                                    }
+                                <ExamsView
+                                    openedSession={openedSession}
+                                    onOpenSession={onOpenSession}
+                                    onCloseSession={onCloseSession}
                                 />
+                            ) : (
+                                <SettingsView />
                             )}
                         </div>
                     </div>
@@ -277,68 +72,6 @@ function SidebarContent({
                 </span>
             )}
         </aside>
-    );
-}
-
-type SidebarSettingsProps = {
-    allowedEmailDomain: string;
-    message: SettingsMessage | null;
-    onAllowedEmailDomainChange: (value: string) => void;
-};
-
-function SidebarSettings({
-                             allowedEmailDomain,
-                             message,
-                             onAllowedEmailDomainChange,
-                         }: SidebarSettingsProps) {
-    return (
-        <section>
-            <h2 className="app-section-title">Settings</h2>
-
-            {message && (
-                <p
-                    aria-live="polite"
-                    className={`mt-2 rounded-md border-2 px-3 py-2 text-sm font-semibold ${
-                        message.type === "success"
-                            ? "border-isel-purple bg-isel-purple/5 text-isel-purple"
-                            : "border-isel-red bg-isel-pink text-isel-purple"
-                    }`}
-                >
-                    {message.text}
-                </p>
-            )}
-
-            <section className="mt-6 rounded-md border-2 border-isel-purple bg-isel-white p-4">
-                <h3 className="text-sm font-bold uppercase tracking-wide text-isel-purple">
-                    Sessions
-                </h3>
-
-                <label
-                    htmlFor="allowed-email-domain"
-                    className="mt-4 block text-xs font-bold uppercase tracking-wide text-isel-purple/70"
-                >
-                    Allowed Email Domain
-                </label>
-
-                <input
-                    id="allowed-email-domain"
-                    value={allowedEmailDomain}
-                    onChange={(event) =>
-                        onAllowedEmailDomainChange(event.currentTarget.value)
-                    }
-                    placeholder="isel.pt"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    className="mt-1 w-full rounded-md border-2 border-isel-purple bg-isel-white px-3 py-2 text-sm font-semibold text-isel-purple outline-none placeholder:text-isel-purple/35 focus:border-isel-red"
-                />
-
-                <p className="mt-2 text-xs font-semibold text-isel-purple/60">
-                    Students must use this email domain to join newly created
-                    sessions.
-                </p>
-            </section>
-        </section>
     );
 }
 
