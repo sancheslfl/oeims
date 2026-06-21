@@ -3,13 +3,14 @@ import type {EventResponse, ParticipantResponse, SessionResponse} from "../types
 
 export function createSession(
     examId: string,
+    allowedEmailDomain: string,
     token: string,
 ): Promise<SessionResponse> {
     return apiFetch<SessionResponse>(
         "/sessions",
         {
             method: "POST",
-            body: JSON.stringify({ examId }),
+            body: JSON.stringify({ examId, allowedEmailDomain }),
         },
         token,
     );

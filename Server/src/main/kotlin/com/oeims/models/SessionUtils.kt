@@ -22,7 +22,6 @@ fun String.toSessionCode(): SessionCode = SessionCode(this)
 value class AllowedEmailDomain(val value: String) {
     init {
         require(value.isNotBlank()) { "Allowed email domain cannot be blank" }
-        require(value.startsWith("@")) { "Allowed email domain must start with @" }
         require(value.contains(".")) { "Allowed email domain must contain a dot" }
     }
 

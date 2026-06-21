@@ -40,3 +40,14 @@
         transform: scale(1.35);
     }
 }
+
+@keyframes sidebar-view-toggle-idle {
+    0%,
+    93% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.45;
+    }
+}

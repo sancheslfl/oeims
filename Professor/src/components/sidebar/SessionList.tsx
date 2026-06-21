@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type SubmitEventHandler, useState } from "react";
 import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
 import { useAuth } from "../../AuthContext";
 import { createSession, joinSessionAsSupervisor } from "../../api/sessions";
@@ -10,6 +10,7 @@ type SessionListProps = {
     activeSessions: SessionResponse[];
     isLoading: boolean;
     openedSession: OpenedSession | null;
+    allowedEmailDomain: string;
     onOpenSession: (openedSession: OpenedSession) => void;
 };
 
@@ -17,14 +18,25 @@ type ExamCardProps = {
     exam: ExamResponse;
     activeSession: SessionResponse | undefined;
     restoredSession?: SessionResponse;
+    allowedEmailDomain: string;
     onOpenSession: (openedSession: OpenedSession) => void;
 };
 
-function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamCardProps) {
+function ExamCard({
+                      exam,
+                      activeSession,
+                      restoredSession,
+                      allowedEmailDomain,
+                      onOpenSession,
+                  }: ExamCardProps) {
     const { auth } = useAuth();
 
-    const ownActiveSession = activeSession?.supervisorId === auth?.id ? activeSession : undefined;
-    const [session, setSession] = useState<SessionResponse | undefined>(restoredSession ?? ownActiveSession);
+    const ownActiveSession =
+        activeSession?.supervisorId === auth?.id ? activeSession : undefined;
+
+    const [session, setSession] = useState<SessionResponse | undefined>(
+        restoredSession ?? ownActiveSession,
+    );
     const [isExpanded, setIsExpanded] = useState(Boolean(restoredSession));
     const [isCreatingSession, setIsCreatingSession] = useState(false);
 
@@ -55,7 +67,11 @@ function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamC
         setIsCreatingSession(true);
 
         try {
-            const createdSession = await createSession(exam.id, auth.token);
+            const createdSession = await createSession(
+                exam.id,
+                allowedEmailDomain,
+                auth.token
+            );
 
             setSession(createdSession);
             setIsExpanded(true);
@@ -71,8 +87,8 @@ function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamC
         }
     }
 
-    async function handleJoin(e: React.FormEvent) {
-        e.preventDefault();
+    const handleJoin: SubmitEventHandler<HTMLFormElement> = async (event) => {
+        event.preventDefault();
 
         if (!auth || !joinCode.trim()) return;
 
@@ -80,7 +96,10 @@ function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamC
         setIsJoining(true);
 
         try {
-            const joinedSession = await joinSessionAsSupervisor(joinCode.trim(), auth.token);
+            const joinedSession = await joinSessionAsSupervisor(
+                joinCode.trim(),
+                auth.token,
+            );
             const joinedExam = await getExam(joinedSession.examId, auth.token);
 
             saveLastSessionId(auth.id, joinedSession.id);
@@ -92,18 +111,19 @@ function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamC
         } finally {
             setIsJoining(false);
         }
-    }
+    };
 
-    const borderClass = openSession || hasActiveSession
-        ? "border-green-500"
-        : "border-isel-purple";
+    const borderClass =
+        openSession || hasActiveSession
+            ? "border-green-500"
+            : "border-isel-purple";
 
     return (
-        <article className={`grid gap-3 rounded-md border-2 ${borderClass} bg-isel-white p-4 transition-colors duration-300`}>
+        <article
+            className={`grid gap-3 rounded-md border-2 ${borderClass} bg-isel-white p-4 transition-colors duration-300`}
+        >
             <div className="grid gap-1">
-                <h3 className="font-bold text-isel-purple">
-                    {exam.title}
-                </h3>
+                <h3 className="font-bold text-isel-purple">{exam.title}</h3>
 
                 {exam.description && (
                     <p className="text-sm text-isel-purple/80">
@@ -139,9 +159,12 @@ function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamC
                         placeholder="Session code"
                         maxLength={6}
                         value={joinCode}
-                        onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                        onChange={(event) =>
+                            setJoinCode(event.currentTarget.value.toUpperCase())
+                        }
                         autoFocus
                     />
+
                     <div className="flex gap-2">
                         <button
                             type="submit"
@@ -150,10 +173,15 @@ function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamC
                         >
                             {isJoining ? "Joining..." : "Join"}
                         </button>
+
                         <button
                             type="button"
                             className="app-button app-button-secondary flex-1"
-                            onClick={() => { setShowJoinInput(false); setJoinCode(""); setError(""); }}
+                            onClick={() => {
+                                setShowJoinInput(false);
+                                setJoinCode("");
+                                setError("");
+                            }}
                         >
                             Cancel
                         </button>
@@ -166,9 +194,13 @@ function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamC
                     type="button"
                     className="app-button app-button-secondary"
                     disabled={isCreatingSession}
-                    onClick={() => handleToggleSession()}
+                    onClick={handleToggleSession}
                 >
-                    {getSessionButtonLabel(openSession, isExpanded, isCreatingSession)}
+                    {getSessionButtonLabel(
+                        openSession,
+                        isExpanded,
+                        isCreatingSession,
+                    )}
                 </button>
             )}
 
@@ -188,12 +220,13 @@ function ExamCard({ exam, activeSession, restoredSession, onOpenSession }: ExamC
 }
 
 export function SessionList({
-    exams,
-    activeSessions,
-    isLoading,
-    openedSession,
-    onOpenSession,
-}: SessionListProps) {
+                                exams,
+                                activeSessions,
+                                isLoading,
+                                openedSession,
+                                allowedEmailDomain,
+                                onOpenSession,
+                            }: SessionListProps) {
     return (
         <section className="grid min-h-0 flex-1 grid-rows-[auto_1fr] gap-4">
             <h2 className="app-section-title">Available exams</h2>
@@ -216,7 +249,7 @@ export function SessionList({
                                     : undefined;
 
                             const activeSession = activeSessions.find(
-                                (s) => s.examId === exam.id
+                                (session) => session.examId === exam.id,
                             );
 
                             return (
@@ -225,6 +258,7 @@ export function SessionList({
                                     exam={exam}
                                     activeSession={activeSession}
                                     restoredSession={restoredSession}
+                                    allowedEmailDomain={allowedEmailDomain}
                                     onOpenSession={onOpenSession}
                                 />
                             );

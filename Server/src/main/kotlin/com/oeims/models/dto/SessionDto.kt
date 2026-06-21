@@ -1,12 +1,20 @@
 package com.oeims.models.dto
 
+import com.oeims.exceptions.ValidationException
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class CreateSessionRequest(
     val examId: String,
+
+    @SerialName("allowedEmailDomain")
+    private val nullableAllowedEmailDomain: String? = null,
+) {
     val allowedEmailDomain: String
-)
+        get() = nullableAllowedEmailDomain
+            ?: throw ValidationException("Set an allowed email domain in Settings before creating a session.")
+}
 
 @Serializable
 data class SessionResponse(
