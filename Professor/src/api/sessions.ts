@@ -94,15 +94,25 @@ export function joinSessionAsSupervisor(
     );
 }
 
-export function verifySessionParticipant(
+export function requestSessionJoin(
     code: string,
     email: string,
-): Promise<StudentAuth> {
-    return apiFetch<StudentAuth>(
-        "/sessions/participants/verification",
+): Promise<void> {
+    return apiFetch<void>(
+        `/sessions/${encodeURIComponent(code)}/join`,
         {
             method: "POST",
-            body: JSON.stringify({ code, email }),
+            body: JSON.stringify({ email }),
+        },
+    );
+}
+
+export function verifyJoin(token: string): Promise<StudentAuth> {
+    return apiFetch<StudentAuth>(
+        "/sessions/join/verify",
+        {
+            method: "POST",
+            body: JSON.stringify({ token }),
         },
     );
 }

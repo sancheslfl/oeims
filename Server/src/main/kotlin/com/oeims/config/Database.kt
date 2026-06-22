@@ -1,4 +1,4 @@
-package com.oeims.plugins
+package com.oeims.config
 
 import com.oeims.models.*
 import io.ktor.server.application.*

@@ -201,9 +201,13 @@ class SessionRepository : ISessionRepository {
 
     override suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean =
         newSuspendedTransaction(Dispatchers.IO) {
-            SessionJoins.update({ SessionJoins.id eq id }) {
+            SessionJoins.update(
+                where = {
+                    (SessionJoins.id eq id) and SessionJoins.verifiedAt.isNull()
+                }
+            ) {
                 it[SessionJoins.verifiedAt] = verifiedAt
-            } > 0
+            } == 1
         }
 }
 

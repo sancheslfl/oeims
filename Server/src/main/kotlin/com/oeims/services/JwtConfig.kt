@@ -26,7 +26,7 @@ data class JwtSettings(
             .build()
 }
 
-fun Application.loadAuthJwtSettings() = JwtSettings(
+fun Application.configureAuthJwt() = JwtSettings(
     issuer = environment.config.property("jwt.issuer").getString(),
     audience = environment.config.property("jwt.auth.audience").getString(),
     realm = environment.config.property("jwt.auth.realm").getString(),
@@ -36,7 +36,7 @@ fun Application.loadAuthJwtSettings() = JwtSettings(
     algorithm = Algorithm.HMAC256(jwtSecret()),
 )
 
-fun Application.loadSessionJoinJwtSettings() = JwtSettings(
+fun Application.configureSessionJoinJwt() = JwtSettings(
     issuer = environment.config.property("jwt.issuer").getString(),
     audience = environment.config.property("jwt.session-join.audience").getString(),
     realm = environment.config.property("jwt.session-join.realm").getString(),

@@ -54,6 +54,9 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.25")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.1")
 
+    // Email service
+    implementation("org.eclipse.angus:jakarta.mail:2.0.5")
+
     // Testing
     testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
     testImplementation("io.ktor:ktor-client-content-negotiation:$ktor_version")

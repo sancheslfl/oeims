@@ -1,4 +1,4 @@
-package com.oeims.plugins
+package com.oeims.config
 
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -16,10 +16,7 @@ fun Application.configureOpenApi() {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Swagger UI HTML
-// ─────────────────────────────────────────────────────────────────────────────
-
 private fun swaggerUiPage() = """
 <!DOCTYPE html>
 <html lang="en">

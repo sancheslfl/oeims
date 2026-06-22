@@ -2,9 +2,13 @@ package com.oeims.services
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.exceptions.JWTVerificationException
+import com.auth0.jwt.exceptions.TokenExpiredException
+import com.oeims.config.Environment
 import com.oeims.exceptions.ConflictException
 import com.oeims.exceptions.ForbiddenException
 import com.oeims.exceptions.NotFoundException
+import com.oeims.exceptions.UnauthorizedException
+import com.oeims.exceptions.ValidationException
 import com.oeims.models.*
 import com.oeims.models.dto.*
 import com.oeims.models.ids.*
@@ -26,6 +30,7 @@ class SessionService(
     private val participantRepository: IParticipantRepository,
     private val jwtSettings: JwtSettings,
     private val sseBroadcaster: SseBroadcaster,
+    private val emailSender: EmailSender,
 ) {
     suspend fun createSession(
         professorId: ProfessorId,
@@ -111,20 +116,23 @@ class SessionService(
         val session = sessionRepository.findByCode(code.value)
             ?: throw NotFoundException("Session not found")
 
-        if (session.status == SessionStatus.ENDED)
+        if (session.status == SessionStatus.ENDED) {
             throw ConflictException("Session has already ended")
+        }
 
         val allowedDomain = session.allowedEmailDomain.toAllowedEmailDomain()
-        if (!allowedDomain.allows(email))
+        if (!allowedDomain.allows(email)) {
             throw ForbiddenException("Email domain is not allowed for this session")
+        }
 
         val existingParticipant = participantRepository.findByEmailAndSession(
             email = email.address,
             sessionId = session.id,
         )
 
-        if (existingParticipant != null)
+        if (existingParticipant != null) {
             return EmailJoinResponse("This email has already joined this session")
+        }
 
         val token = createJoinToken(
             session = session,
@@ -138,8 +146,14 @@ class SessionService(
             expiresAt = token.expiresAt,
         )
 
-        // ponytail: development-only delivery; replace with real email delivery later.
-        println("OEIMS join verification link: http://localhost:5173/verify-join?token=${token.value}")
+        val verificationLink =
+            "${Environment.frontendBaseUrl}/student/join/verify?token=${token.value}"
+
+        emailSender.sendJoinVerification(
+            to = email.address,
+            verificationLink = verificationLink,
+            expiresAt = token.expiresAt,
+        )
 
         return EmailJoinResponse(
             message = "Verification email sent"
@@ -150,25 +164,27 @@ class SessionService(
         val verifiedToken = verifyJoinToken(token)
 
         val emailJoin = sessionRepository.findEmailJoinByJwtId(verifiedToken.jwtId)
-            ?: throw NotFoundException("Invalid or expired join token")
+            ?: throw NotFoundException("It seems the token may be invalid or expired. Please try again")
 
-        if (emailJoin.verifiedAt != null)
-            throw ConflictException("Join token has already been used")
-
-        if (emailJoin.expiresAt < Instant.now())
-            throw ConflictException("Join token has expired")
-
-        if (!emailJoin.email.equals(verifiedToken.email, ignoreCase = true))
-            throw ConflictException("Join token does not match email")
+        if (emailJoin.verifiedAt != null) {
+            throw ConflictException("This token has already been used")
+        }
 
         val session = sessionRepository.findById(emailJoin.sessionId)
-            ?: throw NotFoundException("Session not found")
+            ?: throw NotFoundException("The respective session does not exist anymore")
 
-        if (session.code != verifiedToken.sessionCode)
-            throw ConflictException("Join token does not match session")
-
-        if (session.status == SessionStatus.ENDED)
+        if (session.status == SessionStatus.ENDED) {
             throw ConflictException("Session has already ended")
+        }
+
+        val isNotUpdated = !sessionRepository.updateEmailJoinVerification(
+            id = emailJoin.id,
+            verifiedAt = Instant.now(),
+        )
+
+        if (isNotUpdated) {
+            throw ConflictException("This token has already been used")
+        }
 
         val existingParticipant = participantRepository.findByEmailAndSession(
             email = emailJoin.email,
@@ -178,11 +194,6 @@ class SessionService(
         val participant = existingParticipant ?: participantRepository.create(
             sessionId = session.id,
             email = emailJoin.email,
-        )
-
-        sessionRepository.updateEmailJoinVerification(
-            id = emailJoin.id,
-            verifiedAt = Instant.now(),
         )
 
         if (existingParticipant == null) {
@@ -287,8 +298,12 @@ class SessionService(
     private fun verifyJoinToken(token: EmailJoinToken): VerifiedJoinToken {
         val jwt = try {
             jwtSettings.verifier.verify(token.value)
+        } catch (_: TokenExpiredException) {
+            throw ConflictException("This token has expired. Please verify the email again and try again")
         } catch (_: JWTVerificationException) {
-            throw ForbiddenException("Invalid or expired join token")
+            throw UnauthorizedException("This token is invalid. Please use the latest verification link sent to your email")
+        } catch (_: IllegalArgumentException) {
+            throw ValidationException("Malformed verification token")
         }
 
         return VerifiedJoinToken(

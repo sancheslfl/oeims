@@ -6,8 +6,13 @@ ktor:
     port: 8080
 
 app:
+  environment: "development"
+
   api:
     base-path: "/api"
+
+  frontend:
+    base-url: "http://localhost:5173"
 
 jwt:
   secret: "$JWT_SECRET"

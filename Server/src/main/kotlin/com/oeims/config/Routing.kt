@@ -1,4 +1,4 @@
-package com.oeims.plugins
+package com.oeims.config
 
 import com.oeims.exceptions.*
 import com.oeims.http.*
@@ -10,7 +10,6 @@ import com.oeims.services.SessionService
 import com.oeims.sse.SseBroadcaster
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*

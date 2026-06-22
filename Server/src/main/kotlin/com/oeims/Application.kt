@@ -1,12 +1,15 @@
 package com.oeims
 
 import com.auth0.jwt.JWT
+import com.oeims.config.Environment
 import com.oeims.http.AUTH_COOKIE_NAME
 import com.oeims.http.webSocketRoutes
-import com.oeims.plugins.configureDatabase
-import com.oeims.plugins.configureOpenApi
-import com.oeims.plugins.configureRouting
-import com.oeims.plugins.configureSecurity
+import com.oeims.config.configureDatabase
+import com.oeims.config.configureEmail
+import com.oeims.config.configureOpenApi
+import com.oeims.config.configureRouting
+import com.oeims.config.configureSecurity
+import com.oeims.models.SmtpEmailSender
 import com.oeims.repositories.*
 import com.oeims.services.*
 import com.oeims.sse.SseBroadcaster
@@ -98,6 +101,9 @@ fun Application.module() {
     // SSE
     install(SSE)
 
+    // App variables
+    Environment.configure(environment.config)
+
     // Database
     configureDatabase()
 
@@ -109,9 +115,12 @@ fun Application.module() {
     val eventRepository = EventRepository()
 
     // Config
-    val authJwtSettings = loadAuthJwtSettings()
-    val sessionJoinJwtSettings = loadSessionJoinJwtSettings()
-    val heartbeatConfig = loadHeartbeatConfig()
+    val authJwtSettings = configureAuthJwt()
+    val sessionJoinJwtSettings = configureSessionJoinJwt()
+    val heartbeatConfig = configureHeartbeat()
+
+    // Email service
+    val smtpEmailSender = configureEmail()
 
     // Realtime
     val sseBroadcaster = SseBroadcaster()
@@ -120,7 +129,7 @@ fun Application.module() {
     val authService = AuthService(userRepository, authJwtSettings)
     val examService = ExamService(examRepository)
     val sessionService =
-        SessionService(sessionRepository, examRepository, participantRepository, sessionJoinJwtSettings, sseBroadcaster)
+        SessionService(sessionRepository, examRepository, participantRepository, sessionJoinJwtSettings, sseBroadcaster, smtpEmailSender)
     val eventService = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
     val heartbeatService = HeartbeatService(participantRepository, sessionRepository, sseBroadcaster, heartbeatConfig)
 

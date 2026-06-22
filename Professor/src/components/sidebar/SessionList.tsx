@@ -10,7 +10,7 @@ import {createSession, joinSessionAsSupervisor} from "../../api/sessions";
 import {getExam} from "../../api/exams";
 import {saveLastSessionId} from "../../localStorage.ts";
 
-const STUDENT_SESSION_PATH = "/student/join";
+const JOIN_PAGE_PATH = "/student/join";
 
 type SessionListProps = {
     exams: ExamResponse[];
@@ -335,9 +335,10 @@ export function SessionList({
 }
 
 function buildStudentSessionLink(code: string) {
-    const url = new URL(STUDENT_SESSION_PATH, window.location.origin);
-    url.searchParams.set("code", code);
-    return url.toString();
+    return new URL(
+        `${JOIN_PAGE_PATH}/${encodeURIComponent(code)}`,
+        window.location.origin,
+    ).toString();
 }
 
 async function copyToClipboard(value: string) {

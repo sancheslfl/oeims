@@ -20,7 +20,11 @@ const app = createBrowserRouter([
             ),
     },
     {
-        path: "/student/join",
+        path: "/student/join/:code",
+        element: <SessionVerification/>
+    },
+    {
+        path: "/student/join/verify",
         element: <SessionVerification/>
     }
     /*{

@@ -1,4 +1,4 @@
-package com.oeims.plugins
+package com.oeims.config
 
 import com.oeims.http.AUTH_COOKIE_NAME
 import com.oeims.models.dto.ErrorResponse

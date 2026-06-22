@@ -8,7 +8,7 @@ data class HeartbeatConfig(
     val timeout: Duration
 )
 
-fun Application.loadHeartbeatConfig() = HeartbeatConfig(
+fun Application.configureHeartbeat() = HeartbeatConfig(
     interval = Duration.ofMillis(environment.config.property("heartbeat.interval-ms").getString().toLong()),
     timeout = Duration.ofMillis(environment.config.property("heartbeat.timeout-ms").getString().toLong())
 )

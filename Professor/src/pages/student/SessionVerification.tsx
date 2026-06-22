@@ -1,41 +1,70 @@
-import { type SubmitEventHandler, useState } from "react";
+import {type SubmitEventHandler, useState} from "react";
 import type {StudentAuth} from "../../types";
-import {verifySessionParticipant} from "../../api/sessions.ts";
 import {saveStudentAuth} from "../../localStorage.ts";
+import {requestSessionJoin, verifyJoin} from "../../api/sessions.ts";
+import {IselLogo} from "../../components/topbar/IselLogo.tsx";
 
-const SESSION_CODE_QUERY_PARAM = "code";
+function getJoinCodeFromUrl() {
+    const joinPathRegex = /^\/student\/join\/(?!verify$)([^/]+)$/;
+    const match = window.location.pathname.match(joinPathRegex);
+    return match ? decodeURIComponent(match[1]) : "";
+}
 
-function getSessionCodeFromUrl() {
+function getJoinTokenFromUrl() {
+    const joinQueryParam = "token";
     return (
         new URLSearchParams(window.location.search).get(
-            SESSION_CODE_QUERY_PARAM,
+            joinQueryParam,
         ) ?? ""
     );
 }
 
 export function SessionVerification() {
-    const [sessionCode] = useState(getSessionCodeFromUrl);
+    const [sessionCode] = useState(getJoinCodeFromUrl);
+    const [joinToken] = useState(getJoinTokenFromUrl);
+
     const [email, setEmail] = useState("");
     const [studentAuth, setStudentAuth] = useState<StudentAuth | null>(null);
+    const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
     const [isVerifying, setIsVerifying] = useState(false);
+    const [emailSubmitted, setEmailSubmitted] = useState(false);
     const [error, setError] = useState("");
 
-    const canVerify =
-        Boolean(sessionCode) && Boolean(email.trim()) && !isVerifying;
+    const isTokenVerification = Boolean(joinToken);
+    const canSubmitEmail =
+        Boolean(sessionCode) && Boolean(email.trim()) && !isSubmittingEmail;
+    const canVerify = Boolean(joinToken) && !isVerifying;
 
-    const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
+    const handleSubmitEmail: SubmitEventHandler<HTMLFormElement> = async (
+        event,
+    ) => {
         event.preventDefault();
 
+        if (!canSubmitEmail) return;
+
+        setError("");
+        setIsSubmittingEmail(true);
+
+        try {
+            await requestSessionJoin(sessionCode, email.trim());
+            setEmailSubmitted(true);
+        } catch (error) {
+            if (error instanceof Error) {
+                setError(error.message);
+            }
+        } finally {
+            setIsSubmittingEmail(false);
+        }
+    };
+
+    async function handleVerifyJoin() {
         if (!canVerify) return;
 
         setError("");
         setIsVerifying(true);
 
         try {
-            const verifiedStudentAuth = await verifySessionParticipant(
-                sessionCode,
-                email.trim(),
-            );
+            const verifiedStudentAuth = await verifyJoin(joinToken);
 
             saveStudentAuth(verifiedStudentAuth);
             setStudentAuth(verifiedStudentAuth);
@@ -46,30 +75,34 @@ export function SessionVerification() {
         } finally {
             setIsVerifying(false);
         }
-    };
+    }
 
     return (
-        <main className="grid min-h-screen place-items-center bg-isel-white px-6 py-10">
-            <section className="w-full max-w-md rounded-md border-2 border-isel-purple bg-isel-white p-6 shadow-sm">
-                <div className="grid gap-2">
-                    <p className="text-xs font-bold uppercase tracking-widest text-isel-red">
-                        OEIMS
-                    </p>
+        <main className="grid min-h-screen place-items-center bg-linear-to-br from-isel-white via-isel-pink to-isel-white px-6 py-10">
+            <section className="w-full max-w-md rounded-md border-2 border-isel-purple bg-isel-white/95 p-6 shadow-sm">
+                <div className="grid justify-items-center gap-4 text-center">
+                    <IselLogo className="h-8 w-auto" />
 
-                    <h1 className="text-2xl font-bold text-isel-purple">
-                        Session verification
-                    </h1>
+                    <div className="grid gap-2">
+                        <p className="text-xs font-bold uppercase tracking-widest text-isel-red">
+                            OEIMS
+                        </p>
 
-                    <p className="text-sm font-semibold text-isel-purple/70">
-                        Verify your institutional email before joining the exam
-                        session.
-                    </p>
+                        <h1 className="text-2xl font-bold text-isel-purple">
+                            Session verification
+                        </h1>
+
+                        <p className="text-sm font-semibold text-isel-purple/70">
+                            Verify your institutional email before joining the
+                            exam session.
+                        </p>
+                    </div>
                 </div>
 
-                {!sessionCode && (
+                {!sessionCode && !joinToken && (
                     <p className="mt-6 rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
-                        Missing session code. Open the link provided by your
-                        professor.
+                        Invalid join link. Open the link provided for this
+                        session.
                     </p>
                 )}
 
@@ -83,8 +116,39 @@ export function SessionVerification() {
                             You can now start the exam client.
                         </p>
                     </div>
+                ) : emailSubmitted ? (
+                    <div className="mt-6 rounded-md border-2 border-isel-purple bg-isel-purple/5 px-3 py-3">
+                        <p className="text-sm font-bold text-isel-purple">
+                            Verification email sent.
+                        </p>
+
+                        <p className="mt-1 text-sm font-semibold text-isel-purple/70">
+                            Open the verification link sent to your email to
+                            finish joining the session.
+                        </p>
+                    </div>
+                ) : isTokenVerification ? (
+                    <div className="mt-6 grid gap-4">
+                        {error && (
+                            <p className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
+                                {error}
+                            </p>
+                        )}
+
+                        <button
+                            type="button"
+                            className="app-button"
+                            disabled={!canVerify}
+                            onClick={handleVerifyJoin}
+                        >
+                            {isVerifying ? "Verifying..." : "Verify session"}
+                        </button>
+                    </div>
                 ) : (
-                    <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
+                    <form
+                        className="mt-6 grid gap-4"
+                        onSubmit={handleSubmitEmail}
+                    >
                         <div>
                             <label
                                 htmlFor="session-code"
@@ -116,7 +180,7 @@ export function SessionVerification() {
                                 onChange={(event) =>
                                     setEmail(event.currentTarget.value)
                                 }
-                                placeholder="student@isel.pt"
+                                placeholder="student@alunos.isel.pt"
                                 autoCapitalize="none"
                                 autoCorrect="off"
                                 spellCheck={false}
@@ -133,9 +197,11 @@ export function SessionVerification() {
                         <button
                             type="submit"
                             className="app-button"
-                            disabled={!canVerify}
+                            disabled={!canSubmitEmail}
                         >
-                            {isVerifying ? "Verifying..." : "Verify session"}
+                            {isSubmittingEmail
+                                ? "Sending..."
+                                : "Send verification email"}
                         </button>
                     </form>
                 )}

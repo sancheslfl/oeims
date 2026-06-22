@@ -5,6 +5,8 @@
 - [ ] Corrigir o logging do servidor para incluir a identidade do utilizador (email/role) em cada request
 - [ ] Adicionar a claim de email ao JWT para facilitar o logging e rastreabilidade
 - [ ] Investigar que valor usar para `maxFrameSize` na configuração das WebSockets
+- [ ] (NEW) Tornar prazo de expiração dos tokens de joins independentes da timezone
+- [ ] (NEW) Fazer cleanup automático de tokens expirados
 
 ## Serviço
 
@@ -32,7 +34,7 @@
 - [ ] (NEW) Começar o capítulo de Arquitetura da solução
 
 ## Dúvidas
-
+- Considerando que, com o novo fluxo de autenticação, temos frontend solto para o estudante, em que módulo é que devemos colocar respeitando a nossa organização?
 
 ## Concluído
 
