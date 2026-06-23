@@ -31,9 +31,11 @@ object SessionSupervisors : Table("session_supervisors") {
 object SessionJoins : UUIDTable("session_joins") {
     val sessionId = reference("session_id", Sessions)
     val email = varchar("email", 254)
-    val jwtId = varchar("jwt_id", 36).uniqueIndex()
-    val expiresAt = timestamp("expires_at")
-    val verifiedAt = timestamp("verified_at").nullable()
+
+    val emailJwtId = varchar("jwt_id", 36).uniqueIndex()
+    val emailExpiresAt = timestamp("expires_at")
+    val emailVerifiedAt = timestamp("verified_at").nullable()
+
     val createdAt = timestamp("created_at")
 
     init {

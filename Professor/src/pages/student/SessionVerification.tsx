@@ -1,81 +1,68 @@
-import {type SubmitEventHandler, useState} from "react";
-import type {StudentAuth} from "../../types";
-import {saveStudentAuth} from "../../localStorage.ts";
-import {requestSessionJoin, verifyJoin} from "../../api/sessions.ts";
-import {IselLogo} from "../../components/topbar/IselLogo.tsx";
+import { type SubmitEventHandler, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { authorizeSentinel } from "../../api/loopback.ts";
+import { requestSessionJoin } from "../../api/sessions.ts";
+import { IselLogo } from "../../components/topbar/IselLogo.tsx";
 
-function getJoinCodeFromUrl() {
-    const joinPathRegex = /^\/student\/join\/(?!verify$)([^/]+)$/;
-    const match = window.location.pathname.match(joinPathRegex);
-    return match ? decodeURIComponent(match[1]) : "";
-}
-
-function getJoinTokenFromUrl() {
-    const joinQueryParam = "token";
-    return (
-        new URLSearchParams(window.location.search).get(
-            joinQueryParam,
-        ) ?? ""
-    );
-}
+type Message = {
+    type: "success" | "error";
+    text: string;
+};
 
 export function SessionVerification() {
-    const [sessionCode] = useState(getJoinCodeFromUrl);
-    const [joinToken] = useState(getJoinTokenFromUrl);
+    const { code } = useParams<{ code: string }>();
+    const [searchParams] = useSearchParams();
+
+    const emailJoinToken = searchParams.get("token") ?? "";
+    const isAuthorizationStep = Boolean(emailJoinToken);
+    const isValidLink = Boolean(code || emailJoinToken);
 
     const [email, setEmail] = useState("");
-    const [studentAuth, setStudentAuth] = useState<StudentAuth | null>(null);
-    const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
-    const [isVerifying, setIsVerifying] = useState(false);
-    const [emailSubmitted, setEmailSubmitted] = useState(false);
-    const [error, setError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [message, setMessage] = useState<Message | null>(null);
 
-    const isTokenVerification = Boolean(joinToken);
-    const canSubmitEmail =
-        Boolean(sessionCode) && Boolean(email.trim()) && !isSubmittingEmail;
-    const canVerify = Boolean(joinToken) && !isVerifying;
+    const isDone = message?.type === "success";
+    const canSubmit =
+        !isSubmitting &&
+        !isDone &&
+        (isAuthorizationStep || Boolean(code && email.trim()));
 
-    const handleSubmitEmail: SubmitEventHandler<HTMLFormElement> = async (
-        event,
-    ) => {
+    const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
         event.preventDefault();
 
-        if (!canSubmitEmail) return;
+        if (!canSubmit) return;
 
-        setError("");
-        setIsSubmittingEmail(true);
+        setMessage(null);
+        setIsSubmitting(true);
 
         try {
-            await requestSessionJoin(sessionCode, email.trim());
-            setEmailSubmitted(true);
-        } catch (error) {
-            if (error instanceof Error) {
-                setError(error.message);
+            if (isAuthorizationStep) {
+                await authorizeSentinel(emailJoinToken);
+
+                setMessage({
+                    type: "success",
+                    text: "Sentinel authorized successfully.",
+                });
+            } else {
+                await requestSessionJoin(code!, email.trim());
+
+                setMessage({
+                    type: "success",
+                    text: "Verification email sent. Open the verification link sent to your email to authorize Sentinel.",
+                });
             }
+        } catch (error) {
+            setMessage({
+                type: "error",
+                text:
+                    error instanceof Error
+                        ? error.message
+                        : "Sentinel authorization failed.",
+            });
         } finally {
-            setIsSubmittingEmail(false);
+            setIsSubmitting(false);
         }
     };
-
-    async function handleVerifyJoin() {
-        if (!canVerify) return;
-
-        setError("");
-        setIsVerifying(true);
-
-        try {
-            const verifiedStudentAuth = await verifyJoin(joinToken);
-
-            saveStudentAuth(verifiedStudentAuth);
-            setStudentAuth(verifiedStudentAuth);
-        } catch (error) {
-            if (error instanceof Error) {
-                setError(error.message);
-            }
-        } finally {
-            setIsVerifying(false);
-        }
-    }
 
     return (
         <main className="grid min-h-screen place-items-center bg-linear-to-br from-isel-white via-isel-pink to-isel-white px-6 py-10">
@@ -89,123 +76,103 @@ export function SessionVerification() {
                         </p>
 
                         <h1 className="text-2xl font-bold text-isel-purple">
-                            Session verification
+                            {isAuthorizationStep
+                                ? "Sentinel authorization"
+                                : "Session join"}
                         </h1>
 
                         <p className="text-sm font-semibold text-isel-purple/70">
-                            Verify your institutional email before joining the
-                            exam session.
+                            {isAuthorizationStep
+                                ? "Authorize the local OEIMS Sentinel before joining the exam session."
+                                : "Enter your institutional email to receive the Sentinel authorization link."}
                         </p>
                     </div>
                 </div>
 
-                {!sessionCode && !joinToken && (
-                    <p className="mt-6 rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
-                        Invalid join link. Open the link provided for this
-                        session.
-                    </p>
+                {!isValidLink && (
+                    <Notice
+                        type="error"
+                        text="Invalid join link. Open the link provided for this session."
+                    />
                 )}
 
-                {studentAuth ? (
-                    <div className="mt-6 rounded-md border-2 border-isel-purple bg-isel-purple/5 px-3 py-3">
-                        <p className="text-sm font-bold text-isel-purple">
-                            Verification completed.
-                        </p>
+                {message && <Notice {...message} />}
 
-                        <p className="mt-1 text-sm font-semibold text-isel-purple/70">
-                            You can now start the exam client.
-                        </p>
-                    </div>
-                ) : emailSubmitted ? (
-                    <div className="mt-6 rounded-md border-2 border-isel-purple bg-isel-purple/5 px-3 py-3">
-                        <p className="text-sm font-bold text-isel-purple">
-                            Verification email sent.
-                        </p>
+                {isValidLink && !isDone && (
+                    <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
+                        {!isAuthorizationStep && (
+                            <>
+                                <div>
+                                    <label
+                                        htmlFor="session-code"
+                                        className="block text-xs font-bold uppercase tracking-wide text-isel-purple/70"
+                                    >
+                                        Session code
+                                    </label>
 
-                        <p className="mt-1 text-sm font-semibold text-isel-purple/70">
-                            Open the verification link sent to your email to
-                            finish joining the session.
-                        </p>
-                    </div>
-                ) : isTokenVerification ? (
-                    <div className="mt-6 grid gap-4">
-                        {error && (
-                            <p className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
-                                {error}
-                            </p>
-                        )}
+                                    <input
+                                        id="session-code"
+                                        value={code}
+                                        readOnly
+                                        className="mt-1 w-full rounded-md border-2 border-isel-purple bg-isel-purple/5 px-3 py-2 text-sm font-bold uppercase tracking-widest text-isel-purple outline-none"
+                                    />
+                                </div>
 
-                        <button
-                            type="button"
-                            className="app-button"
-                            disabled={!canVerify}
-                            onClick={handleVerifyJoin}
-                        >
-                            {isVerifying ? "Verifying..." : "Verify session"}
-                        </button>
-                    </div>
-                ) : (
-                    <form
-                        className="mt-6 grid gap-4"
-                        onSubmit={handleSubmitEmail}
-                    >
-                        <div>
-                            <label
-                                htmlFor="session-code"
-                                className="block text-xs font-bold uppercase tracking-wide text-isel-purple/70"
-                            >
-                                Session code
-                            </label>
+                                <div>
+                                    <label
+                                        htmlFor="student-email"
+                                        className="block text-xs font-bold uppercase tracking-wide text-isel-purple/70"
+                                    >
+                                        Student email
+                                    </label>
 
-                            <input
-                                id="session-code"
-                                value={sessionCode}
-                                readOnly
-                                className="mt-1 w-full rounded-md border-2 border-isel-purple bg-isel-purple/5 px-3 py-2 text-sm font-bold uppercase tracking-widest text-isel-purple outline-none"
-                            />
-                        </div>
-
-                        <div>
-                            <label
-                                htmlFor="student-email"
-                                className="block text-xs font-bold uppercase tracking-wide text-isel-purple/70"
-                            >
-                                Student email
-                            </label>
-
-                            <input
-                                id="student-email"
-                                type="email"
-                                value={email}
-                                onChange={(event) =>
-                                    setEmail(event.currentTarget.value)
-                                }
-                                placeholder="student@alunos.isel.pt"
-                                autoCapitalize="none"
-                                autoCorrect="off"
-                                spellCheck={false}
-                                className="mt-1 w-full rounded-md border-2 border-isel-purple bg-isel-white px-3 py-2 text-sm font-semibold text-isel-purple outline-none placeholder:text-isel-purple/35 focus:border-isel-red"
-                            />
-                        </div>
-
-                        {error && (
-                            <p className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
-                                {error}
-                            </p>
+                                    <input
+                                        id="student-email"
+                                        type="email"
+                                        value={email}
+                                        onChange={(event) =>
+                                            setEmail(event.currentTarget.value)
+                                        }
+                                        placeholder="student@alunos.isel.pt"
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
+                                        spellCheck={false}
+                                        className="mt-1 w-full rounded-md border-2 border-isel-purple bg-isel-white px-3 py-2 text-sm font-semibold text-isel-purple outline-none placeholder:text-isel-purple/35 focus:border-isel-red"
+                                    />
+                                </div>
+                            </>
                         )}
 
                         <button
                             type="submit"
                             className="app-button"
-                            disabled={!canSubmitEmail}
+                            disabled={!canSubmit}
                         >
-                            {isSubmittingEmail
-                                ? "Sending..."
-                                : "Send verification email"}
+                            {isSubmitting
+                                ? isAuthorizationStep
+                                    ? "Authorizing..."
+                                    : "Sending..."
+                                : isAuthorizationStep
+                                    ? "Authorize Sentinel"
+                                    : "Send verification email"}
                         </button>
                     </form>
                 )}
             </section>
         </main>
+    );
+}
+
+function Notice({ type, text }: Message) {
+    return (
+        <p
+            className={`mt-6 rounded-md border-2 px-3 py-2 text-sm font-semibold text-isel-purple ${
+                type === "error"
+                    ? "border-isel-red bg-isel-pink"
+                    : "border-isel-purple bg-isel-purple/5"
+            }`}
+        >
+            {text}
+        </p>
     );
 }

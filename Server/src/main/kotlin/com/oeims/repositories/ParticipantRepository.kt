@@ -1,6 +1,5 @@
 package com.oeims.repositories
 
-import com.oeims.exceptions.NotFoundException
 import com.oeims.models.*
 import com.oeims.repositories.interfaces.IParticipantRepository
 import kotlinx.coroutines.Dispatchers
@@ -12,7 +11,6 @@ import java.util.*
 data class ParticipantRecord(
     val id: UUID,
     val sessionId: UUID,
-    val userId: UUID?,
     val email: String,
     val connectionStatus: ConnectionStatus,
     val lastHeartbeat: Instant?,
@@ -36,17 +34,6 @@ class ParticipantRepository : IParticipantRepository {
                 .map { it.toRecord() }
         }
 
-    suspend fun findByUserAndSession(userId: UUID, sessionId: UUID): ParticipantRecord? =
-        newSuspendedTransaction(Dispatchers.IO) {
-            Participants.selectAll()
-                .where {
-                    (Participants.userId eq userId) and
-                            (Participants.sessionId eq sessionId)
-                }
-                .singleOrNull()
-                ?.toRecord()
-        }
-
     override suspend fun findByEmailAndSession(email: String, sessionId: UUID): ParticipantRecord? =
         newSuspendedTransaction(Dispatchers.IO) {
             Participants.selectAll()
@@ -58,38 +45,6 @@ class ParticipantRepository : IParticipantRepository {
                 ?.toRecord()
         }
 
-    suspend fun create(sessionId: UUID, userId: UUID): ParticipantRecord =
-        newSuspendedTransaction(Dispatchers.IO) {
-            val id = UUID.randomUUID()
-            val now = Instant.now()
-
-            val email = Users.selectAll()
-                .where { Users.id eq userId }
-                .singleOrNull()
-                ?.get(Users.email)
-                ?: throw NotFoundException("User not found")
-
-            Participants.insert {
-                it[Participants.id] = id
-                it[Participants.sessionId] = sessionId
-                it[Participants.userId] = userId
-                it[Participants.email] = email
-                it[Participants.connectionStatus] = ConnectionStatus.DISCONNECTED
-                it[Participants.lastHeartbeat] = null
-                it[Participants.joinedAt] = now
-            }
-
-            ParticipantRecord(
-                id = id,
-                sessionId = sessionId,
-                userId = userId,
-                email = email,
-                connectionStatus = ConnectionStatus.DISCONNECTED,
-                lastHeartbeat = null,
-                joinedAt = now
-            )
-        }
-
     override suspend fun create(sessionId: UUID, email: String): ParticipantRecord =
         newSuspendedTransaction(Dispatchers.IO) {
             val id = UUID.randomUUID()
@@ -98,7 +53,6 @@ class ParticipantRepository : IParticipantRepository {
             Participants.insert {
                 it[Participants.id] = id
                 it[Participants.sessionId] = sessionId
-                it[Participants.userId] = null
                 it[Participants.email] = email
                 it[Participants.connectionStatus] = ConnectionStatus.DISCONNECTED
                 it[Participants.lastHeartbeat] = null
@@ -108,7 +62,6 @@ class ParticipantRepository : IParticipantRepository {
             ParticipantRecord(
                 id = id,
                 sessionId = sessionId,
-                userId = null,
                 email = email,
                 connectionStatus = ConnectionStatus.DISCONNECTED,
                 lastHeartbeat = null,
@@ -155,7 +108,6 @@ class ParticipantRepository : IParticipantRepository {
     private fun ResultRow.toRecord() = ParticipantRecord(
         id = this[Participants.id].value,
         sessionId = this[Participants.sessionId].value,
-        userId = this[Participants.userId]?.value,
         email = this[Participants.email],
         connectionStatus = this[Participants.connectionStatus],
         lastHeartbeat = this[Participants.lastHeartbeat],

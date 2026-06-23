@@ -99,7 +99,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "Window lost focus", "Warning")))
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "Window lost focus", "Warning")))
             delay(50)   // let the server process the frame before we close
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
@@ -125,7 +125,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
             send("this is not valid json {{{")
             delay(50)
             // Send a valid frame afterwards — connection must still be alive
-            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "valid msg", "Info")))
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "valid msg", "Info")))
             delay(50)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
@@ -147,10 +147,10 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "msg", "NotARealSeverity")))
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "msg", "NotARealSeverity")))
             delay(50)
             // Valid frame after the bad one — connection must still be alive
-            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "valid msg", "Critical")))
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "valid msg", "Critical")))
             delay(50)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
@@ -171,9 +171,9 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(DaemonEventMessage("FocusMonitor", "lost focus", "Info")))
-            send(Json.encodeToString(DaemonEventMessage("ClipboardMonitor", "clipboard access", "Warning")))
-            send(Json.encodeToString(DaemonEventMessage("ProcessMonitor", "unknown process", "Critical")))
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "lost focus", "Info")))
+            send(Json.encodeToString(SentinelEventMessage("ClipboardMonitor", "clipboard access", "Warning")))
+            send(Json.encodeToString(SentinelEventMessage("ProcessMonitor", "unknown process", "Critical")))
             delay(50)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }

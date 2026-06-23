@@ -9,7 +9,6 @@ import com.oeims.config.configureEmail
 import com.oeims.config.configureOpenApi
 import com.oeims.config.configureRouting
 import com.oeims.config.configureSecurity
-import com.oeims.models.SmtpEmailSender
 import com.oeims.repositories.*
 import com.oeims.services.*
 import com.oeims.sse.SseBroadcaster
@@ -116,7 +115,7 @@ fun Application.module() {
 
     // Config
     val authJwtSettings = configureAuthJwt()
-    val sessionJoinJwtSettings = configureSessionJoinJwt()
+    val sessionJwtSettings = SessionJwtSettings(configureEmailJoinJwt(), authJwtSettings)
     val heartbeatConfig = configureHeartbeat()
 
     // Email service
@@ -129,7 +128,7 @@ fun Application.module() {
     val authService = AuthService(userRepository, authJwtSettings)
     val examService = ExamService(examRepository)
     val sessionService =
-        SessionService(sessionRepository, examRepository, participantRepository, sessionJoinJwtSettings, sseBroadcaster, smtpEmailSender)
+        SessionService(sessionRepository, examRepository, participantRepository, sessionJwtSettings, sseBroadcaster, smtpEmailSender)
     val eventService = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
     val heartbeatService = HeartbeatService(participantRepository, sessionRepository, sseBroadcaster, heartbeatConfig)
 

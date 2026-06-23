@@ -57,8 +57,6 @@ data class VerifyJoinRequest(
 
 @Serializable
 data class VerifyJoinResponse(
+    val token: String,
     val participantId: String,
-    val sessionId: String,
-    val email: String,
-    val status: String,
 )

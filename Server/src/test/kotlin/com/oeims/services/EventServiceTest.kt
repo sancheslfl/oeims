@@ -47,7 +47,6 @@ class EventServiceTest {
             val record = ParticipantRecord(
                 id = UUID.randomUUID(),
                 sessionId = sessionId,
-                userId = userId,
                 email = "student@test.pt",
                 connectionStatus = ConnectionStatus.CONNECTED,
                 lastHeartbeat = null,

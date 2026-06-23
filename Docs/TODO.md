@@ -34,7 +34,6 @@
 - [ ] (NEW) Começar o capítulo de Arquitetura da solução
 
 ## Dúvidas
-- Considerando que, com o novo fluxo de autenticação, temos frontend solto para o estudante, em que módulo é que devemos colocar respeitando a nossa organização?
 
 ## Concluído
 

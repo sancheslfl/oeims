@@ -9,12 +9,15 @@ import io.ktor.server.routing.*
 
 fun Route.participantRoutes(sessionService: SessionService) {
     authenticate("auth-student") {
-
-        // POST /participants/{id}/heartbeat
         post("/participants/{id}/heartbeat") {
-            val userId = call.userId()
+            val authenticatedParticipantId = call.participantId()
             val participantId = call.uuidParam("id")
-            sessionService.heartbeat(participantId.toParticipantId())
+
+            sessionService.heartbeat(
+                pid = participantId.toParticipantId(),
+                authenticatedPid= authenticatedParticipantId.toParticipantId()
+            )
+
             call.respond(HttpStatusCode.NoContent)
         }
     }

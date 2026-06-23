@@ -23,10 +23,15 @@ jwt:
     realm: "oeims"
     expiration-ms: 3600000
 
-  session-join:
-    audience: "oeims:session-join"
+  email-join:
+    audience: "oeims:email-join"
     realm: "oeims"
     expiration-ms: 600000
+
+  sentinel:
+    audience: "oeims:sentinel"
+    realm: "oeims"
+    expiration-ms: 7200000
 
 database:
   path: "./oeims.db"

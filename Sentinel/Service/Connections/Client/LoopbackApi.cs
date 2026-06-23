@@ -1,0 +1,75 @@
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using OEIMS.Sentinel.Service.Connections.Server;
+using System.Text.Json.Serialization;
+
+namespace OEIMS.Sentinel.Service.Connections.Client;
+
+internal static class LoopbackApi
+{
+    private const string AuthorizePath = "/sentinel/authorize";
+
+    internal static WebApplication MapLoopbackApi(this WebApplication app)
+    {
+        var clientOrigin = app.Configuration["Loopback:ClientOrigin"];
+
+        if (string.IsNullOrWhiteSpace(clientOrigin))
+            throw new InvalidOperationException(
+                "Missing Loopback:ClientOrigin configuration.");
+
+        app.MapPost(AuthorizePath, async (
+            AuthorizeRequest request,
+            ServerApi serverApi,
+            ServerSession serverSession,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
+        {
+            var logger = loggerFactory.CreateLogger("LoopbackApi");
+            var emailJoinToken = request.EmailJoinToken.Trim();
+
+            if (emailJoinToken.Length == 0)
+                return Results.BadRequest(new
+                {
+                    error = "Missing email join token."
+                });
+
+            try
+            {
+                var join = await serverApi.VerifyJoinTokenAsync(
+                    emailJoinToken,
+                    ct);
+
+                serverSession.Authorize(
+                    token: join.Token,
+                    participantId: join.ParticipantId);
+
+                return Results.Ok(new
+                {
+                    status = "authorized"
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Sentinel authorization failed.");
+
+                return Results.Json(
+                    new
+                    {
+                        error = ex.Message
+                    },
+                    statusCode: StatusCodes.Status500InternalServerError);
+            }
+        })
+        .RequireCors(policy =>
+            policy
+                .WithOrigins(clientOrigin)
+                .WithMethods("POST")
+                .WithHeaders("Content-Type"));
+
+        return app;
+    }
+}
+
+internal sealed record AuthorizeRequest(
+    [property: JsonPropertyName("emailJoinToken")]
+    string EmailJoinToken);

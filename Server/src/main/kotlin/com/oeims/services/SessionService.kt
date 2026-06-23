@@ -21,6 +21,8 @@ import com.oeims.sse.SseBroadcaster
 import com.oeims.sse.SseChannels
 import com.oeims.sse.SseEvent
 import kotlinx.serialization.json.Json
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.*
 
@@ -28,7 +30,7 @@ class SessionService(
     private val sessionRepository: ISessionRepository,
     private val examRepository: IExamRepository,
     private val participantRepository: IParticipantRepository,
-    private val jwtSettings: JwtSettings,
+    private val jwtSettings: SessionJwtSettings,
     private val sseBroadcaster: SseBroadcaster,
     private val emailSender: EmailSender,
 ) {
@@ -146,8 +148,13 @@ class SessionService(
             expiresAt = token.expiresAt,
         )
 
+        val encodedToken = URLEncoder.encode(
+            token.value,
+            StandardCharsets.UTF_8,
+        )
+
         val verificationLink =
-            "${Environment.frontendBaseUrl}/student/join/verify?token=${token.value}"
+            "${Environment.frontendBaseUrl}/student/join/verify?token=$encodedToken"
 
         emailSender.sendJoinVerification(
             to = email.address,
@@ -156,7 +163,7 @@ class SessionService(
         )
 
         return EmailJoinResponse(
-            message = "Verification email sent"
+            message = "Verification email sent",
         )
     }
 
@@ -200,15 +207,13 @@ class SessionService(
             sseBroadcaster.publish(
                 channel = SseChannels.session(session.id.toSessionId()),
                 event = SseEvent.PARTICIPANT_JOINED,
-                data = Json.encodeToString(participant.toResponse())
+                data = Json.encodeToString(participant.toResponse()),
             )
         }
 
         return VerifyJoinResponse(
+            token = createSentinelToken(participant),
             participantId = participant.id.toString(),
-            sessionId = session.id.toString(),
-            email = participant.email,
-            status = participant.connectionStatus.name,
         )
     }
 
@@ -245,11 +250,15 @@ class SessionService(
         return participantRepository.findBySession(sessionId.value).map { it.toResponse() }
     }
 
-    suspend fun heartbeat(participantId: ParticipantId) {
-        val participant = participantRepository.findById(participantId.value)
+    suspend fun heartbeat(pid: ParticipantId, authenticatedPid: ParticipantId) {
+        val participant = participantRepository.findById(pid.value)
             ?: throw NotFoundException("Participant not found")
 
-        participantRepository.updateHeartbeat(participantId.value)
+        if (participant.id != authenticatedPid.value) {
+            throw ForbiddenException("Forbidden")
+        }
+
+        participantRepository.updateHeartbeat(pid.value)
 
         if (participant.connectionStatus != ConnectionStatus.CONNECTED) {
             sseBroadcaster.publish(
@@ -269,24 +278,25 @@ class SessionService(
         session: SessionRecord,
         email: Email,
     ): CreatedJoinToken {
+        val settings = jwtSettings.emailJoin
         val jwtId = UUID.randomUUID().toString()
         val now = Instant.now()
-        val expiresAt = now.plus(jwtSettings.expiration)
+        val expiresAt = now.plus(settings.expiration)
 
         val builder = JWT.create()
-            .withIssuer(jwtSettings.issuer)
-            .withAudience(jwtSettings.audience)
+            .withIssuer(settings.issuer)
+            .withAudience(settings.audience)
             .withJWTId(jwtId)
             .withSubject(email.address)
             .withIssuedAt(now)
             .withExpiresAt(expiresAt)
             .withClaim("sessionCode", session.code)
 
-        val value = if (jwtSettings.purpose == null)
-            builder.sign(jwtSettings.algorithm)
+        val value = if (settings.purpose == null)
+            builder.sign(settings.algorithm)
         else
-            builder.withClaim("purpose", jwtSettings.purpose)
-                .sign(jwtSettings.algorithm)
+            builder.withClaim("purpose", settings.purpose)
+                .sign(settings.algorithm)
 
         return CreatedJoinToken(
             value = value,
@@ -297,7 +307,7 @@ class SessionService(
 
     private fun verifyJoinToken(token: EmailJoinToken): VerifiedJoinToken {
         val jwt = try {
-            jwtSettings.verifier.verify(token.value)
+            jwtSettings.emailJoin.verifier.verify(token.value)
         } catch (_: TokenExpiredException) {
             throw ConflictException("This token has expired. Please verify the email again and try again")
         } catch (_: JWTVerificationException) {
@@ -312,6 +322,20 @@ class SessionService(
             sessionCode = jwt.getClaim("sessionCode").asString()
                 ?: throw ForbiddenException("Join token is missing session code"),
         )
+    }
+
+    private fun createSentinelToken(participant: ParticipantRecord): String {
+        val settings = jwtSettings.sentinel
+        val now = Instant.now()
+
+        return JWT.create()
+            .withIssuer(settings.issuer)
+            .withAudience(settings.audience)
+            .withIssuedAt(now)
+            .withExpiresAt(now.plus(settings.expiration))
+            .withClaim("role", "STUDENT")
+            .withClaim("participantId", participant.id.toString())
+            .sign(settings.algorithm)
     }
 
     private fun generateSessionCode(): String {
@@ -348,7 +372,6 @@ private fun SessionRecord.toResponse() = SessionResponse(
 private fun ParticipantRecord.toResponse() = ParticipantResponse(
     id = id.toString(),
     sessionId = sessionId.toString(),
-    userId = userId.toString(),
     email = email,
     connectionStatus = connectionStatus.name,
     lastHeartbeat = lastHeartbeat?.toString(),

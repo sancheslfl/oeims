@@ -36,17 +36,22 @@ fun Application.configureAuthJwt() = JwtSettings(
     algorithm = Algorithm.HMAC256(jwtSecret()),
 )
 
-fun Application.configureSessionJoinJwt() = JwtSettings(
+fun Application.configureEmailJoinJwt() = JwtSettings(
     issuer = environment.config.property("jwt.issuer").getString(),
-    audience = environment.config.property("jwt.session-join.audience").getString(),
-    realm = environment.config.property("jwt.session-join.realm").getString(),
+    audience = environment.config.property("jwt.email-join.audience").getString(),
+    realm = environment.config.property("jwt.email-join.realm").getString(),
     expiration = Duration.ofMillis(
-        environment.config.property("jwt.session-join.expiration-ms").getString().toLong()
+        environment.config.property("jwt.email-join.expiration-ms").getString().toLong()
     ),
     algorithm = Algorithm.HMAC256(jwtSecret()),
-    purpose = "session_join",
+    purpose = "email_join",
 )
 
 private fun Application.jwtSecret(): String =
     System.getenv("JWT_SECRET")
         ?: environment.config.property("jwt.secret").getString()
+
+data class SessionJwtSettings(
+    val emailJoin: JwtSettings,
+    val sentinel: JwtSettings,
+)

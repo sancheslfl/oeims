@@ -174,9 +174,9 @@ class SessionRepository : ISessionRepository {
                 it[SessionJoins.id] = id
                 it[SessionJoins.sessionId] = sessionId
                 it[SessionJoins.email] = email
-                it[SessionJoins.jwtId] = jwtId
-                it[SessionJoins.expiresAt] = expiresAt
-                it[SessionJoins.verifiedAt] = null
+                it[SessionJoins.emailJwtId] = jwtId
+                it[SessionJoins.emailExpiresAt] = expiresAt
+                it[SessionJoins.emailVerifiedAt] = null
                 it[SessionJoins.createdAt] = now
             }
 
@@ -194,7 +194,7 @@ class SessionRepository : ISessionRepository {
     override suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord? =
         newSuspendedTransaction(Dispatchers.IO) {
             SessionJoins.selectAll()
-                .where { SessionJoins.jwtId eq jwtId }
+                .where { SessionJoins.emailJwtId eq jwtId }
                 .singleOrNull()
                 ?.toEmailJoinRecord()
         }
@@ -203,10 +203,10 @@ class SessionRepository : ISessionRepository {
         newSuspendedTransaction(Dispatchers.IO) {
             SessionJoins.update(
                 where = {
-                    (SessionJoins.id eq id) and SessionJoins.verifiedAt.isNull()
+                    (SessionJoins.id eq id) and SessionJoins.emailVerifiedAt.isNull()
                 }
             ) {
-                it[SessionJoins.verifiedAt] = verifiedAt
+                it[SessionJoins.emailVerifiedAt] = verifiedAt
             } == 1
         }
 }
@@ -227,8 +227,8 @@ private fun ResultRow.toEmailJoinRecord() = EmailJoinRecord(
     id = this[SessionJoins.id].value,
     sessionId = this[SessionJoins.sessionId].value,
     email = this[SessionJoins.email],
-    jwtId = this[SessionJoins.jwtId],
-    expiresAt = this[SessionJoins.expiresAt],
-    verifiedAt = this[SessionJoins.verifiedAt],
+    jwtId = this[SessionJoins.emailJwtId],
+    expiresAt = this[SessionJoins.emailExpiresAt],
+    verifiedAt = this[SessionJoins.emailVerifiedAt],
     createdAt = this[SessionJoins.createdAt],
 )

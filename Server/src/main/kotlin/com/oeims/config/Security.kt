@@ -9,6 +9,7 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
+import java.util.UUID
 
 fun Application.configureSecurity(jwtSettings: JwtSettings) {
     val verifier = jwtSettings.verifier
@@ -64,13 +65,17 @@ fun Application.configureSecurity(jwtSettings: JwtSettings) {
             this.verifier(verifier)
 
             validate { credential ->
-                val userId = credential.payload.getClaim("userId").asString()
                 val role = credential.payload.getClaim("role").asString()
-                val email = credential.payload.getClaim("email").asString()
+                val participantId = credential.payload.getClaim("participantId").asString()
 
-                if (userId != null && role == "STUDENT" && email != null) {
+                if (role != "STUDENT" || participantId == null) {
+                    return@validate null
+                }
+
+                try {
+                    UUID.fromString(participantId)  // if id fails parsing for not being a valid UUID then null
                     JWTPrincipal(credential.payload)
-                } else {
+                } catch (_: IllegalArgumentException) {
                     null
                 }
             }

@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 // Received from the daemon over WebSocket.
 // Mirrors Daemon.Abstractions.MonitorEvent (PascalCase severity mapped below).
 @Serializable
-data class DaemonEventMessage(
+data class SentinelEventMessage(
     val monitorName: String,
     val message: String,
     val severity: String   // "Info" | "Warning" | "Critical" — daemon casing
