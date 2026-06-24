@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -17,35 +18,23 @@ internal sealed class WebSocketClient(
 
     public async Task StartAsync(CancellationToken ct)
     {
-        logger.LogInformation("[ServerConnection] Waiting for Sentinel authorization");
-
-        try
-        {
-            await serverSession.WaitUntilAuthorizedAsync(ct);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            return;
-        }
+        logger.LogInformation("Waiting for Sentinel authorization");
 
         while (!ct.IsCancellationRequested)
         {
-            var authorization = serverSession.GetAuthorization();
-            var uri = new Uri(
-                $"{_realtimeBaseUrl}/ws/daemon/{authorization.ParticipantId}");
+            var authorization = await serverSession.WaitUntilAuthorizedAsync(ct);
+            var uri = new Uri($"{_realtimeBaseUrl}/ws/daemon/{authorization.ParticipantId}");
 
             try
             {
                 _ws?.Dispose();
                 _ws = new ClientWebSocket();
-
-                _ws.Options.SetRequestHeader(
-                    "Authorization",
-                    $"Bearer {authorization.Token}");
+                _ws.Options.CollectHttpResponseDetails = true;
+                _ws.Options.SetRequestHeader("Authorization", $"Bearer {authorization.Token}");
 
                 await _ws.ConnectAsync(uri, ct);
 
-                logger.LogInformation("[ServerConnection] Connected to {Uri}", uri);
+                logger.LogInformation("Connected to {Uri}", uri);
 
                 var buffer = new byte[256];
 
@@ -56,7 +45,7 @@ internal sealed class WebSocketClient(
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
                         logger.LogWarning(
-                            "[ServerConnection] Server closed the connection: {Reason}",
+                            "Server closed the connection: {Reason}",
                             result.CloseStatusDescription);
 
                         break;
@@ -67,20 +56,17 @@ internal sealed class WebSocketClient(
             {
                 break;
             }
+            catch (WebSocketException ex) when (IsAuthorizationRejected(_ws))
+            {
+                serverSession.Clear();
+                logger.LogWarning(ex, "Authorization rejected by server");
+            }
             catch (Exception ex)
             {
-                logger.LogWarning(
-                    ex,
-                    "[ServerConnection] Disconnected - retrying in 5 s");
+                logger.LogDebug(ex, "Disconnected and retrying in 5 s");
 
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(5), ct);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
+                try { await Task.Delay(TimeSpan.FromSeconds(5), ct); }
+                catch (OperationCanceledException) { break; }
             }
         }
 
@@ -92,7 +78,7 @@ internal sealed class WebSocketClient(
         if (_ws?.State != WebSocketState.Open)
         {
             logger.LogDebug(
-                "[ServerConnection] Socket not open and event dropped: [{Monitor}] {Message}",
+                "Socket not open and event dropped: [{Monitor}] {Message}",
                 e.MonitorName,
                 e.Message);
 
@@ -118,11 +104,21 @@ internal sealed class WebSocketClient(
                 endOfMessage: true,
                 cancellationToken: ct);
         }
+        catch (WebSocketException ex)
+        {
+            _ws.Abort();
+            logger.LogDebug(ex, "[ServerConnection] Event not sent because socket failed");
+        }
         finally
         {
             _sendLock.Release();
         }
     }
+
+    private static bool IsAuthorizationRejected(ClientWebSocket? webSocket) =>
+        webSocket?.HttpStatusCode is
+            HttpStatusCode.Unauthorized or
+            HttpStatusCode.Forbidden;
 
     private async Task CloseAsync()
     {

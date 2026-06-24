@@ -1,4 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace OEIMS.Sentinel.Service.Connections.Server;
 
@@ -6,16 +9,45 @@ internal sealed record ServerAuthorization(
     string Token,
     string ParticipantId);
 
+/**   <summary>
+ *    Stores the current server authorization for the Sentinel Service.
+ *    </summary>
+ *    <remarks>
+ *    The Sentinel receives its server token after the student verifies the join email.
+ *    This class keeps that token in memory while the service is running and also persists it
+ *    encrypted on disk so heartbeat and WebSocket communication can resume after a service restart.
+ *   </remarks>
+ */
 internal sealed class ServerSession
 {
-    private readonly Lock _lock = new();
+    private static readonly string FilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+        "OEIMS",
+        "Sentinel",
+        "server-session.bin");
 
-    private readonly TaskCompletionSource _authorized =
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Lock _lock = new();
+    private readonly ILogger<ServerSession> _logger;
+
+    private TaskCompletionSource _authorized =
+        NewAuthorizationSignal();
 
     private ServerAuthorization? _authorization;
 
-    public bool IsAuthorized => _authorized.Task.IsCompletedSuccessfully;
+    public ServerSession(ILogger<ServerSession> logger)
+    {
+        _logger = logger;
+        Load();
+    }
+
+    public bool IsAuthorized
+    {
+        get
+        {
+            lock (_lock)
+                return _authorization is not null;
+        }
+    }
 
     public void Authorize(string token, string participantId)
     {
@@ -28,7 +60,20 @@ internal sealed class ServerSession
         lock (_lock)
         {
             _authorization = new ServerAuthorization(token, participantId);
+            Save(_authorization);
             _authorized.TrySetResult();
+        }
+    }
+
+    public void Clear()
+    {
+        lock (_lock)
+        {
+            _authorization = null;
+            _authorized = NewAuthorizationSignal();
+
+            if (File.Exists(FilePath))
+                File.Delete(FilePath);
         }
     }
 
@@ -56,4 +101,70 @@ internal sealed class ServerSession
             return authorization is not null;
         }
     }
+
+    private void Load()
+    {
+        if (!File.Exists(FilePath))
+            return;
+
+        try
+        {
+            var encrypted = File.ReadAllBytes(FilePath);
+            var bytes = ProtectedData.Unprotect(
+                encrypted,
+                null,
+                DataProtectionScope.LocalMachine);
+
+            var authorization = JsonSerializer.Deserialize<ServerAuthorization>(
+                Encoding.UTF8.GetString(bytes));
+
+            if (authorization is null)
+                return;
+
+            _authorization = authorization;
+            _authorized.TrySetResult();
+
+            _logger.LogInformation(
+                "[ServerSession] Restored persisted authorization for participant {ParticipantId}",
+                authorization.ParticipantId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "[ServerSession] Could not restore persisted authorization");
+
+            Clear();
+        }
+    }
+
+    /**
+     *   <summary>
+     *   Saves the Sentinel authorization data to disk using Windows DPAPI.
+     *   </summary>
+     *   <remarks>
+     *   Data is encrypted without storing cryptographic key and stored in a file which lets 
+     *   the Windows Service retrieve it after the service is restarted.
+     *   </remarks>
+     *   <param name="authorization">
+     *   The authorization data to persist.
+     *   </param>
+     */
+    private static void Save(ServerAuthorization authorization)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+
+        var bytes = Encoding.UTF8.GetBytes(
+            JsonSerializer.Serialize(authorization));
+
+        var encrypted = ProtectedData.Protect(
+            bytes,
+            null,
+            DataProtectionScope.LocalMachine);  // the same machine can decrypt it, less fragile for a Windows Service
+
+        File.WriteAllBytes(FilePath, encrypted);
+    }
+
+    private static TaskCompletionSource NewAuthorizationSignal() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
