@@ -1,7 +1,5 @@
 package com.oeims.models
 
-import com.oeims.exceptions.ValidationException
-
 @JvmInline
 value class ExamTitle(val value: String) {
 

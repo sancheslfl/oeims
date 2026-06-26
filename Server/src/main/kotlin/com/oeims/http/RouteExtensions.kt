@@ -1,7 +1,7 @@
 package com.oeims.http
 
-import com.oeims.exceptions.UnauthorizedException
-import com.oeims.exceptions.ValidationException
+import com.oeims.models.UnauthorizedException
+import com.oeims.models.ValidationException
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*

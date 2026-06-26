@@ -1,4 +1,4 @@
-package com.oeims.sse
+package com.oeims.connections
 
 import com.oeims.models.ids.SessionId
 import com.oeims.models.ids.toSessionId

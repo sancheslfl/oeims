@@ -3,7 +3,6 @@ package com.oeims
 import com.auth0.jwt.JWT
 import com.oeims.config.Environment
 import com.oeims.http.AUTH_COOKIE_NAME
-import com.oeims.http.webSocketRoutes
 import com.oeims.config.configureDatabase
 import com.oeims.config.configureEmail
 import com.oeims.config.configureOpenApi
@@ -11,7 +10,8 @@ import com.oeims.config.configureRouting
 import com.oeims.config.configureSecurity
 import com.oeims.repositories.*
 import com.oeims.services.*
-import com.oeims.sse.SseBroadcaster
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.WebSocketBroadcaster
 import io.ktor.http.*
 import io.ktor.http.auth.*
 import io.ktor.serialization.kotlinx.json.*
@@ -24,7 +24,6 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.ratelimit.*
-import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.server.websocket.*
 import kotlinx.serialization.json.Json
@@ -123,12 +122,20 @@ fun Application.module() {
 
     // Realtime
     val sseBroadcaster = SseBroadcaster()
+    val webSocketBroadcaster = WebSocketBroadcaster()
 
     // Services
     val authService = AuthService(userRepository, authJwtSettings)
     val examService = ExamService(examRepository)
-    val sessionService =
-        SessionService(sessionRepository, examRepository, participantRepository, sessionJwtSettings, sseBroadcaster, smtpEmailSender)
+    val sessionService = SessionService(sessionRepository, examRepository, sseBroadcaster)
+    val participantService = ParticipantService(
+        participantRepository,
+        sessionRepository,
+        sessionJwtSettings,
+        sseBroadcaster,
+        webSocketBroadcaster,
+        smtpEmailSender
+    )
     val eventService = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
     val heartbeatService = HeartbeatService(participantRepository, sessionRepository, sseBroadcaster, heartbeatConfig)
 
@@ -136,12 +143,15 @@ fun Application.module() {
     configureSecurity(authJwtSettings)
 
     // Routing
-    configureRouting(authService, examService, sessionService, eventService, sseBroadcaster)
-
-    // WebSocket routes
-    routing {
-        webSocketRoutes(eventService, participantRepository)
-    }
+    configureRouting(
+        authService,
+        examService,
+        sessionService,
+        participantService,
+        eventService,
+        sseBroadcaster,
+        webSocketBroadcaster
+    )
 
     // API Docs
     configureOpenApi()

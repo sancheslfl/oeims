@@ -1,8 +1,8 @@
 package com.oeims.services
 
-import com.oeims.exceptions.ConflictException
-import com.oeims.exceptions.ForbiddenException
-import com.oeims.exceptions.NotFoundException
+import com.oeims.models.ConflictException
+import com.oeims.models.ForbiddenException
+import com.oeims.models.NotFoundException
 import com.oeims.models.ConnectionStatus
 import com.oeims.models.SessionStatus
 import com.oeims.models.UserRole
@@ -19,7 +19,7 @@ import com.oeims.repositories.interfaces.IExamRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.repositories.interfaces.IUserRepository
-import com.oeims.sse.SseBroadcaster
+import com.oeims.connections.SseBroadcaster
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

@@ -1,9 +1,9 @@
 package com.oeims.services
 
 import com.auth0.jwt.JWT
-import com.oeims.exceptions.ConflictException
-import com.oeims.exceptions.UnauthorizedException
-import com.oeims.exceptions.ValidationException
+import com.oeims.models.ConflictException
+import com.oeims.models.UnauthorizedException
+import com.oeims.models.ValidationException
 import com.oeims.models.Email
 import com.oeims.models.Password
 import com.oeims.models.UserRole

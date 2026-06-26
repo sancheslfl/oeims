@@ -1,6 +1,6 @@
 package com.oeims.models.dto
 
-import com.oeims.exceptions.ValidationException
+import com.oeims.models.ValidationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -59,4 +59,4 @@ data class VerifyJoinRequest(
 data class VerifyJoinResponse(
     val token: String,
     val participantId: String,
-)
+    )

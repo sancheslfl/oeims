@@ -1,4 +1,4 @@
-package com.oeims.sse
+package com.oeims.connections
 
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow

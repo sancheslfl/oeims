@@ -12,6 +12,7 @@ import com.oeims.models.toEmail
 import com.oeims.models.toEmailJoinToken
 import com.oeims.models.toSessionCode
 import com.oeims.services.EventService
+import com.oeims.services.ParticipantService
 import com.oeims.services.SessionService
 import io.ktor.http.*
 import io.ktor.server.auth.*
@@ -22,6 +23,7 @@ import io.ktor.server.routing.*
 
 fun Route.sessionRoutes(
     sessionService: SessionService,
+    participantService: ParticipantService,
     eventService: EventService,
 ) {
     route("/sessions") {
@@ -33,7 +35,7 @@ fun Route.sessionRoutes(
 
             val req = call.receive<EmailJoinRequest>()
 
-            val response = sessionService.requestJoin(
+            val response = participantService.requestJoin(
                 code = code.toSessionCode(),
                 email = req.email.toEmail(),
             )
@@ -45,7 +47,7 @@ fun Route.sessionRoutes(
         post("/join/verify") {
             val req = call.receive<VerifyJoinRequest>()
 
-            val response = sessionService.verifyJoin(
+            val response = participantService.verifyJoin(
                 token = req.token.toEmailJoinToken(),
             )
 
@@ -112,13 +114,15 @@ fun Route.sessionRoutes(
 
                 // POST /sessions/{id}/start
                 post("/start") {
-                    val professorId = call.userId()
-                    val sessionId = call.uuidParam("id")
+                    val professorId = call.userId().toProfessorId()
+                    val sessionId = call.uuidParam("id").toSessionId()
 
                     val response = sessionService.startSession(
-                        sessionId = sessionId.toSessionId(),
-                        professorId = professorId.toProfessorId(),
+                        sessionId = sessionId,
+                        professorId = professorId,
                     )
+
+                    participantService.sendExamIdentityCodes(sessionId)
 
                     call.respond(HttpStatusCode.OK, response)
                 }
@@ -139,7 +143,7 @@ fun Route.sessionRoutes(
                 // GET /sessions/{id}/participants
                 get("/participants") {
                     val sessionId = call.uuidParam("id")
-                    val response = sessionService.getParticipants(sessionId.toSessionId())
+                    val response = participantService.getParticipants(sessionId.toSessionId())
                     call.respond(HttpStatusCode.OK, response)
                 }
 

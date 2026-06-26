@@ -1,7 +1,7 @@
 package com.oeims.services
 
-import com.oeims.exceptions.NotFoundException
-import com.oeims.exceptions.ValidationException
+import com.oeims.models.NotFoundException
+import com.oeims.models.ValidationException
 import com.oeims.models.ExamTitle
 import com.oeims.models.dto.ExamResponse
 import com.oeims.models.ids.ExamId

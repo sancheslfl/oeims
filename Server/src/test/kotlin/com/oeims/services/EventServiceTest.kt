@@ -1,6 +1,6 @@
 package com.oeims.services
 
-import com.oeims.exceptions.NotFoundException
+import com.oeims.models.NotFoundException
 import com.oeims.models.ConnectionStatus
 import com.oeims.models.SessionStatus
 import com.oeims.models.Severity
@@ -12,10 +12,10 @@ import com.oeims.repositories.SessionRecord
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
-import com.oeims.sse.SseBroadcaster
-import com.oeims.sse.SseChannels
-import com.oeims.sse.SseEvent
-import com.oeims.sse.SseMessage
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.SseChannels
+import com.oeims.connections.SseEvent
+import com.oeims.connections.SseMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.onSubscription
@@ -47,7 +47,7 @@ class EventServiceTest {
             val record = ParticipantRecord(
                 id = UUID.randomUUID(),
                 sessionId = sessionId,
-                email = "student@test.pt",
+                email = "student@test.pt",,
                 connectionStatus = ConnectionStatus.CONNECTED,
                 lastHeartbeat = null,
                 joinedAt = Instant.now()

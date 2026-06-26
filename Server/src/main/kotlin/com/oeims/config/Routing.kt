@@ -1,13 +1,19 @@
 package com.oeims.config
 
-import com.oeims.exceptions.*
 import com.oeims.http.*
 import com.oeims.models.dto.ErrorResponse
 import com.oeims.services.AuthService
 import com.oeims.services.EventService
 import com.oeims.services.ExamService
 import com.oeims.services.SessionService
-import com.oeims.sse.SseBroadcaster
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.WebSocketBroadcaster
+import com.oeims.models.ConflictException
+import com.oeims.models.ForbiddenException
+import com.oeims.models.NotFoundException
+import com.oeims.models.UnauthorizedException
+import com.oeims.models.ValidationException
+import com.oeims.services.ParticipantService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*
@@ -18,8 +24,10 @@ fun Application.configureRouting(
     authService: AuthService,
     examService: ExamService,
     sessionService: SessionService,
+    participantService: ParticipantService,
     eventService: EventService,
     sseBroadcaster: SseBroadcaster,
+    webSocketBroadcaster: WebSocketBroadcaster,
 ) {
     install(StatusPages) {
         exception<ValidationException> { call, cause ->
@@ -52,9 +60,10 @@ fun Application.configureRouting(
         route(basePath) {
             authRoutes(authService)
             examRoutes(examService)
-            participantRoutes(sessionService)
-            sessionRoutes(sessionService, eventService)
+            participantRoutes(participantService)
+            sessionRoutes(sessionService, participantService, eventService)
             sseRoutes(sessionService, sseBroadcaster)
+            webSocketRoutes(eventService, participantService, webSocketBroadcaster)
         }
     }
 }

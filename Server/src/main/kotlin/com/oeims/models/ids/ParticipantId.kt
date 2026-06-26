@@ -6,3 +6,5 @@ import java.util.*
 value class ParticipantId(val value: UUID)
 
 fun UUID.toParticipantId() = ParticipantId(this)
+
+fun String.toParticipantId() = UUID.fromString(this).toParticipantId()

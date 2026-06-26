@@ -5,9 +5,9 @@ import com.oeims.models.dto.ParticipantStatusUpdate
 import com.oeims.models.ids.toSessionId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
-import com.oeims.sse.SseBroadcaster
-import com.oeims.sse.SseChannels
-import com.oeims.sse.SseEvent
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.SseChannels
+import com.oeims.connections.SseEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
