@@ -3,8 +3,18 @@ using Microsoft.AspNetCore.Http;
 using OEIMS.Sentinel.Service.Connections.Server;
 using System.Text.Json.Serialization;
 
-namespace OEIMS.Sentinel.Service.Connections.Client;
+namespace OEIMS.Sentinel.Service.Connections.WebClient;
 
+/// <summary>
+/// Exposes local loopback endpoint used by the Browser
+/// to communicate with Sentinel Service.
+/// </summary>
+/// <remarks>
+/// Communication:
+/// <code>
+/// Web Client -> Sentinel Service
+/// </code>
+/// </remarks>
 internal static class LoopbackApi
 {
     private const string AuthorizePath = "/sentinel/authorize";

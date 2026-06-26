@@ -3,6 +3,15 @@ using System.Net.Http.Headers;
 
 namespace OEIMS.Sentinel.Service.Connections.Server;
 
+/// <summary>
+/// Calls the Server periodically to report that the Sentinel Service is still alive.
+/// </summary>
+/// <remarks>
+/// Communication:
+/// <code>
+/// Sentinel Service -> Server
+/// </code>
+/// </remarks>
 internal sealed class HeartbeatSender(
     ServerConfig config,
     ServerSession serverSession,

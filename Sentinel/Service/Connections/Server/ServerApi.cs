@@ -4,6 +4,15 @@ using System.Text.Json.Serialization;
 
 namespace OEIMS.Sentinel.Service.Connections.Server;
 
+/// <summary>
+/// Calls the Server through HTTP.
+/// </summary>
+/// <remarks>
+/// Communication:
+/// <code>
+/// Sentinel Service -> Server
+/// </code>
+/// </remarks>
 internal sealed class ServerApi(
     ServerConfig config,
     HttpClient httpClient)

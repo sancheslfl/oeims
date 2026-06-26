@@ -4,8 +4,17 @@ using Contracts.Ipc;
 
 namespace OEIMS.Sentinel.Service.Connections.Agent;
 
-internal sealed class AgentPipeServer(
-    ILogger<AgentPipeServer> logger
+/// <summary>
+/// Exposes the event pipe used by the Sentinel Agent to send activity events to the Sentinel Service.
+/// </summary>
+/// <remarks>
+/// Communication:
+/// <code>
+/// Sentinel Service -> Sentinel Agent
+/// </code>
+/// </remarks>
+internal sealed class AgentEventPipeServer(
+    ILogger<AgentEventPipeServer> logger
 )
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -17,7 +26,7 @@ internal sealed class AgentPipeServer(
         while (!ct.IsCancellationRequested)
         {
             await using var pipe = new NamedPipeServerStream(
-                SentinelPipeNames.Agent,
+                PipeNames.AgentEvents,
                 PipeDirection.In,
                 maxNumberOfServerInstances: 1,
                 PipeTransmissionMode.Byte,

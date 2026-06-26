@@ -2,8 +2,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using OEIMS.Sentinel.Service.Connections.Agent;
-using OEIMS.Sentinel.Service.Connections.Client;
 using OEIMS.Sentinel.Service.Connections.Server;
+using OEIMS.Sentinel.Service.Connections.WebClient;
 using OEIMS.Sentinel.Service.Mitigators;
 using OEIMS.Sentinel.Service.Monitors;
 using OEIMS.Sentinel.Service.Platform.Windows;
@@ -32,7 +32,7 @@ internal static class ServiceCollectionExtensions
 
         services.AddWindowsPlatform();
 
-        services.AddSingleton<AgentPipeServer>();
+        services.AddSingleton<AgentEventPipeServer>();
 
         services.AddMonitors();
         services.AddMitigators();

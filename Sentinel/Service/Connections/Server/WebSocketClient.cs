@@ -1,16 +1,34 @@
+using Contracts;
+using Contracts.Ipc;
+using Contracts.WebSocket;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using Contracts;
 
 namespace OEIMS.Sentinel.Service.Connections.Server;
 
+/// <summary>
+/// Maintains the realtime WebSocket connection with the server.
+/// </summary>
+/// <remarks>
+/// Communication:
+/// <code>
+/// Windows Service <-> OEIMS Server
+/// </code>
+/// Sends monitor events and receives server commands.
+/// </remarks>
 internal sealed class WebSocketClient(
     ServerConfig config,
     ServerSession serverSession,
+    AgentCommandPipeClient agentClient,
     ILogger<WebSocketClient> logger) : IAsyncDisposable
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly string _realtimeBaseUrl = config.RealtimeBaseUrl.TrimEnd('/');
     private readonly SemaphoreSlim _sendLock = new(1, 1);
 
@@ -18,7 +36,7 @@ internal sealed class WebSocketClient(
 
     public async Task StartAsync(CancellationToken ct)
     {
-        logger.LogInformation("Waiting for Sentinel authorization");
+        logger.LogInformation("Waiting for authorization");
 
         while (!ct.IsCancellationRequested)
         {
@@ -34,22 +52,19 @@ internal sealed class WebSocketClient(
 
                 await _ws.ConnectAsync(uri, ct);
 
-                logger.LogInformation("Connected to {Uri}", uri);
-
-                var buffer = new byte[256];
+                logger.LogInformation("Connected to server");
 
                 while (!ct.IsCancellationRequested && _ws.State == WebSocketState.Open)
                 {
-                    var result = await _ws.ReceiveAsync(buffer, ct);
+                    var message = await ReceiveTextAsync(_ws, ct);
 
-                    if (result.MessageType == WebSocketMessageType.Close)
+                    if (message is null)
                     {
-                        logger.LogWarning(
-                            "Server closed the connection: {Reason}",
-                            result.CloseStatusDescription);
-
+                        logger.LogInformation("Server closed the connection");
                         break;
                     }
+
+                    await HandleServerMessageAsync(message, ct);
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -63,7 +78,7 @@ internal sealed class WebSocketClient(
             }
             catch (Exception ex)
             {
-                logger.LogDebug(ex, "Disconnected and retrying in 5 s");
+                logger.LogDebug(ex, "Disconnected from server; retrying in 5 seconds");
 
                 try { await Task.Delay(TimeSpan.FromSeconds(5), ct); }
                 catch (OperationCanceledException) { break; }
@@ -78,7 +93,7 @@ internal sealed class WebSocketClient(
         if (_ws?.State != WebSocketState.Open)
         {
             logger.LogDebug(
-                "Socket not open and event dropped: [{Monitor}] {Message}",
+                "Socket not open; event dropped: [{Monitor}] {Message}",
                 e.MonitorName,
                 e.Message);
 
@@ -107,11 +122,81 @@ internal sealed class WebSocketClient(
         catch (WebSocketException ex)
         {
             _ws.Abort();
-            logger.LogDebug(ex, "[ServerConnection] Event not sent because socket failed");
+            logger.LogDebug(ex, "Event not sent because socket failed");
         }
         finally
         {
             _sendLock.Release();
+        }
+    }
+
+    private async Task HandleServerMessageAsync(string json, CancellationToken ct)
+    {
+        ServerMessage? message;
+
+        try
+        {
+            message = JsonSerializer.Deserialize<ServerMessage>(json, JsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            logger.LogDebug(ex, "Ignored malformed server message");
+            return;
+        }
+
+        if (message is null)
+            return;
+
+        switch (message.Type)
+        {
+            case ServerMessageTypes.ExamIdentityCode:
+                await SendExamIdentityCodeAsync(message.Data, ct);
+                break;
+
+            default:
+                logger.LogDebug("Ignored unknown server message type: {Type}", message.Type);
+                break;
+        }
+    }
+
+    private async Task SendExamIdentityCodeAsync(JsonElement data, CancellationToken ct)
+    {
+        if (data.ValueKind != JsonValueKind.String)
+        {
+            logger.LogWarning("Ignored exam identity code message with invalid data");
+            return;
+        }
+
+        var code = data.GetString();
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            logger.LogWarning("Ignored empty exam identity code message");
+            return;
+        }
+
+        await agentClient.SendAsync(new ShowExamIdentityCodeCommand(code), ct);
+    }
+
+    private static async Task<string?> ReceiveTextAsync(ClientWebSocket ws, CancellationToken ct)
+    {
+        var buffer = new byte[1024];
+        using var message = new MemoryStream();
+
+        while (true)
+        {
+            var result = await ws.ReceiveAsync(buffer, ct);
+
+            if (result.MessageType == WebSocketMessageType.Close)
+                return null;
+
+            if (result.MessageType != WebSocketMessageType.Text)
+                continue;
+
+            message.Write(buffer, 0, result.Count);
+
+            if (result.EndOfMessage)
+                return Encoding.UTF8.GetString(message.ToArray());
         }
     }
 
@@ -128,12 +213,11 @@ internal sealed class WebSocketClient(
             {
                 await _ws.CloseAsync(
                     WebSocketCloseStatus.NormalClosure,
-                    "Sentinel shutting down",
+                    "Service shutting down",
                     CancellationToken.None);
             }
             catch
             {
-                
             }
         }
     }

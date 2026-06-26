@@ -6,7 +6,7 @@ namespace OEIMS.Sentinel.Agent;
 internal sealed class Worker(
     IEnumerable<IMonitor> monitors,
     IEnumerable<IMitigator> mitigators,
-    AgentPipeClient pipeClient,
+    AgentEventPipeClient pipeClient,
     ILogger<Worker> logger
 ) : BackgroundService
 {

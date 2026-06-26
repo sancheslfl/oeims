@@ -14,7 +14,7 @@ builder.Logging.AddDebug();
 
 builder.Services.AddHostedService<Worker>();
 
-builder.Services.AddSingleton<AgentPipeClient>();
+builder.Services.AddSingleton<AgentEventPipeClient>();
 
 builder.Services.AddSingleton<IActiveWindowSource, WinActiveWindowSource>();
 builder.Services.AddSingleton<IClipboardSource, WinClipboardSource>();

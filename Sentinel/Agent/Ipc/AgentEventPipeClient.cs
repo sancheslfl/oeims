@@ -5,8 +5,17 @@ using Contracts.Ipc;
 
 namespace OEIMS.Sentinel.Agent.Ipc;
 
-internal sealed class AgentPipeClient(
-    ILogger<AgentPipeClient> logger
+/// <summary>
+/// Sends activity events through the event pipe from the Sentinel Agent to the Sentinel Service.
+/// </summary>
+/// <remarks>
+/// Communication:
+/// <code>
+/// Sentinel Service -> Sentinel Agent
+/// </code>
+/// </remarks>
+internal sealed class AgentEventPipeClient(
+    ILogger<AgentEventPipeClient> logger
 ) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _writeLock = new(1, 1);
@@ -65,7 +74,7 @@ internal sealed class AgentPipeClient(
 
         _pipe = new NamedPipeClientStream(
             ".",
-            SentinelPipeNames.Agent,
+            PipeNames.AgentEvents,
             PipeDirection.Out,
             PipeOptions.Asynchronous);
 
