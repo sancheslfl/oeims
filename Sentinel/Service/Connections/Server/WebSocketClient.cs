@@ -1,6 +1,7 @@
 using Contracts;
 using Contracts.Ipc;
 using Contracts.WebSocket;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
@@ -17,6 +18,8 @@ namespace OEIMS.Sentinel.Service.Connections.Server;
 /// Windows Service <-> OEIMS Server
 /// </code>
 /// Sends monitor events and receives server commands.
+/// Events fired while the socket is closed are held in an in-memory queue and
+/// flushed (with their original timestamps) as soon as the connection resumes.
 /// </remarks>
 internal sealed class WebSocketClient(
     ServerConfig config,
@@ -31,6 +34,7 @@ internal sealed class WebSocketClient(
 
     private readonly string _realtimeBaseUrl = config.RealtimeBaseUrl.TrimEnd('/');
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private readonly ConcurrentQueue<(MonitorEvent Event, DateTime OccurredAt)> _offlineBuffer = new();
 
     private ClientWebSocket? _ws;
 
@@ -53,6 +57,8 @@ internal sealed class WebSocketClient(
                 await _ws.ConnectAsync(uri, ct);
 
                 logger.LogInformation("Connected to server");
+
+                await FlushBufferAsync(ct);
 
                 while (!ct.IsCancellationRequested && _ws.State == WebSocketState.Open)
                 {
@@ -92,19 +98,36 @@ internal sealed class WebSocketClient(
     {
         if (_ws?.State != WebSocketState.Open)
         {
+            _offlineBuffer.Enqueue((e, DateTime.UtcNow));
             logger.LogDebug(
-                "Socket not open; event dropped: [{Monitor}] {Message}",
+                "Socket not open; event buffered: [{Monitor}] {Message}",
                 e.MonitorName,
                 e.Message);
-
             return;
         }
 
+        await SendFrameAsync(e, DateTime.UtcNow, ct);
+    }
+
+    private async Task FlushBufferAsync(CancellationToken ct)
+    {
+        if (_offlineBuffer.IsEmpty)
+            return;
+
+        logger.LogInformation("Flushing {Count} buffered events", _offlineBuffer.Count);
+
+        while (_offlineBuffer.TryDequeue(out var item))
+            await SendFrameAsync(item.Event, item.OccurredAt, ct);
+    }
+
+    private async Task SendFrameAsync(MonitorEvent e, DateTime occurredAt, CancellationToken ct)
+    {
         var payload = JsonSerializer.Serialize(new
         {
             monitorName = e.MonitorName,
             message = e.Message,
-            severity = e.Severity.ToString()
+            severity = e.Severity.ToString(),
+            occurredAt = occurredAt.ToString("O")  // ISO 8601, e.g. "2026-06-27T14:32:01.123Z"
         });
 
         var bytes = Encoding.UTF8.GetBytes(payload);
@@ -113,7 +136,7 @@ internal sealed class WebSocketClient(
 
         try
         {
-            await _ws.SendAsync(
+            await _ws!.SendAsync(
                 new ArraySegment<byte>(bytes),
                 WebSocketMessageType.Text,
                 endOfMessage: true,
@@ -121,7 +144,7 @@ internal sealed class WebSocketClient(
         }
         catch (WebSocketException ex)
         {
-            _ws.Abort();
+            _ws!.Abort();
             logger.LogDebug(ex, "Event not sent because socket failed");
         }
         finally
