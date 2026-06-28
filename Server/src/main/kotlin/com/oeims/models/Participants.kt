@@ -38,9 +38,6 @@ value class ExamIdentityCode(val value: String) {
 
         private val random = SecureRandom()
 
-        fun parse(value: String): ExamIdentityCode =
-            ExamIdentityCode(value.trim().uppercase())
-
         fun generate(): ExamIdentityCode =
             ExamIdentityCode(
                 buildString(capacity = LENGTH) {

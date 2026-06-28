@@ -11,8 +11,9 @@ export async function authorizeSentinel(emailJoinToken: string) {
     });
 
     if (!response.ok) {
-        throw new Error(
-            "Could not contact Sentinel. Make sure the OEIMS Sentinel is installed and running.",
-        );
+        const body = await response.json().catch(() => undefined);
+
+        throw new Error(body?.error
+            ?? "Could not contact Sentinel. Make sure the OEIMS Sentinel is installed and running.");
     }
 }

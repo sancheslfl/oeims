@@ -41,6 +41,11 @@ internal sealed class WebSocketClient(
         while (!ct.IsCancellationRequested)
         {
             var authorization = await serverSession.WaitUntilAuthorizedAsync(ct);
+            var authorizationChanged = serverSession.WaitUntilAuthorizationChangedAsync(ct);
+
+            if (!serverSession.IsCurrent(authorization))
+                continue;
+
             var uri = new Uri($"{_realtimeBaseUrl}/ws/daemon/{authorization.ParticipantId}");
 
             try
@@ -52,11 +57,27 @@ internal sealed class WebSocketClient(
 
                 await _ws.ConnectAsync(uri, ct);
 
-                logger.LogInformation("Connected to server");
+                logger.LogInformation("Connected to server as authorized participant");
 
                 while (!ct.IsCancellationRequested && _ws.State == WebSocketState.Open)
                 {
-                    var message = await ReceiveTextAsync(_ws, ct);
+                    using var receiveCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+                    var receiveTask = ReceiveTextAsync(_ws, receiveCts.Token);
+                    var completedTask = await Task.WhenAny(receiveTask, authorizationChanged);
+
+                    if (completedTask == authorizationChanged)
+                    {
+                        logger.LogInformation("Authorization changed; reconnecting to server");
+
+                        receiveCts.Cancel();
+                        _ws.Abort();
+
+                        await IgnoreReceiveFailureAsync(receiveTask);
+                        break;
+                    }
+
+                    var message = await receiveTask;
 
                     if (message is null)
                     {
@@ -219,6 +240,20 @@ internal sealed class WebSocketClient(
             catch
             {
             }
+        }
+    }
+
+    private static async Task IgnoreReceiveFailureAsync(Task<string?> receiveTask)
+    {
+        try
+        {
+            await receiveTask;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (WebSocketException)
+        {
         }
     }
 

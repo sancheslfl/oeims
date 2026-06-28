@@ -1,6 +1,5 @@
 package com.oeims.services
 
-
 import com.auth0.jwt.JWT
 import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.exceptions.TokenExpiredException
@@ -9,12 +8,12 @@ import com.oeims.connections.SseBroadcaster
 import com.oeims.connections.SseChannels
 import com.oeims.connections.SseEvent
 import com.oeims.connections.WebSocketBroadcaster
+import com.oeims.connections.WebSocketMessageTypes
+import com.oeims.connections.WebSocketOutboundMessage
 import com.oeims.models.*
 import com.oeims.models.dto.EmailJoinResponse
 import com.oeims.models.dto.ParticipantResponse
 import com.oeims.models.dto.ParticipantStatusUpdate
-import com.oeims.connections.WebSocketMessageTypes
-import com.oeims.connections.WebSocketOutboundMessage
 import com.oeims.models.dto.VerifyJoinResponse
 import com.oeims.models.ids.ParticipantId
 import com.oeims.models.ids.SessionId
@@ -91,9 +90,7 @@ class ParticipantService(
             expiresAt = token.expiresAt,
         )
 
-        return EmailJoinResponse(
-            message = "Verification email sent",
-        )
+        return EmailJoinResponse(message = "Verification email sent")
     }
 
     suspend fun verifyJoin(token: EmailJoinToken): VerifyJoinResponse {
@@ -140,6 +137,10 @@ class ParticipantService(
             )
         }
 
+        if (session.status == SessionStatus.ACTIVE) {
+            sendExamIdentityCode(participant)
+        }
+
         return VerifyJoinResponse(
             token = createSentinelToken(participant),
             participantId = participant.id.toString(),
@@ -180,19 +181,23 @@ class ParticipantService(
         }
     }
 
-    suspend fun sendExamIdentityCodes(sessionId: SessionId) {
+    suspend fun sendExamIdentityCode(participant: ParticipantRecord) {
+        val examIdentityCode = getOrCreateExamIdentityCode(participant)
+
+        webSocketBroadcaster.send(
+            participantId = participant.id,
+            message = WebSocketOutboundMessage(
+                type = WebSocketMessageTypes.EXAM_IDENTITY_CODE,
+                data = examIdentityCode.value,
+            ),
+        )
+    }
+
+    suspend fun sendAllExamIdentityCodes(sessionId: SessionId) {
         val participants = participantRepository.findConnectedBySession(sessionId.value)
 
         for (participant in participants) {
-            val examIdentityCode = getOrCreateExamIdentityCode(participant)
-
-            webSocketBroadcaster.send(
-                participantId = participant.id,
-                message = WebSocketOutboundMessage(
-                    type = WebSocketMessageTypes.EXAM_IDENTITY_CODE,
-                    data = examIdentityCode,
-                ),
-            )
+            sendExamIdentityCode(participant)
         }
     }
 
@@ -218,7 +223,7 @@ class ParticipantService(
 
             val updatedParticipant = participantRepository.findById(participant.id)
             if (updatedParticipant?.examIdentityCode != null) {
-                return ExamIdentityCode.parse(updatedParticipant.examIdentityCode)
+                return updatedParticipant.examIdentityCode.toExamIdentityCode()
             }
         }
 
@@ -260,7 +265,7 @@ class ParticipantService(
         val jwt = try {
             jwtSettings.emailJoin.verifier.verify(token.value)
         } catch (_: TokenExpiredException) {
-            throw ConflictException("This token has expired. Please verify the email again and try again")
+            throw ConflictException("This token has expired. Please request another email verification and try again")
         } catch (_: JWTVerificationException) {
             throw UnauthorizedException("This token is invalid. Please use the latest verification link sent to your email")
         } catch (_: IllegalArgumentException) {

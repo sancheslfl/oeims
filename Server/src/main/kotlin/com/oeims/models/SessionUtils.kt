@@ -19,8 +19,8 @@ fun String.toSessionCode(): SessionCode = SessionCode(this)
 @JvmInline
 value class AllowedEmailDomain(val value: String) {
     init {
-        require(value.isNotBlank()) { "Allowed email domain cannot be blank" }
-        require(value.contains(".")) { "Allowed email domain must contain a dot" }
+        validate(value.isNotBlank()) { "Allowed email domain cannot be blank" }
+        validate(value.contains(".")) { "Allowed email domain must contain a dot" }
     }
 
     fun allows(email: Email): Boolean =
@@ -35,8 +35,8 @@ fun String.toAllowedEmailDomain(): AllowedEmailDomain =
 @JvmInline
 value class EmailJoinToken(val value: String) {
     init {
-        require(value.isNotBlank()) { "Email join token cannot be blank" }
-        require(value.count { it == '.' } == 2) { "Invalid JWT format" }
+        validate(value.isNotBlank()) { "Email join token cannot be blank" }
+        validate(value.count { it == '.' } == 2) { "Invalid JWT format" }
     }
 }
 

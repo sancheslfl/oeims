@@ -29,8 +29,8 @@ internal sealed class ServerSession
     private readonly Lock _lock = new();
     private readonly ILogger<ServerSession> _logger;
 
-    private TaskCompletionSource _authorized =
-        NewAuthorizationSignal();
+    private TaskCompletionSource _authorized = NewSignal();
+    private TaskCompletionSource _authorizationChanged = NewSignal();
 
     private ServerAuthorization? _authorization;
 
@@ -59,9 +59,18 @@ internal sealed class ServerSession
 
         lock (_lock)
         {
-            _authorization = new ServerAuthorization(token, participantId);
+            var authorization = new ServerAuthorization(token, participantId);
+
+            if (_authorization == authorization)
+                return;
+
+            _authorization = authorization;
             Save(_authorization);
+
             _authorized.TrySetResult();
+
+            _authorizationChanged.TrySetResult();
+            _authorizationChanged = NewSignal();
         }
     }
 
@@ -69,8 +78,14 @@ internal sealed class ServerSession
     {
         lock (_lock)
         {
+            if (_authorization is null)
+                return;
+
             _authorization = null;
-            _authorized = NewAuthorizationSignal();
+            _authorized = NewSignal();
+
+            _authorizationChanged.TrySetResult();
+            _authorizationChanged = NewSignal();
 
             if (File.Exists(FilePath))
                 File.Delete(FilePath);
@@ -81,6 +96,18 @@ internal sealed class ServerSession
     {
         await _authorized.Task.WaitAsync(ct);
         return GetAuthorization();
+    }
+
+    public Task WaitUntilAuthorizationChangedAsync(CancellationToken ct)
+    {
+        lock (_lock)
+            return _authorizationChanged.Task.WaitAsync(ct);
+    }
+
+    public bool IsCurrent(ServerAuthorization authorization)
+    {
+        lock (_lock)
+            return _authorization == authorization;
     }
 
     public ServerAuthorization GetAuthorization()
@@ -124,7 +151,7 @@ internal sealed class ServerSession
             _authorization = authorization;
             _authorized.TrySetResult();
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "[ServerSession] Restored persisted authorization for participant {ParticipantId}",
                 authorization.ParticipantId);
         }
@@ -132,7 +159,7 @@ internal sealed class ServerSession
         {
             _logger.LogWarning(
                 ex,
-                "[ServerSession] Could not restore persisted authorization");
+                "Could not restore persisted authorization");
 
             Clear();
         }
@@ -165,6 +192,6 @@ internal sealed class ServerSession
         File.WriteAllBytes(FilePath, encrypted);
     }
 
-    private static TaskCompletionSource NewAuthorizationSignal() =>
+    private static TaskCompletionSource NewSignal() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

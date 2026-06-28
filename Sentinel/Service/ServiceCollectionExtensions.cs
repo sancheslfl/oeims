@@ -33,6 +33,7 @@ internal static class ServiceCollectionExtensions
         services.AddWindowsPlatform();
 
         services.AddSingleton<AgentEventPipeServer>();
+        services.AddSingleton<AgentCommandPipeClient>();
 
         services.AddMonitors();
         services.AddMitigators();
@@ -87,14 +88,14 @@ internal static class ServiceCollectionExtensions
     }
 
     private static ApplicationConfig GetApplicationConfig(
-        IConfiguration configuration)
+        ConfigurationManager configuration)
     {
         return configuration
             .GetSection("Application")
             .Get<ApplicationConfig>() ?? new ApplicationConfig();
     }
 
-    private static ServerConfig GetServerConfig(IConfiguration configuration)
+    private static ServerConfig GetServerConfig(ConfigurationManager configuration)
     {
         return configuration
             .GetSection("Server")

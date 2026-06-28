@@ -122,7 +122,7 @@ fun Route.sessionRoutes(
                         professorId = professorId,
                     )
 
-                    participantService.sendExamIdentityCodes(sessionId)
+                    participantService.sendAllExamIdentityCodes(sessionId)
 
                     call.respond(HttpStatusCode.OK, response)
                 }

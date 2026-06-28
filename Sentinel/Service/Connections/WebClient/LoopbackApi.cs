@@ -45,28 +45,33 @@ internal static class LoopbackApi
 
             try
             {
-                var join = await serverApi.VerifyJoinTokenAsync(
+                var successfulJoin = await serverApi.VerifyJoinTokenAsync(
                     emailJoinToken,
                     ct);
 
                 serverSession.Authorize(
-                    token: join.Token,
-                    participantId: join.ParticipantId);
+                    token: successfulJoin.Token,
+                    participantId: successfulJoin.ParticipantId);
 
                 return Results.Ok(new
                 {
                     status = "authorized"
                 });
             }
+            catch (ServerException ex)
+            {
+                logger.LogWarning(ex, "Sentinel authorization rejected by server.");
+
+                return Results.Content(
+                    ex.ResponseBody,
+                    statusCode: (int)ex.StatusCode);
+            }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Sentinel authorization failed.");
 
                 return Results.Json(
-                    new
-                    {
-                        error = ex.Message
-                    },
+                    new { error = ex.Message },
                     statusCode: StatusCodes.Status500InternalServerError);
             }
         })

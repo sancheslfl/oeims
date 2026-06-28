@@ -1,4 +1,6 @@
 using Contracts;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using OEIMS.Sentinel.Agent.Ipc;
 
 namespace OEIMS.Sentinel.Agent;

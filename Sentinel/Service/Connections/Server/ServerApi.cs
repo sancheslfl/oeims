@@ -37,16 +37,10 @@ internal sealed class ServerApi(
         var body = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(
-                $"Sentinel authorization failed. Server returned {(int)response.StatusCode}: {body}");
+            throw new ServerException(response.StatusCode, body);
 
-        var join = JsonSerializer.Deserialize<JoinExchangeResponse>(
-            body,
-            JsonOptions);
-
-        if (join is null)
-            throw new InvalidOperationException(
-                "Empty Sentinel authorization response.");
+        var join = JsonSerializer.Deserialize<JoinExchangeResponse>(body,JsonOptions) 
+            ?? throw new InvalidOperationException("Empty Sentinel authorization response.");
 
         if (string.IsNullOrWhiteSpace(join.Token))
             throw new InvalidOperationException(
