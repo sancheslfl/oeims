@@ -9,7 +9,8 @@ import kotlinx.serialization.Serializable
 data class SentinelEventMessage(
     val monitorName: String,
     val message: String,
-    val severity: String   // "Info" | "Warning" | "Critical" — daemon casing
+    val severity: String,  // "Info" | "Warning" | "Critical" — daemon casing
+    val occurredAt: String? = null // present for buffered events, absent for live ones
 )
 
 // Stored in DB and broadcast to the professor console.

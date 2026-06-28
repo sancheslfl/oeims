@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.slf4j.Logger
+import java.time.Instant
 import java.util.UUID
 
 fun Route.webSocketRoutes(
@@ -93,11 +94,14 @@ private suspend fun DefaultWebSocketServerSession.receiveFrames(
                 continue
             }
 
+            val occurredAt = msg.occurredAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
+
             eventService.handleEvent(
                 participantId = participant.id.toParticipantId(),
                 monitorName = msg.monitorName,
                 message = msg.message,
                 severity = severity,
+                occurredAt = occurredAt,
             )
         }
     } catch (_: ClosedReceiveChannelException) {
