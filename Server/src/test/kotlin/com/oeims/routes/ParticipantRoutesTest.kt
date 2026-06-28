@@ -33,10 +33,10 @@ class ParticipantRoutesTest : BaseRouteTest() {
      * @return Triple(professorToken, studentToken, participantId)
      */
     private suspend fun ApplicationTestBuilder.setup(
-        profEmail: String    = "prof@isel.pt",
+        profEmail: String = "prof@isel.pt",
         studentEmail: String = "student@isel.pt"
     ): Triple<String, String, String> {
-        val prof    = register(profEmail, "password123", "PROFESSOR")
+        val prof = register(profEmail, "password123", "PROFESSOR")
         val student = register(studentEmail, "password123", "STUDENT")
 
         val exam = jsonClient().post("/exams") {

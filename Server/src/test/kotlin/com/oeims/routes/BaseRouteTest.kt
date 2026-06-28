@@ -1,7 +1,8 @@
 package com.oeims.routes
 
-import com.oeims.module
 import com.oeims.models.*
+import com.oeims.module
+import com.oeims.routes.BaseRouteTest.Companion.keepAlive
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
@@ -42,16 +43,16 @@ abstract class BaseRouteTest {
 
         /** Configuration shared by all route tests. */
         val testConfig = MapApplicationConfig(
-            "database.path"         to DB_URL,
-            "app.api.base-path"     to "",
-            "jwt.secret"            to "test-secret-key-long-enough",
-            "jwt.issuer"            to "oeims",
-            "jwt.audience"          to "oeims-users",
-            "jwt.realm"             to "OEIMS",
-            "jwt.expiration-ms"     to "3600000",
+            "database.path" to DB_URL,
+            "app.api.base-path" to "",
+            "jwt.secret" to "test-secret-key-long-enough",
+            "jwt.issuer" to "oeims",
+            "jwt.audience" to "oeims-users",
+            "jwt.realm" to "OEIMS",
+            "jwt.expiration-ms" to "3600000",
             // Extremely long — ensures the heartbeat sweeper never fires during a test.
             "heartbeat.interval-ms" to "999999999",
-            "heartbeat.timeout-ms"  to "999999999"
+            "heartbeat.timeout-ms" to "999999999"
         )
     }
 

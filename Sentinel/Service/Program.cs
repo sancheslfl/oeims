@@ -1,17 +1,12 @@
+using Microsoft.AspNetCore.Builder;
 using OEIMS.Sentinel.Service;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddExamMonitoringService(
-    builder.Configuration,
-    builder.Environment);
+builder.AddExamMonitoringService();
 
-if (builder.Environment.IsProduction())
-    builder.Logging.AddEventLog();
+var app = builder.Build();
 
-var host = builder.Build();
+app.UseExamMonitoringService();
 
-if (builder.Environment.IsProduction())
-    host.Services.GetRequiredService<SingleInstanceGuard>();
-
-host.Run();
+app.Run();

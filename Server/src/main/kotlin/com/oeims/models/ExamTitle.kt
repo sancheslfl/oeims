@@ -1,7 +1,5 @@
 package com.oeims.models
 
-import com.oeims.exceptions.ValidationException
-
 @JvmInline
 value class ExamTitle(val value: String) {
 
@@ -13,7 +11,8 @@ value class ExamTitle(val value: String) {
     companion object {
         // {Course abbreviation}-{Subject abbreviation} {Exam type} {Exam room number}
         // e.g. "LEIC-AED T1 C.3.07"
-        val REGEX = Regex("""^[A-Z]{4}-[A-Z]{2,4} (T1|T2|EN|ER|EE) [ACEFGMP]\.\d{1,2}\.\d{2}$""")    }
+        val REGEX = Regex("""^[A-Z]{4}-[A-Z]{2,4} (T1|T2|EN|ER|EE) [ACEFGMP]\.\d{1,2}\.\d{2}$""")
+    }
 }
 
 fun String.toExamTitle() = ExamTitle(this)

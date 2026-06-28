@@ -6,7 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Agent-9ea3bc6e-d2d0-41d2-bada-aa06bf006f03</UserSecretsId>
 
-	<AssemblyName>OEIMS.Sentinel.Agent</AssemblyName>
+	<UseWindowsForms>true</UseWindowsForms>
+
 	<RootNamespace>OEIMS.Sentinel.Agent</RootNamespace>
   </PropertyGroup>
 

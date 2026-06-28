@@ -2,7 +2,7 @@ package com.oeims.repositories.interfaces
 
 import com.oeims.models.UserRole
 import com.oeims.repositories.UserRecord
-import java.util.UUID
+import java.util.*
 
 interface IUserRepository {
     suspend fun findById(id: UUID): UserRecord?

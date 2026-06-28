@@ -1,13 +1,14 @@
 package com.oeims.http
 
-import com.oeims.models.dto.DaemonEventMessage
+import com.oeims.connections.WebSocketBroadcaster
+import com.oeims.models.dto.ParticipantResponse
+import com.oeims.models.dto.SentinelEventMessage
 import com.oeims.models.dto.toDomainSeverity
 import com.oeims.models.ids.toParticipantId
-import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.services.EventService
-import io.ktor.server.application.log
+import com.oeims.services.ParticipantService
+import io.ktor.server.application.*
 import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
@@ -16,59 +17,104 @@ import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import org.slf4j.Logger
+import java.time.Instant
+import java.util.UUID
 
 fun Route.webSocketRoutes(
     eventService: EventService,
-    participantRepository: IParticipantRepository
+    participantService: ParticipantService,
+    webSocketBroadcaster: WebSocketBroadcaster,
 ) {
     authenticate("auth-student") {
         webSocket("/ws/daemon/{participantId}") {
-            val authenticatedUserId = call.userId()
-            val participantId       = call.uuidParam("participantId")
+            val authenticatedParticipantId = call.participantId()
+            val participantId = call.uuidParam("participantId")
 
-            val participant = participantRepository.findById(participantId)
-                ?: return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Participant not found"))
+            if (participantId != authenticatedParticipantId) {
+                return@webSocket close(
+                    CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Connection not accepted")
+                )
+            }
 
-            if (participant.userId != authenticatedUserId)
-                return@webSocket close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Forbidden"))
+            val participant = participantService.getParticipantById(participantId.toParticipantId())
+                ?: return@webSocket close(
+                    CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Connection not accepted")
+                )
 
-            val email = call.authentication.principal<JWTPrincipal>()
-                ?.payload?.getClaim("email")?.asString()
-            val mdc = if (email != null) mapOf("user-email" to email) else emptyMap()
-
-            withContext(MDCContext(mdc)) {
-                try {
-                    for (frame in incoming) {
-                        if (frame is Frame.Text) {
-                            try {
-                                val msg      = Json.decodeFromString<DaemonEventMessage>(frame.readText())
-                                val severity = msg.severity.toDomainSeverity()
-
-                                if (severity == null) {
-                                    application.log.warn("Service sent unknown severity '${msg.severity}' for participant $participantId — frame dropped")
-                                } else {
-                                    eventService.handleEvent(
-                                        participantId = participant.id.toParticipantId(),
-                                        monitorName   = msg.monitorName,
-                                        message       = msg.message,
-                                        severity      = severity
-                                    )
-                                }
-                            } catch (e: SerializationException) {
-                                application.log.debug(
-                                    "Daemon sent malformed frame for {} - ignored: {}",
-                                    participantId,
-                                    e.message
-                                )
-                            }
-                        }
-                    }
-                } catch (_: ClosedReceiveChannelException) {
-                    application.log.debug("Daemon disconnected: {} — {}", participantId, closeReason.await())
-                } catch (e: Throwable) {
-                    application.log.warn("Daemon WebSocket error for $participantId", e)
+            // SLF4J logging context
+            withContext(
+                MDCContext(
+                    mapOf(
+                        "participant-id" to participant.id,
+                        "participant-email" to participant.email,
+                    )
+                )
+            ) {
+                webSocketBroadcaster.register(UUID.fromString(participant.id), this@webSocket) {
+                    receiveFrames(
+                        participant = participant,
+                        eventService = eventService,
+                        log = application.log,
+                    )
                 }
             }
         }
+    }
+}
+
+private suspend fun DefaultWebSocketServerSession.receiveFrames(
+    participant: ParticipantResponse,
+    eventService: EventService,
+    log: Logger,
+    json: Json = Json,
+) {
+    try {
+        for (frame in incoming) {
+            if (frame !is Frame.Text) continue
+
+            val msg = try {
+                json.decodeFromString<SentinelEventMessage>(frame.readText())
+            } catch (e: SerializationException) {
+                log.debug(
+                    "Sentinel frame ignored for participant {}: malformed payload ({})",
+                    participant.id,
+                    e.message,
+                )
+                continue
+            }
+
+            val severity = msg.severity.toDomainSeverity()
+            if (severity == null) {
+                log.warn(
+                    "Sentinel frame ignored for participant {}: unknown severity '{}'",
+                    participant.id,
+                    msg.severity,
+                )
+                continue
+            }
+
+            val occurredAt = msg.occurredAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
+
+            eventService.handleEvent(
+                participantId = participant.id.toParticipantId(),
+                monitorName = msg.monitorName,
+                message = msg.message,
+                severity = severity,
+                occurredAt = occurredAt,
+            )
+        }
+    } catch (_: ClosedReceiveChannelException) {
+        log.debug(
+            "Sentinel WebSocket closed for participant {}: {}",
+            participant.id,
+            closeReason.await(),
+        )
+    } catch (e: Throwable) {
+        log.warn(
+            "Sentinel WebSocket failed for participant {}",
+            participant.id,
+            e,
+        )
     }
 }

@@ -1,9 +1,9 @@
 package com.oeims.services
 
 import com.auth0.jwt.JWT
-import com.oeims.exceptions.ConflictException
-import com.oeims.exceptions.UnauthorizedException
-import com.oeims.exceptions.ValidationException
+import com.oeims.models.ConflictException
+import com.oeims.models.UnauthorizedException
+import com.oeims.models.ValidationException
 import com.oeims.models.Email
 import com.oeims.models.Password
 import com.oeims.models.UserRole
@@ -14,7 +14,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -44,11 +44,11 @@ class AuthServiceTest {
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     private val jwtConfig = JwtConfig(
-        secret       = "test-secret-key-long-enough",
-        issuer       = "test-issuer",
-        audience     = "test-audience",
-        realm        = "test-realm",
-        expirationMs = 3_600_000L
+        secret = "test-secret-key-long-enough",
+        issuer = "test-issuer",
+        audience = "test-audience",
+        realm = "test-realm",
+        expiration = 3_600_000L
     )
 
     private lateinit var fakeRepo: FakeUserRepository
@@ -57,7 +57,7 @@ class AuthServiceTest {
     @BeforeEach
     fun setup() {
         fakeRepo = FakeUserRepository()
-        service  = AuthService(fakeRepo, jwtConfig)
+        service = AuthService(fakeRepo, jwtConfig)
     }
 
     // ── register ──────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ class AuthServiceTest {
         service.register(Email("student@alunos.isel.pt"), Password("password1"), "STUDENT")
 
         val response = service.login(Email("student@alunos.isel.pt"), Password("password1"))
-        val decoded  = JWT.decode(response.token)
+        val decoded = JWT.decode(response.token)
 
         assertEquals(response.userId, decoded.getClaim("userId").asString())
         assertEquals("STUDENT", decoded.getClaim("role").asString())
@@ -171,8 +171,22 @@ class AuthServiceTest {
     fun `login returns the same error message for wrong email and wrong password`() = runBlocking<Unit> {
         service.register(Email("student@alunos.isel.pt"), Password("correct12"), "STUDENT")
 
-        val wrongEmail    = assertThrows<UnauthorizedException> { runBlocking { service.login(Email("nobody@isel.pt"), Password("anything1")) } }
-        val wrongPassword = assertThrows<UnauthorizedException> { runBlocking { service.login(Email("student@alunos.isel.pt"), Password("wrongpass1")) } }
+        val wrongEmail = assertThrows<UnauthorizedException> {
+            runBlocking {
+                service.login(
+                    Email("nobody@isel.pt"),
+                    Password("anything1")
+                )
+            }
+        }
+        val wrongPassword = assertThrows<UnauthorizedException> {
+            runBlocking {
+                service.login(
+                    Email("student@alunos.isel.pt"),
+                    Password("wrongpass1")
+                )
+            }
+        }
 
         assertEquals(wrongEmail.message, wrongPassword.message)
     }

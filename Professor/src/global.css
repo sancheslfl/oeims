@@ -89,4 +89,16 @@
   .sidebar-scroll::-webkit-scrollbar {
     display: none;
   }
+
+  .sidebar-view-toggle {
+    opacity: 0.45;
+    animation: sidebar-view-toggle-idle 3200ms ease-out both;
+    transition: opacity 150ms ease;
+  }
+
+  .sidebar-view-toggle:hover,
+  .sidebar-view-toggle:focus-within {
+    opacity: 1;
+    animation: none;
+  }
 }

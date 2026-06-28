@@ -5,7 +5,7 @@ import com.oeims.models.dto.LoginRequest
 import com.oeims.models.dto.RegisterRequest
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -130,9 +130,11 @@ class AuthRoutesTest : BaseRouteTest() {
         // Decode the JWT without verifying the signature and check claim values.
         // The token is a three-part Base64 string; the middle part is the payload.
         val payloadJson = String(
-            java.util.Base64.getUrlDecoder().decode(body.token.split(".")[1].padEnd(
-                body.token.split(".")[1].length + (4 - body.token.split(".")[1].length % 4) % 4, '='
-            ))
+            java.util.Base64.getUrlDecoder().decode(
+                body.token.split(".")[1].padEnd(
+                    body.token.split(".")[1].length + (4 - body.token.split(".")[1].length % 4) % 4, '='
+                )
+            )
         )
         assertTrue(payloadJson.contains(body.userId))
         assertTrue(payloadJson.contains("PROFESSOR"))
@@ -195,7 +197,7 @@ class AuthRoutesTest : BaseRouteTest() {
             setBody(RegisterRequest("student@isel.pt", "password123", "STUDENT"))
         }
 
-        val wrongEmail    = client.post("/auth/login") {
+        val wrongEmail = client.post("/auth/login") {
             contentType(ContentType.Application.Json)
             setBody(LoginRequest("nobody@isel.pt", "anything1"))
         }

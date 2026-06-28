@@ -1,56 +1,63 @@
 package com.oeims.services
 
-import com.oeims.exceptions.ConflictException
-import com.oeims.exceptions.ForbiddenException
-import com.oeims.exceptions.NotFoundException
-import com.oeims.models.ConnectionStatus
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.SseChannels
+import com.oeims.connections.SseEvent
+import com.oeims.models.AllowedEmailDomain
+import com.oeims.models.ConflictException
+import com.oeims.models.ForbiddenException
+import com.oeims.models.NotFoundException
 import com.oeims.models.SessionCode
 import com.oeims.models.SessionStatus
-import com.oeims.models.dto.JoinSessionResponse
-import com.oeims.models.dto.ParticipantResponse
-import com.oeims.models.dto.ParticipantStatusUpdate
 import com.oeims.models.dto.SessionResponse
-import com.oeims.models.ids.*
-import com.oeims.models.toSessionCode
-import com.oeims.repositories.ParticipantRecord
+import com.oeims.models.ids.ExamId
+import com.oeims.models.ids.ProfessorId
+import com.oeims.models.ids.SessionId
 import com.oeims.repositories.SessionRecord
 import com.oeims.repositories.interfaces.IExamRepository
-import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
-import com.oeims.repositories.interfaces.IUserRepository
-import com.oeims.sse.SseBroadcaster
-import com.oeims.sse.SseChannels
-import com.oeims.sse.SseEvent
 import kotlinx.serialization.json.Json
 import java.time.Instant
 
 class SessionService(
     private val sessionRepository: ISessionRepository,
     private val examRepository: IExamRepository,
-    private val participantRepository: IParticipantRepository,
-    private val userRepository: IUserRepository,
     private val sseBroadcaster: SseBroadcaster,
 ) {
-
-    suspend fun createSession(professorId: ProfessorId, examId: ExamId): SessionResponse {
+    suspend fun createSession(
+        professorId: ProfessorId,
+        examId: ExamId,
+        allowedEmailDomain: AllowedEmailDomain,
+    ): SessionResponse {
         examRepository.findById(examId.value)
             ?: throw NotFoundException("Exam not found")
 
-        val code = generateUniqueCode()
-        val response = sessionRepository
-            .create(examId.value, professorId.value, code.value)
-            .toResponse()
+        repeat(5) {
+            val response = sessionRepository.create(
+                examId = examId.value,
+                supervisorId = professorId.value,
+                code = generateSessionCode(),
+                allowedEmailDomain = allowedEmailDomain.value,
+            )?.toResponse()
 
-        sseBroadcaster.publish(
-            channel = SseChannels.sessions(),
-            event = SseEvent.SESSION_CREATED,
-            data = Json.encodeToString(response)
-        )
+            if (response != null) {
+                sseBroadcaster.publish(
+                    channel = SseChannels.sessions(),
+                    event = SseEvent.SESSION_CREATED,
+                    data = Json.encodeToString(response),
+                )
 
-        return response
+                return response
+            }
+        }
+
+        throw IllegalStateException("Failed to generate a unique session code after 5 attempts")
     }
 
-    suspend fun startSession(sessionId: SessionId, professorId: ProfessorId): SessionResponse {
+    suspend fun startSession(
+        sessionId: SessionId,
+        professorId: ProfessorId,
+    ): SessionResponse {
         val session = sessionRepository.findById(sessionId.value)
             ?: throw NotFoundException("Session not found")
 
@@ -61,18 +68,24 @@ class SessionService(
             throw ConflictException("Only a pending session can be started")
 
         sessionRepository.updateStatus(sessionId.value, SessionStatus.ACTIVE)
-        val response = session.copy(status = SessionStatus.ACTIVE, startedAt = Instant.now()).toResponse()
+
+        val response = session
+            .copy(status = SessionStatus.ACTIVE, startedAt = Instant.now())
+            .toResponse()
 
         sseBroadcaster.publish(
             channel = SseChannels.sessions(),
             event = SseEvent.SESSION_STATUS_UPDATED,
-            data = Json.encodeToString(response)
+            data = Json.encodeToString(response),
         )
 
         return response
     }
 
-    suspend fun endSession(sessionId: SessionId, professorId: ProfessorId): SessionResponse {
+    suspend fun endSession(
+        sessionId: SessionId,
+        professorId: ProfessorId,
+    ): SessionResponse {
         val session = sessionRepository.findById(sessionId.value)
             ?: throw NotFoundException("Session not found")
 
@@ -83,47 +96,28 @@ class SessionService(
             throw ConflictException("Only an active session can be ended")
 
         sessionRepository.updateStatus(sessionId.value, SessionStatus.ENDED)
-        val response = session.copy(status = SessionStatus.ENDED, endedAt = Instant.now()).toResponse()
+
+        val response = session
+            .copy(status = SessionStatus.ENDED, endedAt = Instant.now())
+            .toResponse()
 
         sseBroadcaster.publish(
             channel = SseChannels.sessions(),
             event = SseEvent.SESSION_STATUS_UPDATED,
-            data = Json.encodeToString(response)
+            data = Json.encodeToString(response),
         )
 
         return response
-    }
-
-    suspend fun joinSession(code: SessionCode, studentId: StudentId): JoinSessionResponse {
-        val session = sessionRepository.findByCode(code.value)
-            ?: throw NotFoundException("Session not found")
-
-        if (session.status == SessionStatus.ENDED)
-            throw ConflictException("Session has already ended")
-
-        userRepository.findById(studentId.value)
-            ?: throw NotFoundException("User not found")
-
-        val existing = participantRepository.findByUserAndSession(studentId.value, session.id)
-        if (existing != null)
-            return buildJoinResponse(existing, session)
-
-        val participant = participantRepository.create(session.id, studentId.value)
-
-        sseBroadcaster.publish(
-            channel = SseChannels.session(session.id.toSessionId()),
-            event = SseEvent.PARTICIPANT_JOINED,
-            data = Json.encodeToString(participant.toResponse())
-        )
-
-        return buildJoinResponse(participant, session)
     }
 
     suspend fun getSession(sessionId: SessionId): SessionResponse =
         sessionRepository.findById(sessionId.value)?.toResponse()
             ?: throw NotFoundException("Session not found")
 
-    suspend fun joinAsAdditionalSupervisor(code: SessionCode, professorId: ProfessorId): SessionResponse {
+    suspend fun joinAsAdditionalSupervisor(
+        code: SessionCode,
+        professorId: ProfessorId,
+    ): SessionResponse {
         val session = sessionRepository.findByCode(code.value)
             ?: throw NotFoundException("Session not found")
 
@@ -131,10 +125,14 @@ class SessionService(
             throw ConflictException("Cannot join a session that has already ended")
 
         sessionRepository.addSupervisor(session.id, professorId.value)
+
         return session.toResponse()
     }
 
-    suspend fun canSupervise(sessionId: SessionId, professorId: ProfessorId): Boolean =
+    suspend fun canSupervise(
+        sessionId: SessionId,
+        professorId: ProfessorId,
+    ): Boolean =
         sessionRepository.isSupervisor(sessionId.value, professorId.value)
 
     suspend fun getActiveSessions(): List<SessionResponse> =
@@ -145,68 +143,21 @@ class SessionService(
             .findLatestOpenBySupervisor(professorId.value)
             ?.toResponse()
 
-    suspend fun getParticipants(sessionId: SessionId): List<ParticipantResponse> {
-        sessionRepository.findById(sessionId.value)
-            ?: throw NotFoundException("Session not found")
-
-        return participantRepository.findBySession(sessionId.value).map { it.toResponse() }
-    }
-
-    suspend fun heartbeat(participantId: ParticipantId, userId: UserId) {
-        val participant = participantRepository.findById(participantId.value)
-            ?: throw NotFoundException("Participant not found")
-        if (participant.userId != userId.value)
-            throw ForbiddenException("You do not own this participant")
-        participantRepository.updateHeartbeat(participantId.value)
-
-        if (participant.connectionStatus != ConnectionStatus.CONNECTED) {
-            sseBroadcaster.publish(
-                channel = SseChannels.session(participant.sessionId.toSessionId()),
-                event   = SseEvent.PARTICIPANT_STATUS_UPDATED,
-                data    = Json.encodeToString(ParticipantStatusUpdate(participant.id.toString(), "CONNECTED"))
-            )
-        }
-    }
-
-    private suspend fun generateUniqueCode(): SessionCode {
+    private fun generateSessionCode(): String {
         val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        repeat(5) {
-            val code = (1..6).map { chars.random() }.joinToString("")
-            if (sessionRepository.findByCode(code) == null)
-                return code.toSessionCode()
-        }
-        throw IllegalStateException("Failed to generate a unique session code after 5 attempts")
-    }
 
-    private suspend fun buildJoinResponse(participant: ParticipantRecord, session: SessionRecord): JoinSessionResponse {
-        val exam = examRepository.findById(session.examId)
-            ?: throw NotFoundException("Exam not found")
-
-        return JoinSessionResponse(
-            participantId = participant.id.toString(),
-            sessionId     = session.id.toString(),
-            examTitle     = exam.title,
-            durationMins  = exam.durationMins
-        )
+        return (1..6)
+            .map { chars.random() }
+            .joinToString("")
     }
 }
 
 private fun SessionRecord.toResponse() = SessionResponse(
-    id           = id.toString(),
-    examId       = examId.toString(),
+    id = id.toString(),
+    examId = examId.toString(),
     supervisorId = supervisorId.toString(),
-    code         = code,
-    status       = status.name,
-    startedAt    = startedAt?.toString(),
-    endedAt      = endedAt?.toString()
-)
-
-private fun ParticipantRecord.toResponse() = ParticipantResponse(
-    id               = id.toString(),
-    sessionId        = sessionId.toString(),
-    userId           = userId.toString(),
-    email            = email,
-    connectionStatus = connectionStatus.name,
-    lastHeartbeat    = lastHeartbeat?.toString(),
-    joinedAt         = joinedAt.toString()
+    code = code,
+    status = status.name,
+    startedAt = startedAt?.toString(),
+    endedAt = endedAt?.toString(),
 )

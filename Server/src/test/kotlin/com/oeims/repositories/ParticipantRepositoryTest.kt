@@ -1,12 +1,6 @@
 package com.oeims.repositories
 
-import com.oeims.models.ConnectionStatus
-import com.oeims.models.Exams
-import com.oeims.models.Participants
-import com.oeims.models.SessionStatus
-import com.oeims.models.Sessions
-import com.oeims.models.UserRole
-import com.oeims.models.Users
+import com.oeims.models.*
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -16,12 +10,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.sql.DriverManager
 import java.time.Instant
-import java.util.UUID
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import java.util.*
+import kotlin.test.*
 
 class ParticipantRepositoryTest {
 
@@ -45,13 +35,13 @@ class ParticipantRepositoryTest {
         val examRepo = ExamRepository()
         sessionRepository = SessionRepository()
 
-        val professorId  = userRepo.create("prof@isel.pt",             UserRole.PROFESSOR, "hash").id
-        studentId        = userRepo.create("student1@alunos.isel.pt",  UserRole.STUDENT,   "hash").id
-        otherStudentId   = userRepo.create("student2@alunos.isel.pt",  UserRole.STUDENT,   "hash").id
-        val examId       = examRepo.create(professorId, "Networks", null, 90).id
-        sessionId        = sessionRepository.create(examId, professorId, "SES001").id
+        val professorId = userRepo.create("prof@isel.pt", UserRole.PROFESSOR, "hash").id
+        studentId = userRepo.create("student1@alunos.isel.pt", UserRole.STUDENT, "hash").id
+        otherStudentId = userRepo.create("student2@alunos.isel.pt", UserRole.STUDENT, "hash").id
+        val examId = examRepo.create(professorId, "Networks", null, 90).id
+        sessionId = sessionRepository.create(examId, professorId, "SES001").id
 
-        // Activate the session so markTimedOut considers it
+        // Activate the session so updateTimedOut considers it
         sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE)
 
         participantRepository = ParticipantRepository()
@@ -154,7 +144,7 @@ class ParticipantRepositoryTest {
         val participant = participantRepository.create(sessionId, studentId)
 
         val updated = participantRepository.updateHeartbeat(participant.id)
-        val result  = participantRepository.findById(participant.id)!!
+        val result = participantRepository.findById(participant.id)!!
 
         assertTrue(updated)
         assertNotNull(result.lastHeartbeat)
@@ -175,7 +165,7 @@ class ParticipantRepositoryTest {
         val participant = participantRepository.create(sessionId, studentId)
 
         val updated = participantRepository.updateConnectionStatus(participant.id, ConnectionStatus.DISCONNECTED)
-        val result  = participantRepository.findById(participant.id)!!
+        val result = participantRepository.findById(participant.id)!!
 
         assertTrue(updated)
         assertEquals(ConnectionStatus.DISCONNECTED, result.connectionStatus)
@@ -188,7 +178,7 @@ class ParticipantRepositoryTest {
         assertFalse(updated)
     }
 
-    // ── markTimedOut ──────────────────────────────────────────────────────────
+    // ── updateTimedOut ──────────────────────────────────────────────────────────
 
     @Test
     fun `markTimedOut marks CONNECTED participants whose heartbeat is older than threshold`() = runBlocking {
@@ -197,7 +187,7 @@ class ParticipantRepositoryTest {
 
         // threshold = now + 1 hour → every heartbeat is "older than" this
         val threshold = Instant.now().plusSeconds(3600)
-        val timedOut  = participantRepository.markTimedOut(threshold)
+        val timedOut = participantRepository.updateTimedOut(threshold)
 
         assertEquals(1, timedOut.size)
         assertEquals(participant.id, timedOut[0].id)
@@ -213,7 +203,7 @@ class ParticipantRepositoryTest {
 
         // threshold = 1 hour ago → no recent heartbeat is older than this
         val threshold = Instant.now().minusSeconds(3600)
-        val timedOut  = participantRepository.markTimedOut(threshold)
+        val timedOut = participantRepository.updateTimedOut(threshold)
 
         assertTrue(timedOut.isEmpty())
 
@@ -227,7 +217,7 @@ class ParticipantRepositoryTest {
         participantRepository.create(sessionId, studentId)
 
         val threshold = Instant.now().plusSeconds(3600)
-        val timedOut  = participantRepository.markTimedOut(threshold)
+        val timedOut = participantRepository.updateTimedOut(threshold)
 
         assertTrue(timedOut.isEmpty())
     }
@@ -237,8 +227,8 @@ class ParticipantRepositoryTest {
         // Create a second session and leave it PENDING
         val userRepo = UserRepository()
         val examRepo = ExamRepository()
-        val prof2Id  = userRepo.create("prof2@isel.pt", UserRole.PROFESSOR, "hash").id
-        val exam2Id  = examRepo.create(prof2Id, "Algebra", null, 60).id
+        val prof2Id = userRepo.create("prof2@isel.pt", UserRole.PROFESSOR, "hash").id
+        val exam2Id = examRepo.create(prof2Id, "Algebra", null, 60).id
         val pendingSessionId = sessionRepository.create(exam2Id, prof2Id, "PEN001").id
         // Note: do NOT activate this session
 
@@ -246,7 +236,7 @@ class ParticipantRepositoryTest {
         participantRepository.updateHeartbeat(participantInPending.id)
 
         val threshold = Instant.now().plusSeconds(3600)
-        val timedOut  = participantRepository.markTimedOut(threshold)
+        val timedOut = participantRepository.updateTimedOut(threshold)
 
         // Participant in PENDING session must NOT be timed out
         assertTrue(timedOut.none { it.id == participantInPending.id })

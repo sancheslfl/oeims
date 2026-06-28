@@ -18,10 +18,11 @@ internal sealed class WinClipboardSource : IClipboardSource
             User32.OpenClipboard(_hwnd);
             ready.Set();
             Thread.Sleep(Timeout.Infinite);
-        });
-
-        _thread.Name = nameof(WinClipboardSource);
-        _thread.IsBackground = true;
+        })
+        {
+            Name = nameof(WinClipboardSource),
+            IsBackground = true
+        };
         _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
 

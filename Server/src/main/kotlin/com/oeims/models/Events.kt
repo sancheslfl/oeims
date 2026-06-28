@@ -9,8 +9,8 @@ enum class Severity { INFO, WARNING, CRITICAL }
 
 object Events : UUIDTable("events") {
     val participantId = reference("participant_id", Participants)
-    val monitorName   = varchar("monitor_name", 50)
-    val message       = varchar("message", 255)
-    val severity      = enumerationByName("severity", 16, Severity::class)
-    val occurredAt    = timestamp("occurred_at")
+    val monitorName = varchar("monitor_name", 50)
+    val message = varchar("message", 255)
+    val severity = enumerationByName("severity", 16, Severity::class)
+    val occurredAt = timestamp("occurred_at")
 }
