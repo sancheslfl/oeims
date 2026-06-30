@@ -6,14 +6,10 @@ internal sealed class ServerConfig
 
     public string ApiBaseUrl { get; init; } = "";
     public string RealtimeBaseUrl { get; init; } = "";
-    public string Token { get; init; } = "";
-    public string ParticipantId { get; init; } = "";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(ApiBaseUrl) &&
-        !string.IsNullOrWhiteSpace(RealtimeBaseUrl) &&
-        !string.IsNullOrWhiteSpace(Token) &&
-        !string.IsNullOrWhiteSpace(ParticipantId);
+        !string.IsNullOrWhiteSpace(RealtimeBaseUrl);
 
     public bool ShouldConnect => Enabled && IsConfigured;
 }

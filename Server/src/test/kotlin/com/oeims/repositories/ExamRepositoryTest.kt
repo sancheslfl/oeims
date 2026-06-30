@@ -11,7 +11,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.sql.DriverManager
-import java.util.UUID
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -34,7 +34,7 @@ class ExamRepositoryTest {
         transaction { SchemaUtils.create(Users, Exams) }
 
         val userRepository = UserRepository()
-        professorId      = userRepository.create("prof1@isel.pt", UserRole.PROFESSOR, "hash1").id
+        professorId = userRepository.create("prof1@isel.pt", UserRole.PROFESSOR, "hash1").id
         otherProfessorId = userRepository.create("prof2@isel.pt", UserRole.PROFESSOR, "hash2").id
 
         examRepository = ExamRepository()
@@ -100,9 +100,9 @@ class ExamRepositoryTest {
 
     @Test
     fun `findByTitle returns all exams with that title`() = runBlocking {
-        examRepository.create(professorId,      "Calculus", null, 90)
+        examRepository.create(professorId, "Calculus", null, 90)
         examRepository.create(otherProfessorId, "Calculus", null, 90)
-        examRepository.create(professorId,      "Physics",  null, 60)
+        examRepository.create(professorId, "Physics", null, 60)
 
         val results = examRepository.findByTitle("Calculus")
 
@@ -132,8 +132,8 @@ class ExamRepositoryTest {
 
     @Test
     fun `findByProfessor returns only exams belonging to that professor`() = runBlocking {
-        examRepository.create(professorId,      "Exam A", null, 60)
-        examRepository.create(professorId,      "Exam B", null, 60)
+        examRepository.create(professorId, "Exam A", null, 60)
+        examRepository.create(professorId, "Exam B", null, 60)
         examRepository.create(otherProfessorId, "Exam C", null, 60)
 
         val results = examRepository.findByProfessor(professorId)
@@ -153,7 +153,7 @@ class ExamRepositoryTest {
 
     @Test
     fun `findAll returns all exams regardless of professor`() = runBlocking {
-        examRepository.create(professorId,      "Exam A", null, 60)
+        examRepository.create(professorId, "Exam A", null, 60)
         examRepository.create(otherProfessorId, "Exam B", null, 60)
 
         val results = examRepository.findAll()

@@ -1,15 +1,21 @@
 import { apiFetch } from "./utils";
-import type {EventResponse, ParticipantResponse, SessionResponse} from "../types";
+import type {
+    EventResponse,
+    ParticipantResponse,
+    SessionResponse,
+    StudentAuth,
+} from "../types";
 
 export function createSession(
     examId: string,
+    allowedEmailDomain: string,
     token: string,
 ): Promise<SessionResponse> {
     return apiFetch<SessionResponse>(
         "/sessions",
         {
             method: "POST",
-            body: JSON.stringify({ examId }),
+            body: JSON.stringify({ examId, allowedEmailDomain }),
         },
         token,
     );
@@ -47,7 +53,7 @@ export function endSession(
     return apiFetch<SessionResponse>(
         `/sessions/${sessionId}/end`,
         {
-            method: "POST"
+            method: "POST",
         },
         token,
     );
@@ -85,6 +91,29 @@ export function joinSessionAsSupervisor(
             body: JSON.stringify({ code }),
         },
         token,
+    );
+}
+
+export function requestSessionJoin(
+    code: string,
+    email: string,
+): Promise<void> {
+    return apiFetch<void>(
+        `/sessions/${encodeURIComponent(code)}/join`,
+        {
+            method: "POST",
+            body: JSON.stringify({ email }),
+        },
+    );
+}
+
+export function verifyJoin(token: string): Promise<StudentAuth> {
+    return apiFetch<StudentAuth>(
+        "/sessions/join/verify",
+        {
+            method: "POST",
+            body: JSON.stringify({ token }),
+        },
     );
 }
 

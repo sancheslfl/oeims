@@ -6,7 +6,8 @@ namespace OEIMS.Sentinel.Agent;
 internal sealed class Worker(
     IEnumerable<IMonitor> monitors,
     IEnumerable<IMitigator> mitigators,
-    AgentPipeClient pipeClient,
+    AgentEventPipeClient pipeClient,
+    AgentCommandPipeServer commandPipeServer,
     ILogger<Worker> logger
 ) : BackgroundService
 {
@@ -15,12 +16,12 @@ internal sealed class Worker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Sentinel Agent starting...");
+        logger.LogInformation("Agent starting...");
 
         foreach (var mitigator in _mitigators)
         {
             mitigator.Apply();
-            logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
+            logger.LogInformation("Mitigator applied: {Name}", mitigator.Name);
         }
 
         var tasks = new List<Task>
@@ -28,6 +29,11 @@ internal sealed class Worker(
             RunComponentAsync(
                 "Agent heartbeat",
                 SendHeartbeatLoopAsync,
+                stoppingToken),
+
+            RunComponentAsync(
+                "Agent command pipe",
+                commandPipeServer.StartAsync,
                 stoppingToken)
         };
 
@@ -55,19 +61,19 @@ internal sealed class Worker(
     {
         try
         {
-            logger.LogInformation("Starting component: {name}", name);
+            logger.LogInformation("Starting component: {Name}", name);
 
             await runAsync(ct);
 
-            logger.LogInformation("Component stopped: {name}", name);
+            logger.LogInformation("Component stopped: {Name}", name);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            logger.LogInformation("Component cancelled: {name}", name);
+            logger.LogInformation("Component cancelled: {Name}", name);
         }
         catch (Exception ex)
         {
-            logger.LogCritical(ex, "Component failed: {name}", name);
+            logger.LogCritical(ex, "Component failed: {Name}", name);
             throw;
         }
     }
@@ -84,19 +90,19 @@ internal sealed class Worker(
         switch (e.Severity)
         {
             case Severity.Info:
-                logger.LogInformation("[{monitor}] {message}", e.MonitorName, e.Message);
+                logger.LogInformation("[{Monitor}] {Message}", e.MonitorName, e.Message);
                 break;
 
             case Severity.Warning:
-                logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
+                logger.LogWarning("[{Monitor}] {Message}", e.MonitorName, e.Message);
                 break;
 
             case Severity.Critical:
-                logger.LogCritical("[{monitor}] {message}", e.MonitorName, e.Message);
+                logger.LogCritical("[{Monitor}] {Message}", e.MonitorName, e.Message);
                 break;
 
             default:
-                logger.LogWarning("[{monitor}] {message}", e.MonitorName, e.Message);
+                logger.LogWarning("[{Monitor}] {Message}", e.MonitorName, e.Message);
                 break;
         }
     }

@@ -1,22 +1,57 @@
 package com.oeims.services
 
+import com.auth0.jwt.JWT
+import com.auth0.jwt.JWTVerifier
+import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.server.application.*
+import java.time.Duration
 
-data class JwtConfig(
-    val secret: String,
+data class JwtSettings(
     val issuer: String,
     val audience: String,
     val realm: String,
-    val expirationMs: Long
+    val expiration: Duration,
+    val algorithm: Algorithm,
+    val purpose: String? = null,
+) {
+    val verifier: JWTVerifier
+        get() = JWT
+            .require(algorithm)
+            .withIssuer(issuer)
+            .withAudience(audience)
+            .let { verification ->
+                if (purpose == null) verification
+                else verification.withClaim("purpose", purpose)
+            }
+            .build()
+}
+
+fun Application.configureAuthJwt() = JwtSettings(
+    issuer = environment.config.property("jwt.issuer").getString(),
+    audience = environment.config.property("jwt.auth.audience").getString(),
+    realm = environment.config.property("jwt.auth.realm").getString(),
+    expiration = Duration.ofMillis(
+        environment.config.property("jwt.auth.expiration-ms").getString().toLong()
+    ),
+    algorithm = Algorithm.HMAC256(jwtSecret()),
 )
 
-fun Application.loadJwtConfig() = JwtConfig(
-    // JWT_SECRET env var takes priority over the yaml placeholder so the yaml file
-    // never needs to contain a real secret (safe to commit).
-    secret       = System.getenv("JWT_SECRET")
-                       ?: environment.config.property("jwt.secret").getString(),
-    issuer       = environment.config.property("jwt.issuer").getString(),
-    audience     = environment.config.property("jwt.audience").getString(),
-    realm        = environment.config.property("jwt.realm").getString(),
-    expirationMs = environment.config.property("jwt.expiration-ms").getString().toLong()
+fun Application.configureEmailJoinJwt() = JwtSettings(
+    issuer = environment.config.property("jwt.issuer").getString(),
+    audience = environment.config.property("jwt.email-join.audience").getString(),
+    realm = environment.config.property("jwt.email-join.realm").getString(),
+    expiration = Duration.ofMillis(
+        environment.config.property("jwt.email-join.expiration-ms").getString().toLong()
+    ),
+    algorithm = Algorithm.HMAC256(jwtSecret()),
+    purpose = "email_join",
+)
+
+private fun Application.jwtSecret(): String =
+    System.getenv("JWT_SECRET")
+        ?: environment.config.property("jwt.secret").getString()
+
+data class SessionJwtSettings(
+    val emailJoin: JwtSettings,
+    val sentinel: JwtSettings,
 )

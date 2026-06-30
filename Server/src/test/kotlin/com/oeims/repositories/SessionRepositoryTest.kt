@@ -1,11 +1,6 @@
 package com.oeims.repositories
 
-import com.oeims.models.Exams
-import com.oeims.models.SessionStatus
-import com.oeims.models.Sessions
-import com.oeims.models.SessionSupervisors
-import com.oeims.models.UserRole
-import com.oeims.models.Users
+import com.oeims.models.*
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -14,12 +9,8 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.sql.DriverManager
-import java.util.UUID
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import java.util.*
+import kotlin.test.*
 
 class SessionRepositoryTest {
 
@@ -41,9 +32,9 @@ class SessionRepositoryTest {
         val userRepo = UserRepository()
         val examRepo = ExamRepository()
 
-        professorId      = userRepo.create("prof1@isel.pt", UserRole.PROFESSOR, "hash").id
+        professorId = userRepo.create("prof1@isel.pt", UserRole.PROFESSOR, "hash").id
         otherProfessorId = userRepo.create("prof2@isel.pt", UserRole.PROFESSOR, "hash").id
-        examId           = examRepo.create(professorId, "Networks", null, 90).id
+        examId = examRepo.create(professorId, "Networks", null, 90).id
 
         sessionRepository = SessionRepository()
     }
@@ -121,8 +112,8 @@ class SessionRepositoryTest {
 
     @Test
     fun `findBySupervisor returns only sessions belonging to that professor`() = runBlocking {
-        sessionRepository.create(examId, professorId,      "AAA001")
-        sessionRepository.create(examId, professorId,      "BBB002")
+        sessionRepository.create(examId, professorId, "AAA001")
+        sessionRepository.create(examId, professorId, "BBB002")
         sessionRepository.create(examId, otherProfessorId, "CCC003")
 
         val results = sessionRepository.findBySupervisor(professorId)
@@ -145,7 +136,7 @@ class SessionRepositoryTest {
         val session = sessionRepository.create(examId, professorId, "ACT001")
 
         val updated = sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
-        val result  = sessionRepository.findById(session.id)!!
+        val result = sessionRepository.findById(session.id)!!
 
         assertTrue(updated)
         assertEquals(SessionStatus.ACTIVE, result.status)
@@ -159,7 +150,7 @@ class SessionRepositoryTest {
         sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
 
         val updated = sessionRepository.updateStatus(session.id, SessionStatus.ENDED)
-        val result  = sessionRepository.findById(session.id)!!
+        val result = sessionRepository.findById(session.id)!!
 
         assertTrue(updated)
         assertEquals(SessionStatus.ENDED, result.status)

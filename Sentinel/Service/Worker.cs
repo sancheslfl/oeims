@@ -10,8 +10,8 @@ namespace OEIMS.Sentinel.Service
         IEnumerable<IMonitor> monitors,
         IEnumerable<IMitigator> mitigators,
         ServerConfig serverConfig,
-        ServiceWebSocketClient wsClient,
-        AgentPipeServer agentPipeServer,
+        WebSocketClient wsClient,
+        AgentEventPipeServer agentPipeServer,
         HeartbeatSender heartbeatSender,
         ILogger<Worker> logger
         ) : BackgroundService

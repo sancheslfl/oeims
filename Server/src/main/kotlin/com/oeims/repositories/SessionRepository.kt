@@ -1,31 +1,36 @@
 package com.oeims.repositories
 
+import com.oeims.models.SessionJoins
 import com.oeims.models.SessionStatus
 import com.oeims.models.SessionSupervisors
 import com.oeims.models.Sessions
 import com.oeims.repositories.interfaces.ISessionRepository
 import kotlinx.coroutines.Dispatchers
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.insertIgnore
-import org.jetbrains.exposed.sql.or
-import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.update
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 data class SessionRecord(
     val id: UUID,
     val examId: UUID,
     val supervisorId: UUID,
     val code: String,
+    val allowedEmailDomain: String,
     val status: SessionStatus,
     val createdAt: Instant,
     val startedAt: Instant?,
     val endedAt: Instant?
+)
+
+data class EmailJoinRecord(
+    val id: UUID,
+    val sessionId: UUID,
+    val email: String,
+    val jwtId: String,
+    val expiresAt: Instant,
+    val verifiedAt: Instant?,
+    val createdAt: Instant,
 )
 
 class SessionRepository : ISessionRepository {
@@ -64,7 +69,7 @@ class SessionRepository : ISessionRepository {
             Sessions.selectAll()
                 .where {
                     (Sessions.status inList openStatuses) and
-                    ((Sessions.supervisorId eq supervisorId) or (Sessions.id inList accessibleIds))
+                            ((Sessions.supervisorId eq supervisorId) or (Sessions.id inList accessibleIds))
                 }
                 .orderBy(Sessions.createdAt to SortOrder.DESC)
                 .limit(1)
@@ -72,31 +77,41 @@ class SessionRepository : ISessionRepository {
                 ?.toRecord()
         }
 
-    override suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord =
+    override suspend fun create(
+        examId: UUID,
+        supervisorId: UUID,
+        code: String,
+        allowedEmailDomain: String,
+    ): SessionRecord? =
         newSuspendedTransaction(Dispatchers.IO) {
             val id = UUID.randomUUID()
             val now = Instant.now()
 
-            Sessions.insert {
+            val insert = Sessions.insertIgnore {
                 it[Sessions.id] = id
                 it[Sessions.examId] = examId
                 it[Sessions.supervisorId] = supervisorId
                 it[Sessions.code] = code
+                it[Sessions.allowedEmailDomain] = allowedEmailDomain
                 it[Sessions.status] = SessionStatus.PENDING
                 it[Sessions.createdAt] = now
                 it[Sessions.startedAt] = null
                 it[Sessions.endedAt] = null
             }
 
+            if (insert.insertedCount == 0)
+                return@newSuspendedTransaction null
+
             SessionRecord(
                 id = id,
                 examId = examId,
                 supervisorId = supervisorId,
                 code = code,
+                allowedEmailDomain = allowedEmailDomain,
                 status = SessionStatus.PENDING,
                 createdAt = now,
                 startedAt = null,
-                endedAt = null
+                endedAt = null,
             )
         }
 
@@ -117,7 +132,7 @@ class SessionRepository : ISessionRepository {
         newSuspendedTransaction(Dispatchers.IO) {
             SessionSupervisors.insertIgnore {
                 it[SessionSupervisors.sessionId] = sessionId
-                it[SessionSupervisors.userId]    = userId
+                it[SessionSupervisors.userId] = userId
             }
         }
 
@@ -138,11 +153,61 @@ class SessionRepository : ISessionRepository {
             val hasAccess = SessionSupervisors.selectAll()
                 .where {
                     (SessionSupervisors.sessionId eq sessionId) and
-                    (SessionSupervisors.userId eq userId)
+                            (SessionSupervisors.userId eq userId)
                 }
                 .count() > 0
 
             isCreator || hasAccess
+        }
+
+    override suspend fun createEmailJoin(
+        sessionId: UUID,
+        email: String,
+        jwtId: String,
+        expiresAt: Instant,
+    ): EmailJoinRecord =
+        newSuspendedTransaction(Dispatchers.IO) {
+            val id = UUID.randomUUID()
+            val now = Instant.now()
+
+            SessionJoins.insert {
+                it[SessionJoins.id] = id
+                it[SessionJoins.sessionId] = sessionId
+                it[SessionJoins.email] = email
+                it[SessionJoins.emailJwtId] = jwtId
+                it[SessionJoins.emailExpiresAt] = expiresAt
+                it[SessionJoins.emailVerifiedAt] = null
+                it[SessionJoins.createdAt] = now
+            }
+
+            EmailJoinRecord(
+                id = id,
+                sessionId = sessionId,
+                email = email,
+                jwtId = jwtId,
+                expiresAt = expiresAt,
+                verifiedAt = null,
+                createdAt = now,
+            )
+        }
+
+    override suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord? =
+        newSuspendedTransaction(Dispatchers.IO) {
+            SessionJoins.selectAll()
+                .where { SessionJoins.emailJwtId eq jwtId }
+                .singleOrNull()
+                ?.toEmailJoinRecord()
+        }
+
+    override suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean =
+        newSuspendedTransaction(Dispatchers.IO) {
+            SessionJoins.update(
+                where = {
+                    (SessionJoins.id eq id) and SessionJoins.emailVerifiedAt.isNull()
+                }
+            ) {
+                it[SessionJoins.emailVerifiedAt] = verifiedAt
+            } == 1
         }
 }
 
@@ -151,8 +216,19 @@ private fun ResultRow.toRecord() = SessionRecord(
     examId = this[Sessions.examId].value,
     supervisorId = this[Sessions.supervisorId].value,
     code = this[Sessions.code],
+    allowedEmailDomain = this[Sessions.allowedEmailDomain],
     status = this[Sessions.status],
     createdAt = this[Sessions.createdAt],
     startedAt = this[Sessions.startedAt],
     endedAt = this[Sessions.endedAt]
+)
+
+private fun ResultRow.toEmailJoinRecord() = EmailJoinRecord(
+    id = this[SessionJoins.id].value,
+    sessionId = this[SessionJoins.sessionId].value,
+    email = this[SessionJoins.email],
+    jwtId = this[SessionJoins.emailJwtId],
+    expiresAt = this[SessionJoins.emailExpiresAt],
+    verifiedAt = this[SessionJoins.emailVerifiedAt],
+    createdAt = this[SessionJoins.createdAt],
 )

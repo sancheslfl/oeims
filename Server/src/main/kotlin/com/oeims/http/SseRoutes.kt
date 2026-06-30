@@ -2,15 +2,15 @@ package com.oeims.http
 
 import com.oeims.models.ids.toProfessorId
 import com.oeims.services.SessionService
-import com.oeims.sse.SseBroadcaster
-import com.oeims.sse.SseChannel
-import com.oeims.sse.SseChannels
-import io.ktor.server.auth.authenticate
-import io.ktor.server.routing.Route
-import io.ktor.server.sse.sse
-import io.ktor.sse.ServerSentEvent
-import io.ktor.util.cio.ChannelWriteException
-import io.ktor.utils.io.ClosedWriteChannelException
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.SseChannel
+import com.oeims.connections.SseChannels
+import io.ktor.server.auth.*
+import io.ktor.server.routing.*
+import io.ktor.server.sse.*
+import io.ktor.sse.*
+import io.ktor.util.cio.*
+import io.ktor.utils.io.*
 
 fun Route.sseRoutes(
     sessionService: SessionService,

@@ -1,29 +1,29 @@
 package com.oeims
 
-import com.oeims.http.webSocketRoutes
-import com.oeims.plugins.configureDatabase
-import com.oeims.plugins.configureOpenApi
-import com.oeims.plugins.configureRouting
-import com.oeims.plugins.configureSecurity
+import com.auth0.jwt.JWT
+import com.oeims.config.Environment
+import com.oeims.http.AUTH_COOKIE_NAME
+import com.oeims.config.configureDatabase
+import com.oeims.config.configureEmail
+import com.oeims.config.configureOpenApi
+import com.oeims.config.configureRouting
+import com.oeims.config.configureSecurity
 import com.oeims.repositories.*
 import com.oeims.services.*
-import com.oeims.sse.SseBroadcaster
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.WebSocketBroadcaster
 import io.ktor.http.*
+import io.ktor.http.auth.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.*
 import io.ktor.server.plugins.callid.*
-import com.auth0.jwt.JWT
-import com.oeims.http.AUTH_COOKIE_NAME
-import io.ktor.http.auth.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.ratelimit.*
-import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.server.websocket.*
 import kotlinx.serialization.json.Json
@@ -72,7 +72,11 @@ fun Application.module() {
                 ?: call.request.queryParameters["token"]
                 ?: call.request.cookies[AUTH_COOKIE_NAME]
             token?.let { raw ->
-                try { JWT.decode(raw).getClaim("email").asString() } catch (_: Exception) { null }
+                try {
+                    JWT.decode(raw).getClaim("email").asString()
+                } catch (_: Exception) {
+                    null
+                }
             }
         }
     }
@@ -87,48 +91,67 @@ fun Application.module() {
 
     // WebSockets
     install(WebSockets) {
-        pingPeriod   = 30.seconds
-        timeout      = 60.seconds
+        pingPeriod = 30.seconds
+        timeout = 60.seconds
         maxFrameSize = 64 * 1024L  // 64 KB
     }
 
     // SSE
     install(SSE)
 
+    // App variables
+    Environment.configure(environment.config)
+
     // Database
     configureDatabase()
 
     // Repositories
-    val userRepository        = UserRepository()
-    val examRepository        = ExamRepository()
-    val sessionRepository     = SessionRepository()
+    val userRepository = UserRepository()
+    val examRepository = ExamRepository()
+    val sessionRepository = SessionRepository()
     val participantRepository = ParticipantRepository()
-    val eventRepository       = EventRepository()
+    val eventRepository = EventRepository()
 
     // Config
-    val jwtConfig       = loadJwtConfig()
-    val heartbeatConfig = loadHeartbeatConfig()
+    val authJwtSettings = configureAuthJwt()
+    val sessionJwtSettings = SessionJwtSettings(configureEmailJoinJwt(), authJwtSettings)
+    val heartbeatConfig = configureHeartbeat()
+
+    // Email service
+    val smtpEmailSender = configureEmail()
 
     // Realtime
     val sseBroadcaster = SseBroadcaster()
+    val webSocketBroadcaster = WebSocketBroadcaster()
 
     // Services
-    val authService      = AuthService(userRepository, jwtConfig)
-    val examService      = ExamService(examRepository)
-    val sessionService   = SessionService(sessionRepository, examRepository, participantRepository, userRepository, sseBroadcaster)
-    val eventService     = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
+    val authService = AuthService(userRepository, authJwtSettings)
+    val examService = ExamService(examRepository)
+    val sessionService = SessionService(sessionRepository, examRepository, sseBroadcaster)
+    val participantService = ParticipantService(
+        participantRepository,
+        sessionRepository,
+        sessionJwtSettings,
+        sseBroadcaster,
+        webSocketBroadcaster,
+        smtpEmailSender
+    )
+    val eventService = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
     val heartbeatService = HeartbeatService(participantRepository, sessionRepository, sseBroadcaster, heartbeatConfig)
 
     // JWT Authentication
-    configureSecurity(jwtConfig)
+    configureSecurity(authJwtSettings)
 
     // Routing
-    configureRouting(authService, examService, sessionService, eventService, sseBroadcaster)
-
-    // WebSocket routes
-    routing {
-        webSocketRoutes(eventService, participantRepository)
-    }
+    configureRouting(
+        authService,
+        examService,
+        sessionService,
+        participantService,
+        eventService,
+        sseBroadcaster,
+        webSocketBroadcaster
+    )
 
     // API Docs
     configureOpenApi()

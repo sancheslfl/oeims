@@ -1,5 +1,6 @@
 <Solution>
-  <Project Path="Agent/Agent.csproj" Id="35666ff4-5bd2-4b50-bfd5-78cc099e7666" />
+  <Project Path="Agent.Core/Agent.Core.csproj" />
+  <Project Path="Agent.Windows/Agent.Windows.csproj" Id="3957fb74-6d54-40d2-82c7-990c53698778" />
   <Project Path="Contracts/Contracts.csproj" />
   <Project Path="Service/Service.csproj" />
 </Solution>

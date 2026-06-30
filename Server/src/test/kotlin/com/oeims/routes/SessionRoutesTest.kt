@@ -76,9 +76,9 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor creates a session and receives 201 with PENDING status`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
-        val exam    = createExam(prof.token)
-        val client  = jsonClient()
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
+        val exam = createExam(prof.token)
+        val client = jsonClient()
 
         val response = client.post("/sessions") {
             bearerAuth(prof.token)
@@ -96,8 +96,8 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `creating a session without a token returns 403`() = routeTest {
-        val prof   = register("prof@isel.pt", "password123", "PROFESSOR")
-        val exam   = createExam(prof.token)
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
+        val exam = createExam(prof.token)
         val client = jsonClient()
 
         val response = client.post("/sessions") {
@@ -110,10 +110,10 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `student token cannot create a session and receives 403`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val student = register("student@isel.pt", "password123", "STUDENT")
-        val exam    = createExam(prof.token)
-        val client  = jsonClient()
+        val exam = createExam(prof.token)
+        val client = jsonClient()
 
         val response = client.post("/sessions") {
             bearerAuth(student.token)
@@ -126,7 +126,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `creating a session for a non-existent exam returns 404`() = routeTest {
-        val prof   = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val client = jsonClient()
 
         val response = client.post("/sessions") {
@@ -142,8 +142,8 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor fetches a session by id and receives the correct session`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
-        val exam    = createExam(prof.token)
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
+        val exam = createExam(prof.token)
         val session = createSession(prof.token, exam.id)
 
         val response = jsonClient().get("/sessions/${session.id}") { bearerAuth(prof.token) }
@@ -167,7 +167,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor starts a PENDING session and receives 200 with ACTIVE status`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
 
         val response = startSession(prof.token, session.id)
@@ -178,8 +178,8 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `a different professor cannot start a session they do not own`() = routeTest {
-        val prof1   = register("prof1@isel.pt", "password123", "PROFESSOR")
-        val prof2   = register("prof2@isel.pt", "password123", "PROFESSOR")
+        val prof1 = register("prof1@isel.pt", "password123", "PROFESSOR")
+        val prof2 = register("prof2@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof1.token, createExam(prof1.token).id)
 
         val response = startSession(prof2.token, session.id)
@@ -189,7 +189,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `starting an already ACTIVE session returns 409`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
 
@@ -200,7 +200,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `starting an ENDED session returns 409`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
         endSession(prof.token, session.id)
@@ -214,7 +214,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor ends an ACTIVE session and receives 200 with ENDED status`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
 
@@ -226,7 +226,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `ending a PENDING session returns 409`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
 
         val response = endSession(prof.token, session.id)
@@ -236,7 +236,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `ending an already ENDED session returns 409`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
         endSession(prof.token, session.id)
@@ -248,8 +248,8 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `a different professor cannot end a session they do not own`() = routeTest {
-        val prof1   = register("prof1@isel.pt", "password123", "PROFESSOR")
-        val prof2   = register("prof2@isel.pt", "password123", "PROFESSOR")
+        val prof1 = register("prof1@isel.pt", "password123", "PROFESSOR")
+        val prof2 = register("prof2@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof1.token, createExam(prof1.token).id)
         startSession(prof1.token, session.id)
 
@@ -262,9 +262,9 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `student joins a PENDING session by code and receives 200`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val student = register("student@isel.pt", "password123", "STUDENT")
-        val exam    = createExam(prof.token, "LEIC-AED T1 C.3.07")
+        val exam = createExam(prof.token, "LEIC-AED T1 C.3.07")
         val session = createSession(prof.token, exam.id)
 
         val response = joinSession(student.token, session.code)
@@ -277,7 +277,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `student joins an ACTIVE session by code and receives 200`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val student = register("student@isel.pt", "password123", "STUDENT")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
@@ -298,7 +298,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `joining an ENDED session returns 409`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val student = register("student@isel.pt", "password123", "STUDENT")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
@@ -311,11 +311,11 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `joining the same session twice is idempotent and returns 200 both times`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val student = register("student@isel.pt", "password123", "STUDENT")
         val session = createSession(prof.token, createExam(prof.token).id)
 
-        val first  = joinSession(student.token, session.code)
+        val first = joinSession(student.token, session.code)
         val second = joinSession(student.token, session.code)
 
         assertEquals(HttpStatusCode.OK, first.status)
@@ -329,7 +329,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `joining without a token returns 403`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
 
         val response = jsonClient().post("/sessions/join") {
@@ -344,10 +344,10 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor fetches active sessions and sees PENDING and ACTIVE ones`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
-        val exam    = createExam(prof.token)
-        val s1      = createSession(prof.token, exam.id)
-        val s2      = createSession(prof.token, exam.id)
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
+        val exam = createExam(prof.token)
+        val s1 = createSession(prof.token, exam.id)
+        val s2 = createSession(prof.token, exam.id)
         startSession(prof.token, s2.id)
 
         val response = jsonClient().get("/sessions/active") { bearerAuth(prof.token) }
@@ -361,7 +361,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `active sessions does not include ENDED sessions`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
         endSession(prof.token, session.id)
@@ -383,8 +383,8 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor joins an active session as additional supervisor and receives 200`() = routeTest {
-        val prof1   = register("prof1@isel.pt", "password123", "PROFESSOR")
-        val prof2   = register("prof2@isel.pt", "password123", "PROFESSOR")
+        val prof1 = register("prof1@isel.pt", "password123", "PROFESSOR")
+        val prof2 = register("prof2@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof1.token, createExam(prof1.token).id)
         startSession(prof1.token, session.id)
 
@@ -405,8 +405,8 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor joins a PENDING session as supervisor and receives 200`() = routeTest {
-        val prof1   = register("prof1@isel.pt", "password123", "PROFESSOR")
-        val prof2   = register("prof2@isel.pt", "password123", "PROFESSOR")
+        val prof1 = register("prof1@isel.pt", "password123", "PROFESSOR")
+        val prof2 = register("prof2@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof1.token, createExam(prof1.token).id)
 
         val response = joinAsAdditionalSupervisor(prof2.token, session.code)
@@ -417,8 +417,8 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `joining an ENDED session as supervisor returns 409`() = routeTest {
-        val prof1   = register("prof1@isel.pt", "password123", "PROFESSOR")
-        val prof2   = register("prof2@isel.pt", "password123", "PROFESSOR")
+        val prof1 = register("prof1@isel.pt", "password123", "PROFESSOR")
+        val prof2 = register("prof2@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof1.token, createExam(prof1.token).id)
         startSession(prof1.token, session.id)
         endSession(prof1.token, session.id)
@@ -430,7 +430,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `joining as supervisor without a token returns 403`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
 
@@ -446,10 +446,10 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor lists participants and sees all students who have joined`() = routeTest {
-        val prof     = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val student1 = register("s1@isel.pt", "password123", "STUDENT")
         val student2 = register("s2@isel.pt", "password123", "STUDENT")
-        val session  = createSession(prof.token, createExam(prof.token).id)
+        val session = createSession(prof.token, createExam(prof.token).id)
         joinSession(student1.token, session.code)
         joinSession(student2.token, session.code)
 
@@ -480,7 +480,7 @@ class SessionRoutesTest : BaseRouteTest() {
 
     @Test
     fun `professor lists events for a new session and receives an empty list`() = routeTest {
-        val prof    = register("prof@isel.pt", "password123", "PROFESSOR")
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
 
         val response = jsonClient().get("/sessions/${session.id}/events") {

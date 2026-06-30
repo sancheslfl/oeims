@@ -5,6 +5,8 @@
 - [ ] Corrigir o logging do servidor para incluir a identidade do utilizador (email/role) em cada request
 - [ ] Adicionar a claim de email ao JWT para facilitar o logging e rastreabilidade
 - [ ] Investigar que valor usar para `maxFrameSize` na configuração das WebSockets
+- [ ] (NEW) Tornar prazo de expiração dos tokens de joins independentes da timezone
+- [ ] (NEW) Fazer cleanup automático de tokens expirados
 
 ## Serviço
 
@@ -14,7 +16,6 @@
 - [ ] Corrigir o problema em que o serviço não interceta nem termina processos proibidos
 - [ ] Adicionar verificação de que o daemon está ligado (CONNECTED) antes de considerar o estudante pronto na sessão
 - [ ] (NEW) Tornar implementação de monitorização de processos independente da plataforma
-- [ ] (NEW) Substituir script "join-session.ps1" com sistema de autenticação
 
 ## Consola do Professor
 
@@ -23,16 +24,14 @@
 - [ ] Criar um campo para a sala no formulário de criação de exame em vez de estar explicito no título
 - [ ] Usar reducer hook no componente Dashboard e Login que tem bastantes estados
 - [ ] Sinalizar e guardar alunos que tiveram atualizações nos eventos e não foram visto pelo professor
-- [ ] (NEW) Criar visual para quando um aluno não tem heartbeat do Serviço
-- [ ] (NEW) Procurar solução para a autenticação do professor
+- [ ] (NEW) Criar visual para mostrar que componentes estão offline na maquina do aluno
 
 ## Documentação
 
 - [ ] Refazer os diagramas com menos ligações e melhor layout
-- [ ] (NEW) Começar o capítulo de Arquitetura da solução
 
 ## Dúvidas
-
+- Para comunicação bidirecional com pipes, devemos usar dois one-way named pipes ou um two-way named pipe?
 
 ## Concluído
 
@@ -56,3 +55,10 @@
 - [X] Permitir que contas de professores acedam a sessões ativas usando os códigos
 - [X] Redirecionar para login quando utilizador tem token expirado [13/6]
 - [X] (NEW) Adicionar flow para professores acederem a sessões através do código (SSE) [12/6]
+- [X] (NEW) Começar o capítulo de Arquitetura da solução [18/6]
+- [X] (NEW) Procurar solução para a autenticação do professor [20/6]
+- [X] (NEW) Substituir script "join-session.ps1" com sistema de autenticação [22/6]
+
+
+
+

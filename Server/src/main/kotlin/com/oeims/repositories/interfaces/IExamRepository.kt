@@ -1,7 +1,7 @@
 package com.oeims.repositories.interfaces
 
 import com.oeims.repositories.ExamRecord
-import java.util.UUID
+import java.util.*
 
 interface IExamRepository {
     suspend fun findById(id: UUID): ExamRecord?

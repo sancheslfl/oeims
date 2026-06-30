@@ -32,7 +32,7 @@ fun Route.examRoutes(examService: ExamService) {
             get {
                 val title = call.request.queryParameters["title"]
                 val response = if (title != null) examService.getExamsByTitle(title.toExamTitle())
-                               else examService.getAllExams()
+                else examService.getAllExams()
                 call.respond(HttpStatusCode.OK, response)
             }
 
