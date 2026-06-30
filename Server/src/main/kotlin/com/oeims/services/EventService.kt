@@ -16,6 +16,7 @@ import com.oeims.connections.SseEvent
 import com.oeims.models.EventRecord
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import java.time.Instant
 
 class EventService(
     private val eventRepository: IEventRepository,
@@ -29,7 +30,8 @@ class EventService(
         participantId: ParticipantId,
         monitorName: String,
         message: String,
-        severity: Severity
+        severity: Severity,
+        occurredAt: Instant? = null
     ): EventResponse? {
         val participant = participantRepository.findById(participantId.value)
             ?: throw NotFoundException("Participant not found")
@@ -45,7 +47,8 @@ class EventService(
             participantId.value,
             monitorName,
             message,
-            severity
+            severity,
+            occurredAt
         )
 
         val response = record.toResponse()

@@ -17,19 +17,20 @@ class EventRepository : IEventRepository {
         participantId: UUID,
         monitorName: String,
         message: String,
-        severity: Severity
+        severity: Severity,
+        occurredAt: Instant?
     ): EventRecord = newSuspendedTransaction(Dispatchers.IO) {
         val id = UUID.randomUUID()
-        val now = Instant.now()
+        val timestamp = occurredAt ?: Instant.now()
         Events.insert {
             it[Events.id] = id
             it[Events.participantId] = participantId
             it[Events.monitorName] = monitorName
             it[Events.message] = message
             it[Events.severity] = severity
-            it[Events.occurredAt] = now
+            it[Events.occurredAt] = timestamp
         }
-        EventRecord(id, participantId, monitorName, message, severity, now)
+        EventRecord(id, participantId, monitorName, message, severity, timestamp)
     }
 
     override suspend fun findByParticipant(participantId: UUID): List<EventRecord> =
