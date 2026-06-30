@@ -1,5 +1,6 @@
 package com.oeims.repositories
 
+import com.oeims.models.EventRecord
 import com.oeims.models.Events
 import com.oeims.models.Participants
 import com.oeims.models.Severity
@@ -9,15 +10,6 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 import java.util.*
-
-data class EventRecord(
-    val id: UUID,
-    val participantId: UUID,
-    val monitorName: String,
-    val message: String,
-    val severity: Severity,
-    val occurredAt: Instant
-)
 
 class EventRepository : IEventRepository {
 
@@ -48,7 +40,17 @@ class EventRepository : IEventRepository {
                 .map { it.toRecord() }
         }
 
-    // Fetch the full event timeline for a session (all participants).
+    override suspend fun findByParticipants(participantIds: List<UUID>): List<EventRecord> =
+        newSuspendedTransaction(Dispatchers.IO) {
+            if (participantIds.isEmpty())
+                return@newSuspendedTransaction emptyList()
+
+            Events
+                .selectAll()
+                .where { Events.participantId inList participantIds }
+                .map { it.toRecord() }
+        }
+
     override suspend fun findBySession(sessionId: UUID): List<EventRecord> = newSuspendedTransaction(Dispatchers.IO) {
         Events.join(Participants, JoinType.INNER, Events.participantId, Participants.id)
             .selectAll()

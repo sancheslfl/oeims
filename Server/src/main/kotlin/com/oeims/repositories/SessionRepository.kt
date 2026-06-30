@@ -1,6 +1,8 @@
 package com.oeims.repositories
 
+import com.oeims.models.SessionJoinRecord
 import com.oeims.models.SessionJoins
+import com.oeims.models.SessionRecord
 import com.oeims.models.SessionStatus
 import com.oeims.models.SessionSupervisors
 import com.oeims.models.Sessions
@@ -10,28 +12,6 @@ import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 import java.util.*
-
-data class SessionRecord(
-    val id: UUID,
-    val examId: UUID,
-    val supervisorId: UUID,
-    val code: String,
-    val allowedEmailDomain: String,
-    val status: SessionStatus,
-    val createdAt: Instant,
-    val startedAt: Instant?,
-    val endedAt: Instant?
-)
-
-data class EmailJoinRecord(
-    val id: UUID,
-    val sessionId: UUID,
-    val email: String,
-    val jwtId: String,
-    val expiresAt: Instant,
-    val verifiedAt: Instant?,
-    val createdAt: Instant,
-)
 
 class SessionRepository : ISessionRepository {
 
@@ -165,7 +145,7 @@ class SessionRepository : ISessionRepository {
         email: String,
         jwtId: String,
         expiresAt: Instant,
-    ): EmailJoinRecord =
+    ): SessionJoinRecord =
         newSuspendedTransaction(Dispatchers.IO) {
             val id = UUID.randomUUID()
             val now = Instant.now()
@@ -180,7 +160,7 @@ class SessionRepository : ISessionRepository {
                 it[SessionJoins.createdAt] = now
             }
 
-            EmailJoinRecord(
+            SessionJoinRecord(
                 id = id,
                 sessionId = sessionId,
                 email = email,
@@ -191,7 +171,7 @@ class SessionRepository : ISessionRepository {
             )
         }
 
-    override suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord? =
+    override suspend fun findEmailJoinByJwtId(jwtId: String): SessionJoinRecord? =
         newSuspendedTransaction(Dispatchers.IO) {
             SessionJoins.selectAll()
                 .where { SessionJoins.emailJwtId eq jwtId }
@@ -223,7 +203,7 @@ private fun ResultRow.toRecord() = SessionRecord(
     endedAt = this[Sessions.endedAt]
 )
 
-private fun ResultRow.toEmailJoinRecord() = EmailJoinRecord(
+private fun ResultRow.toEmailJoinRecord() = SessionJoinRecord(
     id = this[SessionJoins.id].value,
     sessionId = this[SessionJoins.sessionId].value,
     email = this[SessionJoins.email],

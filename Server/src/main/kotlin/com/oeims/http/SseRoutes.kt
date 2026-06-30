@@ -1,6 +1,6 @@
 package com.oeims.http
 
-import com.oeims.models.ids.toProfessorId
+import com.oeims.models.toProfessorId
 import com.oeims.services.SessionService
 import com.oeims.connections.SseBroadcaster
 import com.oeims.connections.SseChannel

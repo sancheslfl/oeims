@@ -5,16 +5,17 @@ import com.oeims.connections.SseChannels
 import com.oeims.connections.SseEvent
 import com.oeims.models.AllowedEmailDomain
 import com.oeims.models.ConflictException
+import com.oeims.models.ExamId
 import com.oeims.models.ForbiddenException
 import com.oeims.models.NotFoundException
+import com.oeims.models.ProfessorId
 import com.oeims.models.SessionCode
+import com.oeims.models.SessionId
 import com.oeims.models.SessionStatus
 import com.oeims.models.dto.SessionResponse
-import com.oeims.models.ids.ExamId
-import com.oeims.models.ids.ProfessorId
-import com.oeims.models.ids.SessionId
-import com.oeims.repositories.SessionRecord
+import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IExamRepository
+import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -22,9 +23,11 @@ import java.time.Instant
 class SessionService(
     private val sessionRepository: ISessionRepository,
     private val examRepository: IExamRepository,
+    private val participantRepository: IParticipantRepository,
+    private val eventRepository: IEventRepository,
     private val sseBroadcaster: SseBroadcaster,
 ) {
-    suspend fun createSession(
+    suspend fun create(
         professorId: ProfessorId,
         examId: ExamId,
         allowedEmailDomain: AllowedEmailDomain,
@@ -54,7 +57,7 @@ class SessionService(
         throw IllegalStateException("Failed to generate a unique session code after 5 attempts")
     }
 
-    suspend fun startSession(
+    suspend fun start(
         sessionId: SessionId,
         professorId: ProfessorId,
     ): SessionResponse {
@@ -82,7 +85,7 @@ class SessionService(
         return response
     }
 
-    suspend fun endSession(
+    suspend fun end(
         sessionId: SessionId,
         professorId: ProfessorId,
     ): SessionResponse {
@@ -113,6 +116,33 @@ class SessionService(
     suspend fun getSession(sessionId: SessionId): SessionResponse =
         sessionRepository.findById(sessionId.value)?.toResponse()
             ?: throw NotFoundException("Session not found")
+
+    suspend fun generateReport(
+        sessionId: SessionId,
+        professorId: ProfessorId,
+    ): String {
+        val session = sessionRepository.findById(sessionId.value)
+            ?: throw NotFoundException("Session not found")
+
+        val exam = examRepository.findById(session.examId)
+            ?: throw NotFoundException("Exam not found")
+
+        if (!sessionRepository.isSupervisor(sessionId.value, professorId.value))
+            throw ForbiddenException("Only session supervisors can generate the report")
+
+        val participants = participantRepository.findBySession(sessionId.value)
+
+        val events = eventRepository.findByParticipants(
+            participantIds = participants.map { it.id },
+        )
+
+        return SessionReportFormatter.format(
+            session = session,
+            exam = exam,
+            participants = participants,
+            events = events,
+        )
+    }
 
     suspend fun joinAsAdditionalSupervisor(
         code: SessionCode,
@@ -151,13 +181,3 @@ class SessionService(
             .joinToString("")
     }
 }
-
-private fun SessionRecord.toResponse() = SessionResponse(
-    id = id.toString(),
-    examId = examId.toString(),
-    supervisorId = supervisorId.toString(),
-    code = code,
-    status = status.name,
-    startedAt = startedAt?.toString(),
-    endedAt = endedAt?.toString(),
-)

@@ -1,6 +1,6 @@
 package com.oeims.repositories.interfaces
 
-import com.oeims.repositories.ExamRecord
+import com.oeims.models.ExamRecord
 import java.util.*
 
 interface IExamRepository {

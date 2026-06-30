@@ -15,11 +15,9 @@ import com.oeims.models.dto.EmailJoinResponse
 import com.oeims.models.dto.ParticipantResponse
 import com.oeims.models.dto.ParticipantStatusUpdate
 import com.oeims.models.dto.VerifyJoinResponse
-import com.oeims.models.ids.ParticipantId
-import com.oeims.models.ids.SessionId
-import com.oeims.models.ids.toSessionId
-import com.oeims.repositories.ParticipantRecord
-import com.oeims.repositories.SessionRecord
+import com.oeims.models.ParticipantId
+import com.oeims.models.SessionId
+import com.oeims.models.toSessionId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import kotlinx.serialization.json.Json
@@ -306,12 +304,3 @@ class ParticipantService(
         val sessionCode: String,
     )
 }
-
-fun ParticipantRecord.toResponse() = ParticipantResponse(
-    id = id.toString(),
-    sessionId = sessionId.toString(),
-    email = email,
-    connectionStatus = connectionStatus.name,
-    lastHeartbeat = lastHeartbeat?.toString(),
-    joinedAt = joinedAt.toString(),
-)

@@ -1,5 +1,6 @@
 package com.oeims.repositories
 
+import com.oeims.models.UserRecord
 import com.oeims.models.UserRole
 import com.oeims.models.Users
 import com.oeims.repositories.interfaces.IUserRepository
@@ -10,14 +11,6 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 import java.util.*
-
-data class UserRecord(
-    val id: UUID,
-    val email: String,
-    val role: UserRole,
-    val passwordHash: String,
-    val createdAt: Instant
-)
 
 class UserRepository : IUserRepository {
 

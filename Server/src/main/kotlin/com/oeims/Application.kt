@@ -127,7 +127,7 @@ fun Application.module() {
     // Services
     val authService = AuthService(userRepository, authJwtSettings)
     val examService = ExamService(examRepository)
-    val sessionService = SessionService(sessionRepository, examRepository, sseBroadcaster)
+    val sessionService = SessionService(sessionRepository, examRepository, participantRepository, eventRepository, sseBroadcaster)
     val participantService = ParticipantService(
         participantRepository,
         sessionRepository,

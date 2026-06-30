@@ -377,7 +377,7 @@ private fun openApiSpec(): String {
         "tags": ["Sessions"],
         "summary": "Create session",
         "description": "Create a new exam session. The server generates a unique 6-character join code. The session starts in `PENDING` status.",
-        "operationId": "createSession",
+        "operationId": "create",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -440,7 +440,7 @@ private fun openApiSpec(): String {
         "tags": ["Sessions"],
         "summary": "Start session",
         "description": "Transition a `PENDING` session to `ACTIVE`. Only the supervising professor can start the session.",
-        "operationId": "startSession",
+        "operationId": "start",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
@@ -461,7 +461,7 @@ private fun openApiSpec(): String {
         "tags": ["Sessions"],
         "summary": "End session",
         "description": "Transition an `ACTIVE` session to `ENDED`. Only the supervising professor can end the session.",
-        "operationId": "endSession",
+        "operationId": "end",
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }

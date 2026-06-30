@@ -4,7 +4,7 @@ import com.oeims.connections.WebSocketBroadcaster
 import com.oeims.models.dto.ParticipantResponse
 import com.oeims.models.dto.SentinelEventMessage
 import com.oeims.models.dto.toDomainSeverity
-import com.oeims.models.ids.toParticipantId
+import com.oeims.models.toParticipantId
 import com.oeims.services.EventService
 import com.oeims.services.ParticipantService
 import io.ktor.server.application.*
@@ -93,7 +93,7 @@ private suspend fun DefaultWebSocketServerSession.receiveFrames(
                 continue
             }
 
-            eventService.handleEvent(
+            eventService.create(
                 participantId = participant.id.toParticipantId(),
                 monitorName = msg.monitorName,
                 message = msg.message,

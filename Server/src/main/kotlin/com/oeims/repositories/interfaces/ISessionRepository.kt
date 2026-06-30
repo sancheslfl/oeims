@@ -1,8 +1,8 @@
 package com.oeims.repositories.interfaces
 
+import com.oeims.models.SessionJoinRecord
+import com.oeims.models.SessionRecord
 import com.oeims.models.SessionStatus
-import com.oeims.repositories.EmailJoinRecord
-import com.oeims.repositories.SessionRecord
 import java.time.Instant
 import java.util.*
 
@@ -31,6 +31,6 @@ interface ISessionRepository {
     suspend fun findAllActive(): List<SessionRecord>
 
     suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean
-    suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord?
-    suspend fun createEmailJoin(sessionId: UUID, email: String, jwtId: String, expiresAt: Instant): EmailJoinRecord
+    suspend fun findEmailJoinByJwtId(jwtId: String): SessionJoinRecord?
+    suspend fun createEmailJoin(sessionId: UUID, email: String, jwtId: String, expiresAt: Instant): SessionJoinRecord
 }

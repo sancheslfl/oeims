@@ -9,16 +9,6 @@ import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransacti
 import java.time.Instant
 import java.util.*
 
-data class ParticipantRecord(
-    val id: UUID,
-    val sessionId: UUID,
-    val email: String,
-    val examIdentityCode: String?,
-    val connectionStatus: ConnectionStatus,
-    val lastHeartbeat: Instant?,
-    val joinedAt: Instant
-)
-
 class ParticipantRepository : IParticipantRepository {
 
     override suspend fun findById(id: UUID): ParticipantRecord? =
