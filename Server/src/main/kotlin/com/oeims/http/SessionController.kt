@@ -9,7 +9,7 @@ import com.oeims.models.toProfessorId
 import com.oeims.models.toSessionId
 import com.oeims.models.toAllowedEmailDomain
 import com.oeims.models.toEmail
-import com.oeims.models.toEmailJoinToken
+import com.oeims.models.toJwtToken
 import com.oeims.models.toSessionCode
 import com.oeims.services.EventService
 import com.oeims.services.ParticipantService
@@ -46,7 +46,7 @@ fun Route.sessionRoutes(
         post("/join/verify") {
             val req = call.receive<VerifyJoinRequest>()
 
-            val response = participantService.verifyJoin(token = req.token.toEmailJoinToken())
+            val response = participantService.verifyJoin(emailToken = req.token.toJwtToken())
 
             call.respond(HttpStatusCode.OK, response)
         }

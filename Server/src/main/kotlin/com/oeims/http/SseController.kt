@@ -12,7 +12,7 @@ import io.ktor.sse.*
 import io.ktor.util.cio.*
 import io.ktor.utils.io.*
 
-fun Route.sseRoutes(
+fun Route.sse(
     sessionService: SessionService,
     sseBroadcaster: SseBroadcaster
 ) {
