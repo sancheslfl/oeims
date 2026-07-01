@@ -12,6 +12,7 @@ import com.oeims.repositories.*
 import com.oeims.services.*
 import com.oeims.connections.SseBroadcaster
 import com.oeims.connections.WebSocketBroadcaster
+import com.oeims.connections.WebSocketService
 import io.ktor.http.*
 import io.ktor.http.auth.*
 import io.ktor.serialization.kotlinx.json.*
@@ -28,6 +29,7 @@ import io.ktor.server.sse.*
 import io.ktor.server.websocket.*
 import kotlinx.serialization.json.Json
 import org.slf4j.event.Level
+import java.time.Clock
 import java.util.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -105,16 +107,19 @@ fun Application.module() {
     // Database
     configureDatabase()
 
+    // Clock
+    val clock = Clock.systemDefaultZone()
+
     // Repositories
     val userRepository = UserRepository()
     val examRepository = ExamRepository()
-    val sessionRepository = SessionRepository()
+    val sessionRepository = SessionRepository(clock)
     val participantRepository = ParticipantRepository()
     val eventRepository = EventRepository()
 
     // Config
     val authJwtSettings = configureAuthJwt()
-    val sessionJwtSettings = SessionJwtSettings(configureEmailJoinJwt(), authJwtSettings)
+    val sessionJwtSettings = SessionJwtSettings(configureEmailVerificationJwt(), authJwtSettings)
     val heartbeatConfig = configureHeartbeat()
 
     // Email service
@@ -122,7 +127,7 @@ fun Application.module() {
 
     // Realtime
     val sseBroadcaster = SseBroadcaster()
-    val webSocketBroadcaster = WebSocketBroadcaster()
+    val webSocketService = WebSocketService(ev)
 
     // Services
     val authService = AuthService(userRepository, authJwtSettings)
@@ -133,7 +138,7 @@ fun Application.module() {
         sessionRepository,
         sessionJwtSettings,
         sseBroadcaster,
-        webSocketBroadcaster,
+        webSocketService,
         smtpEmailSender
     )
     val eventService = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
@@ -150,7 +155,7 @@ fun Application.module() {
         participantService,
         eventService,
         sseBroadcaster,
-        webSocketBroadcaster
+        webSocketService,
     )
 
     // API Docs

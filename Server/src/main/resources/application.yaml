@@ -23,8 +23,8 @@ jwt:
     realm: "oeims"
     expiration-ms: 3600000
 
-  email-join:
-    audience: "oeims:email-join"
+  email-verification:
+    audience: "oeims:email-verification"
     realm: "oeims"
     expiration-ms: 600000
 

@@ -67,7 +67,7 @@ class ParticipantService(
             email = email,
         )
 
-        sessionRepository.createEmailJoin(
+        sessionRepository.createJoinRequest(
             sessionId = session.id,
             email = email.address,
             jwtId = token.jwtId,
@@ -91,25 +91,25 @@ class ParticipantService(
         return EmailJoinResponse(message = "Verification email sent")
     }
 
-    suspend fun verifyJoin(token: EmailJoinToken): VerifyJoinResponse {
-        val verifiedToken = verifyJoinToken(token)
+    suspend fun verifyJoin(emailToken: JwtToken): VerifyJoinResponse {
+        val verifiedToken = verifyEmailToken(emailToken)
 
-        val emailJoin = sessionRepository.findEmailJoinByJwtId(verifiedToken.jwtId)
+        val joinAttempt = sessionRepository.findJoinRequestByJwtId(verifiedToken.jwtId)
             ?: throw NotFoundException("It seems the token may be invalid or expired. Please try again")
 
-        if (emailJoin.verifiedAt != null) {
+        if (joinAttempt.verifiedAt != null) {
             throw ConflictException("This token has already been used")
         }
 
-        val session = sessionRepository.findById(emailJoin.sessionId)
+        val session = sessionRepository.findById(joinAttempt.sessionId)
             ?: throw NotFoundException("The respective session does not exist anymore")
 
         if (session.status == SessionStatus.ENDED) {
             throw ConflictException("Session has already ended")
         }
 
-        val isNotUpdated = !sessionRepository.updateEmailJoinVerification(
-            id = emailJoin.id,
+        val isNotUpdated = !sessionRepository.updateJoinVerification(
+            id = joinAttempt.id,
             verifiedAt = Instant.now(),
         )
 
@@ -118,13 +118,13 @@ class ParticipantService(
         }
 
         val existingParticipant = participantRepository.findByEmailAndSession(
-            email = emailJoin.email,
+            email = joinAttempt.email,
             sessionId = session.id,
         )
 
         val participant = existingParticipant ?: participantRepository.create(
             sessionId = session.id,
-            email = emailJoin.email,
+            email = joinAttempt.email,
         )
 
         if (existingParticipant == null) {
@@ -232,7 +232,7 @@ class ParticipantService(
         session: SessionRecord,
         email: Email,
     ): CreatedJoinToken {
-        val settings = jwtSettings.emailJoin
+        val settings = jwtSettings.emailVerification
         val jwtId = java.util.UUID.randomUUID().toString()
         val now = Instant.now()
         val expiresAt = now.plus(settings.expiration)
@@ -259,9 +259,9 @@ class ParticipantService(
         )
     }
 
-    private fun verifyJoinToken(token: EmailJoinToken): VerifiedJoinToken {
+    private fun verifyEmailToken(emailToken: JwtToken): VerifiedJoinToken {
         val jwt = try {
-            jwtSettings.emailJoin.verifier.verify(token.value)
+            jwtSettings.emailVerification.verifier.verify(emailToken.value)
         } catch (_: TokenExpiredException) {
             throw ConflictException("This token has expired. Please request another email verification and try again")
         } catch (_: JWTVerificationException) {

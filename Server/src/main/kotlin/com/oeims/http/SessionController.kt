@@ -21,7 +21,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.sessionRoutes(
+fun Route.sessions(
     sessionService: SessionService,
     participantService: ParticipantService,
     eventService: EventService,

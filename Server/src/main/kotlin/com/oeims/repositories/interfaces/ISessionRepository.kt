@@ -30,7 +30,7 @@ interface ISessionRepository {
     suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean
     suspend fun findAllActive(): List<SessionRecord>
 
-    suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean
-    suspend fun findEmailJoinByJwtId(jwtId: String): SessionJoinRecord?
-    suspend fun createEmailJoin(sessionId: UUID, email: String, jwtId: String, expiresAt: Instant): SessionJoinRecord
+    suspend fun updateJoinVerification(id: UUID, verifiedAt: Instant): Boolean
+    suspend fun findJoinRequestByJwtId(jwtId: String): SessionJoinRecord?
+    suspend fun createJoinRequest(sessionId: UUID, email: String, jwtId: String, expiresAt: Instant): SessionJoinRecord
 }

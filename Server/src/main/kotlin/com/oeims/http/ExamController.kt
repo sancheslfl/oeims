@@ -11,7 +11,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.examRoutes(examService: ExamService) {
+fun Route.exams(examService: ExamService) {
     authenticate("auth-professor") {
         route("/exams") {
 

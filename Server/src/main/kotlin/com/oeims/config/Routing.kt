@@ -7,7 +7,7 @@ import com.oeims.services.EventService
 import com.oeims.services.ExamService
 import com.oeims.services.SessionService
 import com.oeims.connections.SseBroadcaster
-import com.oeims.connections.WebSocketBroadcaster
+import com.oeims.connections.WebSocketService
 import com.oeims.models.ConflictException
 import com.oeims.models.ForbiddenException
 import com.oeims.models.NotFoundException
@@ -27,7 +27,7 @@ fun Application.configureRouting(
     participantService: ParticipantService,
     eventService: EventService,
     sseBroadcaster: SseBroadcaster,
-    webSocketBroadcaster: WebSocketBroadcaster,
+    webSocketBroadcaster: WebSocketService,
 ) {
     install(StatusPages) {
         exception<ValidationException> { call, cause ->
@@ -58,12 +58,12 @@ fun Application.configureRouting(
 
     routing {
         route(basePath) {
-            authRoutes(authService)
-            examRoutes(examService)
-            participantRoutes(participantService)
-            sessionRoutes(sessionService, participantService, eventService)
-            sseRoutes(sessionService, sseBroadcaster)
-            webSocketRoutes(eventService, participantService, webSocketBroadcaster)
+            authentication(authService)
+            exams(examService)
+            participants(participantService)
+            sessions(sessionService, participantService, eventService)
+            sse(sessionService, sseBroadcaster)
+            webSockets(participantService, webSocketBroadcaster)
         }
     }
 }

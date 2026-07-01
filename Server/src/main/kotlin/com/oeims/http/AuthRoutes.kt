@@ -12,7 +12,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.authRoutes(authService: AuthService) {
+fun Route.authentication(authService: AuthService) {
     route("/auth") {
         rateLimit(RateLimitName("auth")) {
 

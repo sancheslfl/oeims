@@ -7,7 +7,7 @@ import io.ktor.server.auth.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.participantRoutes(participantService: ParticipantService) {
+fun Route.participants(participantService: ParticipantService) {
     authenticate("auth-student") {
         post("/participants/{id}/heartbeat") {
             val authenticatedParticipantId = call.participantId()
