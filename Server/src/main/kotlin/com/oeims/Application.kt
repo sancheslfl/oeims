@@ -8,11 +8,11 @@ import com.oeims.config.configureEmail
 import com.oeims.config.configureOpenApi
 import com.oeims.config.configureRouting
 import com.oeims.config.configureSecurity
+import com.oeims.connections.MAX_FRAME_BYTES
+import com.oeims.connections.SentinelWebSocketManager
 import com.oeims.repositories.*
 import com.oeims.services.*
 import com.oeims.connections.SseBroadcaster
-import com.oeims.connections.WebSocketBroadcaster
-import com.oeims.connections.WebSocketService
 import io.ktor.http.*
 import io.ktor.http.auth.*
 import io.ktor.serialization.kotlinx.json.*
@@ -95,7 +95,7 @@ fun Application.module() {
     install(WebSockets) {
         pingPeriod = 30.seconds
         timeout = 60.seconds
-        maxFrameSize = 64 * 1024L  // 64 KB
+        maxFrameSize = MAX_FRAME_BYTES
     }
 
     // SSE
@@ -127,7 +127,7 @@ fun Application.module() {
 
     // Realtime
     val sseBroadcaster = SseBroadcaster()
-    val webSocketService = WebSocketService(ev)
+    val webSocketManager = SentinelWebSocketManager()
 
     // Services
     val authService = AuthService(userRepository, authJwtSettings)
@@ -138,7 +138,7 @@ fun Application.module() {
         sessionRepository,
         sessionJwtSettings,
         sseBroadcaster,
-        webSocketService,
+        webSocketManager,
         smtpEmailSender
     )
     val eventService = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
@@ -155,7 +155,7 @@ fun Application.module() {
         participantService,
         eventService,
         sseBroadcaster,
-        webSocketService,
+        webSocketManager,
     )
 
     // API Docs

@@ -40,6 +40,6 @@ object SessionJoins : UUIDTable("session_joins") {
 
     init {
         index("session_joins_session_email_index", false, sessionId, email)
-        inde
+        index("session_joins_email_expires_at_index", false, emailExpiresAt)
     }
 }

@@ -70,7 +70,7 @@ class WebSocketManager<K: Any> {
     suspend fun receiveText(
         key: K,
         session: DefaultWebSocketServerSession,
-        maxFrameBytes: Int? = null,
+        maxFrameBytes: Long? = null,
         onTextFrame: suspend (String) -> Unit,
     ) {
         try {

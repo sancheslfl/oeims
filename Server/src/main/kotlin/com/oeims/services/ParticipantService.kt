@@ -4,19 +4,17 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.exceptions.TokenExpiredException
 import com.oeims.config.Environment
+import com.oeims.connections.SentinelWebSocketManager
 import com.oeims.connections.SseBroadcaster
 import com.oeims.connections.SseChannels
 import com.oeims.connections.SseEvent
-import com.oeims.connections.WebSocketBroadcaster
-import com.oeims.connections.WebSocketMessageTypes
-import com.oeims.connections.WebSocketOutboundMessage
 import com.oeims.models.*
+import com.oeims.models.ParticipantId
+import com.oeims.models.SessionId
 import com.oeims.models.dto.EmailJoinResponse
 import com.oeims.models.dto.ParticipantResponse
 import com.oeims.models.dto.ParticipantStatusUpdate
 import com.oeims.models.dto.VerifyJoinResponse
-import com.oeims.models.ParticipantId
-import com.oeims.models.SessionId
 import com.oeims.models.toSessionId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
@@ -30,7 +28,7 @@ class ParticipantService(
     private val sessionRepository: ISessionRepository,
     private val jwtSettings: SessionJwtSettings,
     private val sseBroadcaster: SseBroadcaster,
-    private val webSocketBroadcaster: WebSocketBroadcaster,
+    private val webSocketManager: SentinelWebSocketManager,
     private val emailSender: EmailSender,
 ) {
 
@@ -179,15 +177,12 @@ class ParticipantService(
         }
     }
 
-    suspend fun sendExamIdentityCode(participant: ParticipantRecord) {
+    private suspend fun sendExamIdentityCode(participant: ParticipantRecord) {
         val examIdentityCode = getOrCreateExamIdentityCode(participant)
 
-        webSocketBroadcaster.send(
+        webSocketManager.sendExamIdentityCode(
             participantId = participant.id,
-            message = WebSocketOutboundMessage(
-                type = WebSocketMessageTypes.EXAM_IDENTITY_CODE,
-                data = examIdentityCode.value,
-            ),
+            examIdentityCode = examIdentityCode,
         )
     }
 
@@ -202,7 +197,6 @@ class ParticipantService(
     private suspend fun getOrCreateExamIdentityCode(
         participant: ParticipantRecord,
     ): ExamIdentityCode {
-
         if (participant.examIdentityCode != null) {
             return participant.examIdentityCode.toExamIdentityCode()
         }

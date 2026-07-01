@@ -8,7 +8,7 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.util.UUID
 
-const val MAX_FRAME_BYTES = 8 * 1024    // 8 KB
+const val MAX_FRAME_BYTES: Long = 8 * 1024    // 8 KB
 
 /**
  * Sentinel-specific WebSocket manager.
