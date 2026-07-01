@@ -4,8 +4,7 @@ package com.oeims.models
 value class SessionCode(val value: String) {
 
     init {
-        if (!CODE_REGEX.matches(value))
-            throw ValidationException("Invalid session code format")
+        validate(CODE_REGEX.matches(value)) { "Invalid session code format" }
     }
 
     companion object {
@@ -33,12 +32,12 @@ fun String.toAllowedEmailDomain(): AllowedEmailDomain =
     AllowedEmailDomain(trim().lowercase())
 
 @JvmInline
-value class EmailJoinToken(val value: String) {
+value class JwtToken(val value: String) {
     init {
         validate(value.isNotBlank()) { "Email join token cannot be blank" }
         validate(value.count { it == '.' } == 2) { "Invalid JWT format" }
     }
 }
 
-fun String.toEmailJoinToken(): EmailJoinToken =
-    EmailJoinToken(trim())
+fun String.toJwtToken(): JwtToken =
+    JwtToken(trim())

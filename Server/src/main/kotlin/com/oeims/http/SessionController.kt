@@ -4,12 +4,12 @@ import com.oeims.models.dto.CreateSessionRequest
 import com.oeims.models.dto.EmailJoinRequest
 import com.oeims.models.dto.JoinSessionRequest
 import com.oeims.models.dto.VerifyJoinRequest
-import com.oeims.models.ids.toExamId
-import com.oeims.models.ids.toProfessorId
-import com.oeims.models.ids.toSessionId
+import com.oeims.models.toExamId
+import com.oeims.models.toProfessorId
+import com.oeims.models.toSessionId
 import com.oeims.models.toAllowedEmailDomain
 import com.oeims.models.toEmail
-import com.oeims.models.toEmailJoinToken
+import com.oeims.models.toJwtToken
 import com.oeims.models.toSessionCode
 import com.oeims.services.EventService
 import com.oeims.services.ParticipantService
@@ -21,13 +21,12 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.sessionRoutes(
+fun Route.sessions(
     sessionService: SessionService,
     participantService: ParticipantService,
     eventService: EventService,
 ) {
     route("/sessions") {
-
         // POST /sessions/{code}/join - request to join a session using a verified email flow
         post("/{code}/join") {
             val code = call.parameters["code"]
@@ -47,22 +46,20 @@ fun Route.sessionRoutes(
         post("/join/verify") {
             val req = call.receive<VerifyJoinRequest>()
 
-            val response = participantService.verifyJoin(
-                token = req.token.toEmailJoinToken(),
-            )
+            val response = participantService.verifyJoin(emailToken = req.token.toJwtToken())
 
             call.respond(HttpStatusCode.OK, response)
         }
 
-        authenticate("auth-professor") {
 
+        authenticate("auth-professor") {
             // POST /sessions - create a session for an exam
             post {
                 val professorId = call.userId()
                 val req = call.receive<CreateSessionRequest>()
                 val examId = call.uuidParam(req.examId, "examId")
 
-                val response = sessionService.createSession(
+                val response = sessionService.create(
                     professorId = professorId.toProfessorId(),
                     examId = examId.toExamId(),
                     allowedEmailDomain = req.allowedEmailDomain.toAllowedEmailDomain(),
@@ -103,8 +100,8 @@ fun Route.sessionRoutes(
                 call.respond(HttpStatusCode.OK, response)
             }
 
-            route("/{id}") {
 
+            route("/{id}") {
                 // GET /sessions/{id}
                 get {
                     val sessionId = call.uuidParam("id")
@@ -117,7 +114,7 @@ fun Route.sessionRoutes(
                     val professorId = call.userId().toProfessorId()
                     val sessionId = call.uuidParam("id").toSessionId()
 
-                    val response = sessionService.startSession(
+                    val response = sessionService.start(
                         sessionId = sessionId,
                         professorId = professorId,
                     )
@@ -132,7 +129,7 @@ fun Route.sessionRoutes(
                     val professorId = call.userId()
                     val sessionId = call.uuidParam("id")
 
-                    val response = sessionService.endSession(
+                    val response = sessionService.end(
                         sessionId = sessionId.toSessionId(),
                         professorId = professorId.toProfessorId(),
                     )
@@ -152,6 +149,24 @@ fun Route.sessionRoutes(
                     val sessionId = call.uuidParam("id")
                     val response = eventService.getSessionEvents(sessionId.toSessionId())
                     call.respond(HttpStatusCode.OK, response)
+                }
+
+                // GET /sessions/{id}/report - generate and return a report for a session
+                get("/report") {
+                    val sessionId = call.uuidParam("id").toSessionId()
+                    val professorId = call.userId().toProfessorId()
+
+                    val report = sessionService.generateReport(
+                        sessionId = sessionId,
+                        professorId = professorId,
+                    )
+
+                    call.response.header(
+                        HttpHeaders.ContentDisposition,
+                        """attachment; filename="oeims-session-${sessionId.value}.txt"""",
+                    )
+
+                    call.respondText(report)
                 }
             }
         }

@@ -3,7 +3,6 @@ import type {
     EventResponse,
     ParticipantResponse,
     SessionResponse,
-    StudentAuth,
 } from "../types";
 
 export function createSession(
@@ -107,22 +106,23 @@ export function requestSessionJoin(
     );
 }
 
-export function verifyJoin(token: string): Promise<StudentAuth> {
-    return apiFetch<StudentAuth>(
-        "/sessions/join/verify",
-        {
-            method: "POST",
-            body: JSON.stringify({ token }),
-        },
-    );
-}
-
 export function getSessionEvents(sessionId: string, token: string) {
     return apiFetch<EventResponse[]>(
         `/sessions/${sessionId}/events`,
         {
             method: "GET",
         },
+        token,
+    );
+}
+
+export function getSessionReport(
+    sessionId: string,
+    token: string,
+): Promise<Blob> {
+    return apiFetch<Blob>(
+        `/sessions/${sessionId}/report`,
+        { method: "GET" },
         token,
     );
 }

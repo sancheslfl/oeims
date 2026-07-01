@@ -1,39 +1,21 @@
 package com.oeims.repositories
 
+import com.oeims.models.SessionJoinRecord
 import com.oeims.models.SessionJoins
+import com.oeims.models.SessionRecord
 import com.oeims.models.SessionStatus
 import com.oeims.models.SessionSupervisors
 import com.oeims.models.Sessions
 import com.oeims.repositories.interfaces.ISessionRepository
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.lessEq
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import java.time.Clock
 import java.time.Instant
 import java.util.*
 
-data class SessionRecord(
-    val id: UUID,
-    val examId: UUID,
-    val supervisorId: UUID,
-    val code: String,
-    val allowedEmailDomain: String,
-    val status: SessionStatus,
-    val createdAt: Instant,
-    val startedAt: Instant?,
-    val endedAt: Instant?
-)
-
-data class EmailJoinRecord(
-    val id: UUID,
-    val sessionId: UUID,
-    val email: String,
-    val jwtId: String,
-    val expiresAt: Instant,
-    val verifiedAt: Instant?,
-    val createdAt: Instant,
-)
-
-class SessionRepository : ISessionRepository {
+class SessionRepository(private val clock: Clock) : ISessionRepository {
 
     override suspend fun findById(id: UUID): SessionRecord? = newSuspendedTransaction(Dispatchers.IO) {
         Sessions.selectAll()
@@ -160,12 +142,12 @@ class SessionRepository : ISessionRepository {
             isCreator || hasAccess
         }
 
-    override suspend fun createEmailJoin(
+    override suspend fun createJoinRequest(
         sessionId: UUID,
         email: String,
         jwtId: String,
         expiresAt: Instant,
-    ): EmailJoinRecord =
+    ): SessionJoinRecord =
         newSuspendedTransaction(Dispatchers.IO) {
             val id = UUID.randomUUID()
             val now = Instant.now()
@@ -180,7 +162,7 @@ class SessionRepository : ISessionRepository {
                 it[SessionJoins.createdAt] = now
             }
 
-            EmailJoinRecord(
+            SessionJoinRecord(
                 id = id,
                 sessionId = sessionId,
                 email = email,
@@ -191,15 +173,16 @@ class SessionRepository : ISessionRepository {
             )
         }
 
-    override suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord? =
+    override suspend fun findJoinRequestByJwtId(jwtId: String): SessionJoinRecord? =
         newSuspendedTransaction(Dispatchers.IO) {
+            clearExpiredTokens(clock.instant())
             SessionJoins.selectAll()
                 .where { SessionJoins.emailJwtId eq jwtId }
                 .singleOrNull()
-                ?.toEmailJoinRecord()
+                ?.toSessionJoinRecord()
         }
 
-    override suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean =
+    override suspend fun updateJoinVerification(id: UUID, verifiedAt: Instant): Boolean =
         newSuspendedTransaction(Dispatchers.IO) {
             SessionJoins.update(
                 where = {
@@ -209,8 +192,15 @@ class SessionRepository : ISessionRepository {
                 it[SessionJoins.emailVerifiedAt] = verifiedAt
             } == 1
         }
+
+    private fun clearExpiredTokens(now: Instant) {
+        SessionJoins.deleteWhere {
+            SessionJoins.emailExpiresAt lessEq now
+        }
+    }
 }
 
+// TODO: Move all these to Records.kt?
 private fun ResultRow.toRecord() = SessionRecord(
     id = this[Sessions.id].value,
     examId = this[Sessions.examId].value,
@@ -223,7 +213,7 @@ private fun ResultRow.toRecord() = SessionRecord(
     endedAt = this[Sessions.endedAt]
 )
 
-private fun ResultRow.toEmailJoinRecord() = EmailJoinRecord(
+private fun ResultRow.toSessionJoinRecord() = SessionJoinRecord(
     id = this[SessionJoins.id].value,
     sessionId = this[SessionJoins.sessionId].value,
     email = this[SessionJoins.email],

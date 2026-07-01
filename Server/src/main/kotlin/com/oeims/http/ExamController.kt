@@ -1,8 +1,8 @@
 package com.oeims.http
 
 import com.oeims.models.dto.CreateExamRequest
-import com.oeims.models.ids.toExamId
-import com.oeims.models.ids.toProfessorId
+import com.oeims.models.toExamId
+import com.oeims.models.toProfessorId
 import com.oeims.models.toExamTitle
 import com.oeims.services.ExamService
 import io.ktor.http.*
@@ -11,7 +11,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-fun Route.examRoutes(examService: ExamService) {
+fun Route.exams(examService: ExamService) {
     authenticate("auth-professor") {
         route("/exams") {
 
@@ -38,8 +38,8 @@ fun Route.examRoutes(examService: ExamService) {
 
             // GET /exams/{id}
             get("/{id}") {
-                val id = call.uuidParam("id")
-                val response = examService.getExamById(id.toExamId())
+                val examId = call.uuidParam("id")
+                val response = examService.getExamById(examId.toExamId())
                 call.respond(HttpStatusCode.OK, response)
             }
         }

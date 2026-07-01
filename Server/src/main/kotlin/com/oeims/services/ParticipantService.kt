@@ -4,22 +4,18 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.exceptions.JWTVerificationException
 import com.auth0.jwt.exceptions.TokenExpiredException
 import com.oeims.config.Environment
+import com.oeims.connections.SentinelWebSocketManager
 import com.oeims.connections.SseBroadcaster
 import com.oeims.connections.SseChannels
 import com.oeims.connections.SseEvent
-import com.oeims.connections.WebSocketBroadcaster
-import com.oeims.connections.WebSocketMessageTypes
-import com.oeims.connections.WebSocketOutboundMessage
 import com.oeims.models.*
+import com.oeims.models.ParticipantId
+import com.oeims.models.SessionId
 import com.oeims.models.dto.EmailJoinResponse
 import com.oeims.models.dto.ParticipantResponse
 import com.oeims.models.dto.ParticipantStatusUpdate
 import com.oeims.models.dto.VerifyJoinResponse
-import com.oeims.models.ids.ParticipantId
-import com.oeims.models.ids.SessionId
-import com.oeims.models.ids.toSessionId
-import com.oeims.repositories.ParticipantRecord
-import com.oeims.repositories.SessionRecord
+import com.oeims.models.toSessionId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import kotlinx.serialization.json.Json
@@ -32,7 +28,7 @@ class ParticipantService(
     private val sessionRepository: ISessionRepository,
     private val jwtSettings: SessionJwtSettings,
     private val sseBroadcaster: SseBroadcaster,
-    private val webSocketBroadcaster: WebSocketBroadcaster,
+    private val webSocketManager: SentinelWebSocketManager,
     private val emailSender: EmailSender,
 ) {
 
@@ -69,7 +65,7 @@ class ParticipantService(
             email = email,
         )
 
-        sessionRepository.createEmailJoin(
+        sessionRepository.createJoinRequest(
             sessionId = session.id,
             email = email.address,
             jwtId = token.jwtId,
@@ -93,25 +89,25 @@ class ParticipantService(
         return EmailJoinResponse(message = "Verification email sent")
     }
 
-    suspend fun verifyJoin(token: EmailJoinToken): VerifyJoinResponse {
-        val verifiedToken = verifyJoinToken(token)
+    suspend fun verifyJoin(emailToken: JwtToken): VerifyJoinResponse {
+        val verifiedToken = verifyEmailToken(emailToken)
 
-        val emailJoin = sessionRepository.findEmailJoinByJwtId(verifiedToken.jwtId)
+        val joinAttempt = sessionRepository.findJoinRequestByJwtId(verifiedToken.jwtId)
             ?: throw NotFoundException("It seems the token may be invalid or expired. Please try again")
 
-        if (emailJoin.verifiedAt != null) {
+        if (joinAttempt.verifiedAt != null) {
             throw ConflictException("This token has already been used")
         }
 
-        val session = sessionRepository.findById(emailJoin.sessionId)
+        val session = sessionRepository.findById(joinAttempt.sessionId)
             ?: throw NotFoundException("The respective session does not exist anymore")
 
         if (session.status == SessionStatus.ENDED) {
             throw ConflictException("Session has already ended")
         }
 
-        val isNotUpdated = !sessionRepository.updateEmailJoinVerification(
-            id = emailJoin.id,
+        val isNotUpdated = !sessionRepository.updateJoinVerification(
+            id = joinAttempt.id,
             verifiedAt = Instant.now(),
         )
 
@@ -120,13 +116,13 @@ class ParticipantService(
         }
 
         val existingParticipant = participantRepository.findByEmailAndSession(
-            email = emailJoin.email,
+            email = joinAttempt.email,
             sessionId = session.id,
         )
 
         val participant = existingParticipant ?: participantRepository.create(
             sessionId = session.id,
-            email = emailJoin.email,
+            email = joinAttempt.email,
         )
 
         if (existingParticipant == null) {
@@ -181,15 +177,12 @@ class ParticipantService(
         }
     }
 
-    suspend fun sendExamIdentityCode(participant: ParticipantRecord) {
+    private suspend fun sendExamIdentityCode(participant: ParticipantRecord) {
         val examIdentityCode = getOrCreateExamIdentityCode(participant)
 
-        webSocketBroadcaster.send(
+        webSocketManager.sendExamIdentityCode(
             participantId = participant.id,
-            message = WebSocketOutboundMessage(
-                type = WebSocketMessageTypes.EXAM_IDENTITY_CODE,
-                data = examIdentityCode.value,
-            ),
+            examIdentityCode = examIdentityCode,
         )
     }
 
@@ -204,7 +197,6 @@ class ParticipantService(
     private suspend fun getOrCreateExamIdentityCode(
         participant: ParticipantRecord,
     ): ExamIdentityCode {
-
         if (participant.examIdentityCode != null) {
             return participant.examIdentityCode.toExamIdentityCode()
         }
@@ -234,7 +226,7 @@ class ParticipantService(
         session: SessionRecord,
         email: Email,
     ): CreatedJoinToken {
-        val settings = jwtSettings.emailJoin
+        val settings = jwtSettings.emailVerification
         val jwtId = java.util.UUID.randomUUID().toString()
         val now = Instant.now()
         val expiresAt = now.plus(settings.expiration)
@@ -261,9 +253,9 @@ class ParticipantService(
         )
     }
 
-    private fun verifyJoinToken(token: EmailJoinToken): VerifiedJoinToken {
+    private fun verifyEmailToken(emailToken: JwtToken): VerifiedJoinToken {
         val jwt = try {
-            jwtSettings.emailJoin.verifier.verify(token.value)
+            jwtSettings.emailVerification.verifier.verify(emailToken.value)
         } catch (_: TokenExpiredException) {
             throw ConflictException("This token has expired. Please request another email verification and try again")
         } catch (_: JWTVerificationException) {
@@ -306,12 +298,3 @@ class ParticipantService(
         val sessionCode: String,
     )
 }
-
-fun ParticipantRecord.toResponse() = ParticipantResponse(
-    id = id.toString(),
-    sessionId = sessionId.toString(),
-    email = email,
-    connectionStatus = connectionStatus.name,
-    lastHeartbeat = lastHeartbeat?.toString(),
-    joinedAt = joinedAt.toString(),
-)
