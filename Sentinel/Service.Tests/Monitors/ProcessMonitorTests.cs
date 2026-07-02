@@ -30,7 +30,7 @@ public sealed class ProcessMonitorTests
         cts.Cancel();
         await runTask.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(["slack"], source.KillRequests);
+        Assert.Equal(new[] { "slack" }, source.KillRequests);
 
         var monitorEvent = Assert.Single(events);
         Assert.Equal(nameof(ProcessMonitor), monitorEvent.MonitorName);
@@ -88,7 +88,7 @@ public sealed class ProcessMonitorTests
         cts.Cancel();
         await runTask.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(["slack"], source.KillRequests);
+        Assert.Equal(new[] { "slack" }, source.KillRequests);
 
         var monitorEvent = Assert.Single(events);
         Assert.Equal("Forbidden process killed: Slack", monitorEvent.Message);
@@ -146,10 +146,11 @@ public sealed class ProcessMonitorTests
         var messages = events.Select(e => e.Message).Order().ToArray();
 
         Assert.Equal(
-            [
+            new[]
+            {
                 "Failed to kill forbidden process: Slack (2 instances) (access denied)",
                 "Failed to kill forbidden process: Slack (already exited)"
-            ],
+            },
             messages);
     }
 
