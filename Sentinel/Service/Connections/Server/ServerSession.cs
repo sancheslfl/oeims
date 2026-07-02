@@ -20,7 +20,7 @@ internal sealed record ServerAuthorization(
  */
 internal sealed class ServerSession
 {
-    private static readonly string DefaultFilePath = Path.Combine(
+    private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
         "OEIMS",
         "Sentinel",
@@ -28,9 +28,6 @@ internal sealed class ServerSession
 
     private readonly Lock _lock = new();
     private readonly ILogger<ServerSession> _logger;
-    private readonly string _filePath;
-    private readonly Func<byte[], byte[]> _protect;
-    private readonly Func<byte[], byte[]> _unprotect;
 
     private TaskCompletionSource _authorized = NewSignal();
     private TaskCompletionSource _authorizationChanged = NewSignal();
@@ -38,31 +35,8 @@ internal sealed class ServerSession
     private ServerAuthorization? _authorization;
 
     public ServerSession(ILogger<ServerSession> logger)
-        : this(
-            logger,
-            DefaultFilePath,
-            bytes => ProtectedData.Protect(
-                bytes,
-                optionalEntropy: null,
-                DataProtectionScope.LocalMachine),
-            bytes => ProtectedData.Unprotect(
-                bytes,
-                optionalEntropy: null,
-                DataProtectionScope.LocalMachine))
-    {
-    }
-
-    internal ServerSession(
-        ILogger<ServerSession> logger,
-        string filePath,
-        Func<byte[], byte[]> protect,
-        Func<byte[], byte[]> unprotect)
     {
         _logger = logger;
-        _filePath = filePath;
-        _protect = protect;
-        _unprotect = unprotect;
-
         Load();
     }
 
@@ -113,8 +87,8 @@ internal sealed class ServerSession
             _authorizationChanged.TrySetResult();
             _authorizationChanged = NewSignal();
 
-            if (File.Exists(_filePath))
-                File.Delete(_filePath);
+            if (File.Exists(FilePath))
+                File.Delete(FilePath);
         }
     }
 
@@ -157,13 +131,16 @@ internal sealed class ServerSession
 
     private void Load()
     {
-        if (!File.Exists(_filePath))
+        if (!File.Exists(FilePath))
             return;
 
         try
         {
-            var encrypted = File.ReadAllBytes(_filePath);
-            var bytes = _unprotect(encrypted);
+            var encrypted = File.ReadAllBytes(FilePath);
+            var bytes = ProtectedData.Unprotect(
+                encrypted,
+                null,
+                DataProtectionScope.LocalMachine);
 
             var authorization = JsonSerializer.Deserialize<ServerAuthorization>(
                 Encoding.UTF8.GetString(bytes));
@@ -193,23 +170,26 @@ internal sealed class ServerSession
      *   Saves the Sentinel authorization data to disk using Windows DPAPI.
      *   </summary>
      *   <remarks>
-     *   Data is encrypted without storing cryptographic key and stored in a file which lets
+     *   Data is encrypted without storing cryptographic key and stored in a file which lets 
      *   the Windows Service retrieve it after the service is restarted.
      *   </remarks>
      *   <param name="authorization">
      *   The authorization data to persist.
      *   </param>
      */
-    private void Save(ServerAuthorization authorization)
+    private static void Save(ServerAuthorization authorization)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
 
         var bytes = Encoding.UTF8.GetBytes(
             JsonSerializer.Serialize(authorization));
 
-        var encrypted = _protect(bytes); // production uses DPAPI LocalMachine, tests inject a deterministic protector.
+        var encrypted = ProtectedData.Protect(
+            bytes,
+            null,
+            DataProtectionScope.LocalMachine);  // the same machine can decrypt it, less fragile for a Windows Service
 
-        File.WriteAllBytes(_filePath, encrypted);
+        File.WriteAllBytes(FilePath, encrypted);
     }
 
     private static TaskCompletionSource NewSignal() =>
