@@ -2,13 +2,14 @@ using System.Collections.Concurrent;
 using Contracts;
 using OEIMS.Sentinel.Service.Domain.Platform;
 using OEIMS.Sentinel.Service.Monitors;
+using Xunit;
 
 namespace OEIMS.Sentinel.Service.Tests.Monitors;
 
 public sealed class ProcessMonitorTests
 {
-    [Fact]
-    public async Task StartAsync_kills_existing_forbidden_processes()
+    [Fact(DisplayName = "Existing forbidden processes are killed when monitoring starts")]
+    public async Task ExistingForbiddenProcessesAreKilledWhenMonitoringStarts()
     {
         var source = new FakeProcessSource
         {
@@ -38,8 +39,8 @@ public sealed class ProcessMonitorTests
         Assert.Equal(Severity.Warning, monitorEvent.Severity);
     }
 
-    [Fact]
-    public async Task StartAsync_ignores_processes_that_are_not_forbidden()
+    [Fact(DisplayName = "Started processes that are not forbidden are ignored")]
+    public async Task StartedProcessesThatAreNotForbiddenAreIgnored()
     {
         var source = new FakeProcessSource();
 
@@ -63,8 +64,8 @@ public sealed class ProcessMonitorTests
         Assert.Empty(events);
     }
 
-    [Fact]
-    public async Task StartAsync_normalizes_forbidden_process_names_from_start_events()
+    [Fact(DisplayName = "Forbidden process names are normalized before matching")]
+    public async Task ForbiddenProcessNamesAreNormalizedBeforeMatching()
     {
         var source = new FakeProcessSource
         {
@@ -95,8 +96,8 @@ public sealed class ProcessMonitorTests
         Assert.Equal(Severity.Warning, monitorEvent.Severity);
     }
 
-    [Fact]
-    public async Task StartAsync_reports_kill_source_failure_without_crashing()
+    [Fact(DisplayName = "Kill source failures are reported without crashing the monitor")]
+    public async Task KillSourceFailuresAreReportedWithoutCrashingTheMonitor()
     {
         var source = new FakeProcessSource
         {
@@ -119,8 +120,8 @@ public sealed class ProcessMonitorTests
         Assert.Equal(Severity.Warning, monitorEvent.Severity);
     }
 
-    [Fact]
-    public async Task StartAsync_groups_failed_kill_results_by_process_and_error()
+    [Fact(DisplayName = "Failed kill results are grouped by process and error")]
+    public async Task FailedKillResultsAreGroupedByProcessAndError()
     {
         var source = new FakeProcessSource
         {
