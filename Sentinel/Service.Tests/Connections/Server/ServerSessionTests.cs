@@ -1,12 +1,13 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using OEIMS.Sentinel.Service.Connections.Server;
+using Xunit;
 
 namespace OEIMS.Sentinel.Service.Tests.Connections.Server;
 
 public sealed class ServerSessionTests
 {
-    [Fact]
-    public async Task Authorize_persists_authorization_and_releases_waiters()
+    [Fact(DisplayName = "Authorizing stores the session and releases authorization waiters")]
+    public async Task AuthorizingStoresTheSessionAndReleasesAuthorizationWaiters()
     {
         using var file = TempSessionFile.Create();
         var session = CreateSession(file.Path);
@@ -25,8 +26,8 @@ public sealed class ServerSessionTests
         Assert.Equal(authorization, current);
     }
 
-    [Fact]
-    public void Constructor_restores_persisted_authorization()
+    [Fact(DisplayName = "A persisted authorization is restored when the session starts")]
+    public void APersistedAuthorizationIsRestoredWhenTheSessionStarts()
     {
         using var file = TempSessionFile.Create();
 
@@ -40,8 +41,8 @@ public sealed class ServerSessionTests
             restored.GetAuthorization());
     }
 
-    [Fact]
-    public async Task Clear_removes_authorization_file_and_releases_change_waiters()
+    [Fact(DisplayName = "Clearing the session removes authorization and releases change waiters")]
+    public async Task ClearingTheSessionRemovesAuthorizationAndReleasesChangeWaiters()
     {
         using var file = TempSessionFile.Create();
         var session = CreateSession(file.Path);
@@ -60,8 +61,8 @@ public sealed class ServerSessionTests
         Assert.Throws<InvalidOperationException>(() => session.GetAuthorization());
     }
 
-    [Fact]
-    public async Task WaitUntilAuthorizationChangedAsync_completes_when_authorization_changes()
+    [Fact(DisplayName = "Waiting for authorization changes completes when authorization changes")]
+    public async Task WaitingForAuthorizationChangesCompletesWhenAuthorizationChanges()
     {
         using var file = TempSessionFile.Create();
         var session = CreateSession(file.Path);
@@ -74,12 +75,12 @@ public sealed class ServerSessionTests
         await waitTask;
     }
 
-    [Theory]
+    [Theory(DisplayName = "Authorizing rejects empty values")]
     [InlineData("", "participant-1", "token")]
     [InlineData("   ", "participant-1", "token")]
     [InlineData("token-1", "", "participantId")]
     [InlineData("token-1", "   ", "participantId")]
-    public void Authorize_rejects_empty_values(
+    public void AuthorizingRejectsEmptyValues(
         string token,
         string participantId,
         string expectedParameter)
@@ -95,8 +96,8 @@ public sealed class ServerSessionTests
         Assert.False(File.Exists(file.Path));
     }
 
-    [Fact]
-    public void IsCurrent_returns_false_after_authorization_changes()
+    [Fact(DisplayName = "Old authorizations stop being current after authorization changes")]
+    public void OldAuthorizationsStopBeingCurrentAfterAuthorizationChanges()
     {
         using var file = TempSessionFile.Create();
         var session = CreateSession(file.Path);
@@ -111,15 +112,7 @@ public sealed class ServerSessionTests
     }
 
     private static ServerSession CreateSession(string path) =>
-        new(
-            NullLogger<ServerSession>.Instance,
-            path,
-            Protect,
-            Unprotect);
-
-    private static byte[] Protect(byte[] bytes) => bytes.Reverse().ToArray();
-
-    private static byte[] Unprotect(byte[] bytes) => bytes.Reverse().ToArray();
+        new(NullLogger<ServerSession>.Instance, path);
 
     private sealed class TempSessionFile : IDisposable
     {
