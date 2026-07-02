@@ -64,7 +64,7 @@ class ExamServiceTest {
     // ── createExam ────────────────────────────────────────────────────────────
 
     @Test
-    fun `createExam returns response with correct fields`() = runBlocking {
+    fun `createExam returns response with correct fields`(): Unit = runBlocking {
         val response = service.createExam(professorId.toProfessorId(), TITLE_A, "Network fundamentals", 90)
 
         assertEquals(TITLE_A.value, response.title)

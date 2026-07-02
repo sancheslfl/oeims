@@ -6,6 +6,7 @@ import com.oeims.models.SessionStatus
 import com.oeims.models.Severity
 import com.oeims.models.ids.toParticipantId
 import com.oeims.models.ids.toSessionId
+import com.oeims.repositories.EmailJoinRecord
 import com.oeims.repositories.EventRecord
 import com.oeims.repositories.ParticipantRecord
 import com.oeims.repositories.SessionRecord
@@ -31,6 +32,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 
 class EventServiceTest {
 
@@ -43,11 +45,21 @@ class EventServiceTest {
         override suspend fun findBySession(sessionId: UUID): List<ParticipantRecord> =
             participants.filter { it.sessionId == sessionId }
 
-        suspend fun create(sessionId: UUID, userId: UUID): ParticipantRecord {
+        override suspend fun findByExamIdentityCode(examIdentityCode: String): ParticipantRecord? =
+            participants.find { it.examIdentityCode == examIdentityCode }
+
+        override suspend fun findByEmailAndSession(email: String, sessionId: UUID): ParticipantRecord? =
+            participants.find { it.email == email && it.sessionId == sessionId }
+
+        override suspend fun findConnectedBySession(sessionId: UUID): List<ParticipantRecord> =
+            participants.filter { it.sessionId == sessionId && it.connectionStatus == ConnectionStatus.CONNECTED }
+
+        override suspend fun create(sessionId: UUID, email: String): ParticipantRecord {
             val record = ParticipantRecord(
                 id = UUID.randomUUID(),
                 sessionId = sessionId,
-                email = "student@test.pt",,
+                email = email,
+                examIdentityCode = null,
                 connectionStatus = ConnectionStatus.CONNECTED,
                 lastHeartbeat = null,
                 joinedAt = Instant.now()
@@ -58,7 +70,9 @@ class EventServiceTest {
 
         override suspend fun updateHeartbeat(id: UUID): Boolean = true
         override suspend fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean = true
-        override suspend fun markTimedOut(threshold: Instant): List<ParticipantRecord> = emptyList()
+        override suspend fun updateTimedOut(threshold: Instant): List<ParticipantRecord> = emptyList()
+        override suspend fun updateExamIdentityCode(participantId: UUID, examIdentityCode: String): Boolean =
+            participants.any { it.id == participantId }
     }
 
     private inner class FakeEventRepository : IEventRepository {
@@ -68,9 +82,11 @@ class EventServiceTest {
             participantId: UUID,
             monitorName: String,
             message: String,
-            severity: Severity
+            severity: Severity,
+            occurredAt: Instant?
         ): EventRecord {
-            val record = EventRecord(UUID.randomUUID(), participantId, monitorName, message, severity, Instant.now())
+            val record =
+                EventRecord(UUID.randomUUID(), participantId, monitorName, message, severity, occurredAt ?: Instant.now())
             events.add(record)
             return record
         }
@@ -88,13 +104,27 @@ class EventServiceTest {
         override suspend fun findByCode(code: String): SessionRecord? = sessions.values.find { it.code == code }
         override suspend fun findBySupervisor(supervisorId: UUID): List<SessionRecord> = emptyList()
         override suspend fun findLatestOpenBySupervisor(supervisorId: UUID): SessionRecord? = null
-        override suspend fun create(examId: UUID, supervisorId: UUID, code: String): SessionRecord =
-            throw UnsupportedOperationException()
+        override suspend fun create(
+            examId: UUID,
+            supervisorId: UUID,
+            code: String,
+            allowedEmailDomain: String,
+        ): SessionRecord = throw UnsupportedOperationException()
 
         override suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean = false
         override suspend fun addSupervisor(sessionId: UUID, userId: UUID) {}
         override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean = false
         override suspend fun findAllActive(): List<SessionRecord> = emptyList()
+
+        override suspend fun createEmailJoin(
+            sessionId: UUID,
+            email: String,
+            jwtId: String,
+            expiresAt: Instant,
+        ): EmailJoinRecord = throw UnsupportedOperationException()
+
+        override suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord? = null
+        override suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean = false
     }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
@@ -117,13 +147,14 @@ class EventServiceTest {
         service = EventService(fakeEvents, fakeParticipants, fakeSessions, sseBroadcaster)
 
         sessionId = UUID.randomUUID()
-        participantId = fakeParticipants.create(sessionId, UUID.randomUUID()).id
+        participantId = fakeParticipants.create(sessionId, "student@alunos.isel.pt").id
 
         fakeSessions.sessions[sessionId] = SessionRecord(
             id = sessionId,
             examId = UUID.randomUUID(),
             supervisorId = UUID.randomUUID(),
             code = "TEST01",
+            allowedEmailDomain = "alunos.isel.pt",
             status = SessionStatus.ACTIVE,
             createdAt = Instant.now(),
             startedAt = Instant.now(),
@@ -134,7 +165,7 @@ class EventServiceTest {
     // ── handleEvent ───────────────────────────────────────────────────────────
 
     @Test
-    fun `handleEvent returns response with correct fields`() = runBlocking {
+    fun `handleEvent returns response with correct fields`(): Unit = runBlocking {
         val response =
             service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "Window lost focus", Severity.WARNING)
 
@@ -170,7 +201,7 @@ class EventServiceTest {
         subscribed.await()
         service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
-        val message = withTimeout(1_000) { received.receive() }
+        val message = withTimeout(1_000.milliseconds) { received.receive() }
         job.cancel()
 
         assertEquals(SseEvent.PARTICIPANT_EVENT_RECEIVED, message.event)

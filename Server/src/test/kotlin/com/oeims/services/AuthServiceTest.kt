@@ -1,6 +1,7 @@
 package com.oeims.services
 
 import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import com.oeims.models.ConflictException
 import com.oeims.models.UnauthorizedException
 import com.oeims.models.ValidationException
@@ -13,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.time.Duration
 import java.time.Instant
 import java.util.*
 import kotlin.test.assertEquals
@@ -43,12 +45,12 @@ class AuthServiceTest {
 
     // ── Setup ─────────────────────────────────────────────────────────────────
 
-    private val jwtConfig = JwtConfig(
-        secret = "test-secret-key-long-enough",
+    private val jwtSettings = JwtSettings(
         issuer = "test-issuer",
         audience = "test-audience",
         realm = "test-realm",
-        expiration = 3_600_000L
+        expiration = Duration.ofMillis(3_600_000L),
+        algorithm = Algorithm.HMAC256("test-secret-key-long-enough"),
     )
 
     private lateinit var fakeRepo: FakeUserRepository
@@ -57,13 +59,13 @@ class AuthServiceTest {
     @BeforeEach
     fun setup() {
         fakeRepo = FakeUserRepository()
-        service = AuthService(fakeRepo, jwtConfig)
+        service = AuthService(fakeRepo, jwtSettings)
     }
 
     // ── register ──────────────────────────────────────────────────────────────
 
     @Test
-    fun `register returns response with correct email and role`() = runBlocking {
+    fun `register returns response with correct email and role`(): Unit = runBlocking {
         val response = service.register(Email("student@alunos.isel.pt"), Password("password123"), "STUDENT")
 
         assertEquals("student@alunos.isel.pt", response.email)
@@ -86,7 +88,7 @@ class AuthServiceTest {
         service.register(Email("student@alunos.isel.pt"), Password("password1"), "STUDENT")
 
         assertThrows<ConflictException> {
-            runBlocking { service.register(Email("student@alunos.isel.pt"), Password("password2"), "STUDENT") }
+            service.register(Email("student@alunos.isel.pt"), Password("password2"), "STUDENT")
         }
     }
 
@@ -130,7 +132,7 @@ class AuthServiceTest {
     // ── login ─────────────────────────────────────────────────────────────────
 
     @Test
-    fun `login returns response with correct email and role`() = runBlocking {
+    fun `login returns response with correct email and role`(): Unit = runBlocking {
         service.register(Email("prof@isel.pt"), Password("securepass1"), "PROFESSOR")
 
         val response = service.login(Email("prof@isel.pt"), Password("securepass1"))
@@ -163,7 +165,7 @@ class AuthServiceTest {
         service.register(Email("student@alunos.isel.pt"), Password("correct12"), "STUDENT")
 
         assertThrows<UnauthorizedException> {
-            runBlocking { service.login(Email("student@alunos.isel.pt"), Password("wrongpass1")) }
+            service.login(Email("student@alunos.isel.pt"), Password("wrongpass1"))
         }
     }
 
@@ -172,20 +174,16 @@ class AuthServiceTest {
         service.register(Email("student@alunos.isel.pt"), Password("correct12"), "STUDENT")
 
         val wrongEmail = assertThrows<UnauthorizedException> {
-            runBlocking {
-                service.login(
-                    Email("nobody@isel.pt"),
-                    Password("anything1")
-                )
-            }
+            service.login(
+                Email("nobody@isel.pt"),
+                Password("anything1")
+            )
         }
         val wrongPassword = assertThrows<UnauthorizedException> {
-            runBlocking {
-                service.login(
-                    Email("student@alunos.isel.pt"),
-                    Password("wrongpass1")
-                )
-            }
+            service.login(
+                Email("student@alunos.isel.pt"),
+                Password("wrongpass1")
+            )
         }
 
         assertEquals(wrongEmail.message, wrongPassword.message)
