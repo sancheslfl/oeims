@@ -17,10 +17,11 @@ class ParticipantRepositoryTest {
 
     private lateinit var participantRepository: ParticipantRepository
     private lateinit var sessionRepository: SessionRepository
-    private lateinit var studentId: UUID
-    private lateinit var otherStudentId: UUID
     private lateinit var sessionId: UUID
     private var keepAlive: java.sql.Connection? = null
+
+    private val studentEmail = "student1@alunos.isel.pt"
+    private val otherStudentEmail = "student2@alunos.isel.pt"
 
     @BeforeEach
     fun setup() = runBlocking {
@@ -36,10 +37,8 @@ class ParticipantRepositoryTest {
         sessionRepository = SessionRepository()
 
         val professorId = userRepo.create("prof@isel.pt", UserRole.PROFESSOR, "hash").id
-        studentId = userRepo.create("student1@alunos.isel.pt", UserRole.STUDENT, "hash").id
-        otherStudentId = userRepo.create("student2@alunos.isel.pt", UserRole.STUDENT, "hash").id
         val examId = examRepo.create(professorId, "Networks", null, 90).id
-        sessionId = sessionRepository.create(examId, professorId, "SES001").id
+        sessionId = sessionRepository.create(examId, professorId, "SES001", "alunos.isel.pt")!!.id
 
         // Activate the session so updateTimedOut considers it
         sessionRepository.updateStatus(sessionId, SessionStatus.ACTIVE)
@@ -57,22 +56,22 @@ class ParticipantRepositoryTest {
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns record with CONNECTED status and correct fields`() = runBlocking {
-        val participant = participantRepository.create(sessionId, studentId)
+    fun `create returns record with DISCONNECTED status and correct fields`(): Unit = runBlocking {
+        val participant = participantRepository.create(sessionId, studentEmail)
 
         assertEquals(sessionId, participant.sessionId)
-        assertEquals(studentId, participant.userId)
-        assertEquals(ConnectionStatus.CONNECTED, participant.connectionStatus)
+        assertEquals(studentEmail, participant.email)
+        assertEquals(ConnectionStatus.DISCONNECTED, participant.connectionStatus)
         assertNull(participant.lastHeartbeat)
+        assertNull(participant.examIdentityCode)
         assertNotNull(participant.id)
         assertNotNull(participant.joinedAt)
-        assertNotNull(participant.email)
     }
 
     @Test
     fun `create assigns unique ids to each participant`() = runBlocking {
-        val p1 = participantRepository.create(sessionId, studentId)
-        val p2 = participantRepository.create(sessionId, otherStudentId)
+        val p1 = participantRepository.create(sessionId, studentEmail)
+        val p2 = participantRepository.create(sessionId, otherStudentEmail)
 
         assertTrue(p1.id != p2.id)
     }
@@ -81,13 +80,13 @@ class ParticipantRepositoryTest {
 
     @Test
     fun `findById returns participant when id exists`() = runBlocking {
-        val created = participantRepository.create(sessionId, studentId)
+        val created = participantRepository.create(sessionId, studentEmail)
 
         val result = participantRepository.findById(created.id)
 
         assertNotNull(result)
         assertEquals(created.id, result.id)
-        assertEquals(studentId, result.userId)
+        assertEquals(studentEmail, result.email)
     }
 
     @Test
@@ -101,8 +100,8 @@ class ParticipantRepositoryTest {
 
     @Test
     fun `findBySession returns all participants in the session`() = runBlocking {
-        participantRepository.create(sessionId, studentId)
-        participantRepository.create(sessionId, otherStudentId)
+        participantRepository.create(sessionId, studentEmail)
+        participantRepository.create(sessionId, otherStudentEmail)
 
         val results = participantRepository.findBySession(sessionId)
 
@@ -117,22 +116,22 @@ class ParticipantRepositoryTest {
         assertTrue(results.isEmpty())
     }
 
-    // ── findByUserAndSession ──────────────────────────────────────────────────
+    // ── findByEmailAndSession ─────────────────────────────────────────────────
 
     @Test
-    fun `findByUserAndSession returns participant when both match`() = runBlocking {
-        participantRepository.create(sessionId, studentId)
+    fun `findByEmailAndSession returns participant when both match`() = runBlocking {
+        participantRepository.create(sessionId, studentEmail)
 
-        val result = participantRepository.findByUserAndSession(studentId, sessionId)
+        val result = participantRepository.findByEmailAndSession(studentEmail, sessionId)
 
         assertNotNull(result)
-        assertEquals(studentId, result.userId)
+        assertEquals(studentEmail, result.email)
         assertEquals(sessionId, result.sessionId)
     }
 
     @Test
-    fun `findByUserAndSession returns null when student is not in that session`() = runBlocking {
-        val result = participantRepository.findByUserAndSession(studentId, sessionId)
+    fun `findByEmailAndSession returns null when student is not in that session`() = runBlocking {
+        val result = participantRepository.findByEmailAndSession(studentEmail, sessionId)
 
         assertNull(result)
     }
@@ -141,7 +140,7 @@ class ParticipantRepositoryTest {
 
     @Test
     fun `updateHeartbeat sets lastHeartbeat and returns true`() = runBlocking {
-        val participant = participantRepository.create(sessionId, studentId)
+        val participant = participantRepository.create(sessionId, studentEmail)
 
         val updated = participantRepository.updateHeartbeat(participant.id)
         val result = participantRepository.findById(participant.id)!!
@@ -162,13 +161,13 @@ class ParticipantRepositoryTest {
 
     @Test
     fun `updateConnectionStatus changes status and returns true`() = runBlocking {
-        val participant = participantRepository.create(sessionId, studentId)
+        val participant = participantRepository.create(sessionId, studentEmail)
 
-        val updated = participantRepository.updateConnectionStatus(participant.id, ConnectionStatus.DISCONNECTED)
+        val updated = participantRepository.updateConnectionStatus(participant.id, ConnectionStatus.CONNECTED)
         val result = participantRepository.findById(participant.id)!!
 
         assertTrue(updated)
-        assertEquals(ConnectionStatus.DISCONNECTED, result.connectionStatus)
+        assertEquals(ConnectionStatus.CONNECTED, result.connectionStatus)
     }
 
     @Test
@@ -178,11 +177,35 @@ class ParticipantRepositoryTest {
         assertFalse(updated)
     }
 
+    // ── updateExamIdentityCode ────────────────────────────────────────────────
+
+    @Test
+    fun `updateExamIdentityCode sets the code and can be looked up`() = runBlocking {
+        val participant = participantRepository.create(sessionId, studentEmail)
+
+        val updated = participantRepository.updateExamIdentityCode(participant.id, "ABCD2345")
+        val result = participantRepository.findByExamIdentityCode("ABCD2345")
+
+        assertTrue(updated)
+        assertNotNull(result)
+        assertEquals(participant.id, result.id)
+    }
+
+    @Test
+    fun `updateExamIdentityCode returns false when a code is already set`() = runBlocking {
+        val participant = participantRepository.create(sessionId, studentEmail)
+        participantRepository.updateExamIdentityCode(participant.id, "ABCD2345")
+
+        val second = participantRepository.updateExamIdentityCode(participant.id, "WXYZ6789")
+
+        assertFalse(second)
+    }
+
     // ── updateTimedOut ──────────────────────────────────────────────────────────
 
     @Test
     fun `markTimedOut marks CONNECTED participants whose heartbeat is older than threshold`() = runBlocking {
-        val participant = participantRepository.create(sessionId, studentId)
+        val participant = participantRepository.create(sessionId, studentEmail)
         participantRepository.updateHeartbeat(participant.id)
 
         // threshold = now + 1 hour → every heartbeat is "older than" this
@@ -198,7 +221,7 @@ class ParticipantRepositoryTest {
 
     @Test
     fun `markTimedOut does not mark participants whose heartbeat is recent`() = runBlocking {
-        val participant = participantRepository.create(sessionId, studentId)
+        val participant = participantRepository.create(sessionId, studentEmail)
         participantRepository.updateHeartbeat(participant.id)
 
         // threshold = 1 hour ago → no recent heartbeat is older than this
@@ -214,7 +237,7 @@ class ParticipantRepositoryTest {
     @Test
     fun `markTimedOut ignores participants that have never sent a heartbeat`() = runBlocking {
         // lastHeartbeat is NULL — the `lessEq` condition does not match NULL
-        participantRepository.create(sessionId, studentId)
+        participantRepository.create(sessionId, studentEmail)
 
         val threshold = Instant.now().plusSeconds(3600)
         val timedOut = participantRepository.updateTimedOut(threshold)
@@ -229,10 +252,10 @@ class ParticipantRepositoryTest {
         val examRepo = ExamRepository()
         val prof2Id = userRepo.create("prof2@isel.pt", UserRole.PROFESSOR, "hash").id
         val exam2Id = examRepo.create(prof2Id, "Algebra", null, 60).id
-        val pendingSessionId = sessionRepository.create(exam2Id, prof2Id, "PEN001").id
+        val pendingSessionId = sessionRepository.create(exam2Id, prof2Id, "PEN001", "alunos.isel.pt")!!.id
         // Note: do NOT activate this session
 
-        val participantInPending = participantRepository.create(pendingSessionId, otherStudentId)
+        val participantInPending = participantRepository.create(pendingSessionId, otherStudentEmail)
         participantRepository.updateHeartbeat(participantInPending.id)
 
         val threshold = Instant.now().plusSeconds(3600)

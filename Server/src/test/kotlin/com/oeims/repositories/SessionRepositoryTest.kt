@@ -46,11 +46,14 @@ class SessionRepositoryTest {
         keepAlive = null
     }
 
+    private suspend fun createSession(code: String, supervisor: UUID = professorId): SessionRecord =
+        sessionRepository.create(examId, supervisor, code, "alunos.isel.pt")!!
+
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns session with PENDING status`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "ABC123")
+    fun `create returns session with PENDING status`(): Unit = runBlocking {
+        val session = createSession("ABC123")
 
         assertEquals(SessionStatus.PENDING, session.status)
         assertEquals(examId, session.examId)
@@ -63,8 +66,8 @@ class SessionRepositoryTest {
 
     @Test
     fun `create assigns unique ids`() = runBlocking {
-        val s1 = sessionRepository.create(examId, professorId, "AAA111")
-        val s2 = sessionRepository.create(examId, professorId, "BBB222")
+        val s1 = createSession("AAA111")
+        val s2 = createSession("BBB222")
 
         assertTrue(s1.id != s2.id)
     }
@@ -73,7 +76,7 @@ class SessionRepositoryTest {
 
     @Test
     fun `findById returns session when id exists`() = runBlocking {
-        val created = sessionRepository.create(examId, professorId, "XYZ789")
+        val created = createSession("XYZ789")
 
         val result = sessionRepository.findById(created.id)
 
@@ -93,7 +96,7 @@ class SessionRepositoryTest {
 
     @Test
     fun `findByCode returns session when code exists`() = runBlocking {
-        sessionRepository.create(examId, professorId, "CODE01")
+        createSession("CODE01")
 
         val result = sessionRepository.findByCode("CODE01")
 
@@ -112,9 +115,9 @@ class SessionRepositoryTest {
 
     @Test
     fun `findBySupervisor returns only sessions belonging to that professor`() = runBlocking {
-        sessionRepository.create(examId, professorId, "AAA001")
-        sessionRepository.create(examId, professorId, "BBB002")
-        sessionRepository.create(examId, otherProfessorId, "CCC003")
+        createSession("AAA001")
+        createSession("BBB002")
+        createSession("CCC003", otherProfessorId)
 
         val results = sessionRepository.findBySupervisor(professorId)
 
@@ -133,7 +136,7 @@ class SessionRepositoryTest {
 
     @Test
     fun `updateStatus PENDING to ACTIVE sets startedAt and returns true`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "ACT001")
+        val session = createSession("ACT001")
 
         val updated = sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
         val result = sessionRepository.findById(session.id)!!
@@ -145,8 +148,8 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun `updateStatus ACTIVE to ENDED sets endedAt and returns true`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "END001")
+    fun `updateStatus ACTIVE to ENDED sets endedAt and returns true`(): Unit = runBlocking {
+        val session = createSession("END001")
         sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
 
         val updated = sessionRepository.updateStatus(session.id, SessionStatus.ENDED)
@@ -168,8 +171,8 @@ class SessionRepositoryTest {
 
     @Test
     fun `findAllActive returns PENDING and ACTIVE sessions`() = runBlocking {
-        val s1 = sessionRepository.create(examId, professorId, "ACT001")
-        val s2 = sessionRepository.create(examId, professorId, "ACT002")
+        val s1 = createSession("ACT001")
+        val s2 = createSession("ACT002")
         sessionRepository.updateStatus(s2.id, SessionStatus.ACTIVE)
 
         val result = sessionRepository.findAllActive()
@@ -181,7 +184,7 @@ class SessionRepositoryTest {
 
     @Test
     fun `findAllActive excludes ENDED sessions`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "END001")
+        val session = createSession("END001")
         sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
         sessionRepository.updateStatus(session.id, SessionStatus.ENDED)
 
@@ -194,21 +197,21 @@ class SessionRepositoryTest {
 
     @Test
     fun `isSupervisor returns true for the session creator`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "SUP001")
+        val session = createSession("SUP001")
 
         assertTrue(sessionRepository.isSupervisor(session.id, professorId))
     }
 
     @Test
     fun `isSupervisor returns false for a professor with no relation to the session`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "SUP002")
+        val session = createSession("SUP002")
 
         assertFalse(sessionRepository.isSupervisor(session.id, otherProfessorId))
     }
 
     @Test
     fun `isSupervisor returns true after addSupervisor is called`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "SUP003")
+        val session = createSession("SUP003")
 
         sessionRepository.addSupervisor(session.id, otherProfessorId)
 
@@ -224,7 +227,7 @@ class SessionRepositoryTest {
 
     @Test
     fun `addSupervisor is idempotent when called twice for the same pair`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "ADD001")
+        val session = createSession("ADD001")
         sessionRepository.addSupervisor(session.id, otherProfessorId)
 
         // second call must not throw (composite PK would normally reject a duplicate)
@@ -237,7 +240,7 @@ class SessionRepositoryTest {
 
     @Test
     fun `findLatestOpenBySupervisor returns session when professor is the creator`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "LAT001")
+        val session = createSession("LAT001")
 
         val result = sessionRepository.findLatestOpenBySupervisor(professorId)
 
@@ -247,7 +250,7 @@ class SessionRepositoryTest {
 
     @Test
     fun `findLatestOpenBySupervisor returns session when professor has access via session_supervisors`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "LAT002")
+        val session = createSession("LAT002")
         sessionRepository.addSupervisor(session.id, otherProfessorId)
 
         val result = sessionRepository.findLatestOpenBySupervisor(otherProfessorId)
@@ -265,7 +268,7 @@ class SessionRepositoryTest {
 
     @Test
     fun `findLatestOpenBySupervisor does not return ENDED sessions even with access`() = runBlocking {
-        val session = sessionRepository.create(examId, professorId, "LAT003")
+        val session = createSession("LAT003")
         sessionRepository.updateStatus(session.id, SessionStatus.ACTIVE)
         sessionRepository.updateStatus(session.id, SessionStatus.ENDED)
         sessionRepository.addSupervisor(session.id, otherProfessorId)
