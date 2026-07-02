@@ -3,7 +3,7 @@ using System.Text;
 
 namespace OEIMS.Sentinel.Agent.Native;
 
-internal static class User32
+internal static partial class User32
 {
     internal delegate void WinEventDelegate(
         IntPtr hWinEventHook,
@@ -41,19 +41,60 @@ internal static class User32
         IntPtr hWnd,
         out uint lpdwProcessId);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    internal static extern bool PeekMessage(
+    /// <summary>
+    /// Checks the calling thread's message queue for a message.
+    /// </summary>
+    [LibraryImport("user32.dll", EntryPoint = "PeekMessageW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PeekMessage(
         out MSG lpMsg,
         IntPtr hWnd,
         uint wMsgFilterMin,
         uint wMsgFilterMax,
-        uint wRemoveMsg);
+        uint wRemoveMsg
+    );
 
-    [DllImport("user32.dll")]
-    internal static extern bool TranslateMessage(ref MSG lpMsg);
+    /// <summary>
+    /// Retrieves a message from the calling thread's message queue.
+    /// Blocks until a message is available.
+    /// Returns greater than zero for a normal message, zero for WM_QUIT, and -1 on error.
+    /// </summary>
+    [LibraryImport("user32.dll", EntryPoint = "GetMessageW", SetLastError = true)]
+    internal static partial int GetMessage(
+        out MSG lpMsg,
+        IntPtr hWnd,
+        uint wMsgFilterMin,
+        uint wMsgFilterMax
+    );
 
-    [DllImport("user32.dll")]
-    internal static extern IntPtr DispatchMessage(ref MSG lpMsg);
+    /// <summary>
+    /// Posts a message to the message queue of the specified thread.
+    /// Returns true if the message was posted successfully.
+    /// The target thread must already have a message queue.
+    /// </summary>
+    [LibraryImport("user32.dll", EntryPoint = "PostThreadMessageW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PostThreadMessage(
+        uint idThread,
+        uint msg,
+        UIntPtr wParam,
+        IntPtr lParam
+    );
+
+    /// <summary>
+    /// Translates virtual-key messages into character messages.
+    /// Usually called before DispatchMessage in a standard Win32 message loop.
+    /// </summary>
+    [LibraryImport("user32.dll", SetLastError = false)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool TranslateMessage(ref MSG lpMsg);
+
+    /// <summary>
+    /// Dispatches a message to its target window procedure.
+    /// For thread messages without a target window, this usually does nothing useful.
+    /// </summary>
+    [LibraryImport("user32.dll", EntryPoint = "DispatchMessageW")]
+    internal static partial IntPtr DispatchMessage(ref MSG lpMsg);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool OpenClipboard(IntPtr hWndNewOwner);

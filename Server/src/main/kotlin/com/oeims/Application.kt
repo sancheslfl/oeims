@@ -37,9 +37,12 @@ import kotlin.time.Duration.Companion.seconds
 fun main(args: Array<String>): Unit = EngineMain.main(args)
 
 fun Application.module() {
+    // Environment variables
+    Environment.configure(environment.config)
+
     // CORS
     install(CORS) {
-        allowHost("localhost:5173")
+        allowHost(Environment.frontendBaseUrl.hostWithPort)
         allowCredentials = true
 
         allowMethod(HttpMethod.Get)
@@ -101,12 +104,10 @@ fun Application.module() {
     // SSE
     install(SSE)
 
-    // App variables
-    Environment.configure(environment.config)
-
     // Database
     configureDatabase()
 
+    // TODO: Check if the dependency graph is correct
     // Clock
     val clock = Clock.systemDefaultZone()
 
@@ -125,9 +126,14 @@ fun Application.module() {
     // Email service
     val smtpEmailSender = configureEmail()
 
+    // Json Serializer
+    val json = Json {
+        encodeDefaults = true   // include default values when the server sends messages
+    }
+
     // Realtime
     val sseBroadcaster = SseBroadcaster()
-    val webSocketManager = SentinelWebSocketManager()
+    val webSocketManager = SentinelWebSocketManager(json = json)
 
     // Services
     val authService = AuthService(userRepository, authJwtSettings)

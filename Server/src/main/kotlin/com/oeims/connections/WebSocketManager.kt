@@ -55,7 +55,7 @@ class WebSocketManager<K: Any> {
      * Registers [session] for [key] and receives text frames until the connection
      * closes or violates the text-frame contract.
      *
-     * This method is still transport-only. It does not parse JSON and does not
+     * This method is transport-only which means it does not
      * know what each text frame means.
      *
      * Non-text frames are rejected because callers using this method are opting

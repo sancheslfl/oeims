@@ -8,7 +8,8 @@ import kotlinx.serialization.Serializable
 data class SentinelEventMessage(
     val monitorName: String,
     val message: String,
-    val severity: String   // "Info" | "Warning" | "Critical"
+    val severity: String,   // "Info" | "Warning" | "Critical"
+    val occurredAt: String
 )
 
 @Serializable
@@ -26,10 +27,3 @@ data class ParticipantStatusUpdate(
     val participantId: String,
     val connectionStatus: String  // "CONNECTED" | "DISCONNECTED" | "TIMED_OUT"
 )
-
-fun String.toDomainSeverity(): Severity? = when (this) {
-    "Info" -> Severity.INFO
-    "Warning" -> Severity.WARNING
-    "Critical" -> Severity.CRITICAL
-    else -> null
-}

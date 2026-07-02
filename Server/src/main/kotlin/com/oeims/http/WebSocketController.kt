@@ -1,8 +1,8 @@
 package com.oeims.http
 
 import com.oeims.connections.SentinelWebSocketManager
-import com.oeims.models.dto.toDomainSeverity
 import com.oeims.models.toParticipantId
+import com.oeims.models.toSeverity
 import com.oeims.services.EventService
 import com.oeims.services.ParticipantService
 import io.ktor.server.application.log
@@ -12,6 +12,7 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.slf4j.MDCContext
 import kotlinx.coroutines.withContext
+import java.time.Instant
 
 fun Route.webSockets(
     participantService: ParticipantService,
@@ -47,7 +48,7 @@ fun Route.webSockets(
                     participantId = participantId,
                     session = this@webSocket,
                 ) { message ->
-                    val severity = message.severity.toDomainSeverity()
+                    val severity = message.severity.toSeverity()
 
                     if (severity == null) {
                         application.log.warn(
@@ -63,6 +64,7 @@ fun Route.webSockets(
                         monitorName = message.monitorName,
                         message = message.message,
                         severity = severity,
+                        occurredAt = Instant.parse(message.occurredAt)
                     )
                 }
             }

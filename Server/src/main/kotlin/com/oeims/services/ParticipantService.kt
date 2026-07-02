@@ -18,9 +18,10 @@ import com.oeims.models.dto.VerifyJoinResponse
 import com.oeims.models.toSessionId
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
+import io.ktor.http.URLBuilder
+import io.ktor.http.appendPathSegments
+import io.ktor.http.takeFrom
 import kotlinx.serialization.json.Json
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.time.Instant
 
 class ParticipantService(
@@ -72,13 +73,14 @@ class ParticipantService(
             expiresAt = token.expiresAt,
         )
 
-        val encodedToken = URLEncoder.encode(
-            token.value,
-            StandardCharsets.UTF_8,
-        )
-
-        val verificationLink =
-            "${Environment.frontendBaseUrl}/student/join/verify?token=$encodedToken"
+        // "${Environment.frontendBaseUrl}/student/join/verify?token=$encodedToken"
+        val verificationLink = URLBuilder()
+            .takeFrom(Environment.frontendBaseUrl)
+            .apply {
+                appendPathSegments("student", "join", "verify")
+                parameters.append("token", token.value)
+            }
+            .buildString()
 
         emailSender.sendJoinVerification(
             to = email.address,

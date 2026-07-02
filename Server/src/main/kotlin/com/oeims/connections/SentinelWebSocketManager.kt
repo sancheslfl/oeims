@@ -29,28 +29,9 @@ const val MAX_FRAME_BYTES: Long = 8 * 1024    // 8 KB
  */
 class SentinelWebSocketManager(
     private val connections: WebSocketManager<UUID> = WebSocketManager(),
-    private val json: Json = Json { encodeDefaults = true },
+    private val json: Json,
 ) {
     private val log = LoggerFactory.getLogger(SentinelWebSocketManager::class.java)
-
-    /**
-     * Registers the Sentinel WebSocket connection for [participantId].
-     *
-     * @param participantId participant authenticated by the student/Sentinel JWT.
-     * @param session Ktor WebSocket session created by the route.
-     * @param block suspends while the route receives Sentinel frames.
-     */
-    suspend fun register(
-        participantId: UUID,
-        session: DefaultWebSocketServerSession,
-        block: suspend () -> Unit,
-    ) {
-        connections.register(
-            key = participantId,
-            session = session,
-            block = block,
-        )
-    }
 
     /**
      * Registers the Sentinel WebSocket connection and receives Sentinel event
