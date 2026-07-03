@@ -12,8 +12,7 @@ namespace OEIMS.Sentinel.Service;
 
 internal static class ServiceCollectionExtensions
 {
-    internal static WebApplicationBuilder AddExamMonitoringService(
-        this WebApplicationBuilder builder)
+    internal static WebApplicationBuilder AddExamMonitoringService(this WebApplicationBuilder builder)
     {
         var services = builder.Services;
         var configuration = builder.Configuration;

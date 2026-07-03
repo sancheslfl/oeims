@@ -7,10 +7,10 @@ using OEIMS.Sentinel.Service.Monitors;
 namespace OEIMS.Sentinel.Service
 {
     /// <summary>
-    /// Main background service that starts mitigators, validates pre-exam state, and runs monitoring components.
+    /// Main background service that validates pre-exam state before and then runs monitoring and mitigating components.
     /// </summary>
     /// <remarks>
-    /// This is the Service orchestration point. It does not contain monitor policy itself; it wires monitors,
+    /// This is the Service orchestration point. Its only reponsability is to wire monitors,
     /// mitigators, Agent IPC, heartbeat, and server communication together.
     /// </remarks>
     /// <param name="monitors">All local monitors registered by dependency injection.</param>
@@ -34,7 +34,7 @@ namespace OEIMS.Sentinel.Service
         private readonly IReadOnlyList<IMitigator> _mitigators = mitigators.ToList();
 
         /// <summary>
-        /// Starts the full Sentinel Service runtime.
+        /// Starts Sentinel Service.
         /// </summary>
         /// <param name="stoppingToken">Cancellation token triggered by Windows Service shutdown.</param>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -120,9 +120,9 @@ namespace OEIMS.Sentinel.Service
         }
 
         /// <summary>
-        /// Handles local-only events that should be logged but not sent to the backend.
+        /// Handles local events that should be logged but not sent to the backend.
         /// </summary>
-        /// <param name="e">Monitor event produced before the exam connection flow starts.</param>
+        /// <param name="e">Monitor event produced before the exam connection starts.</param>
         private Task OnLocalEvent(MonitorEvent e)
         {
             Log(e);
@@ -170,7 +170,7 @@ namespace OEIMS.Sentinel.Service
         }
 
         /// <summary>
-        /// Writes one monitor event to the correct log level.
+        /// Logs one monitor event to the correct log level.
         /// </summary>
         /// <param name="e">Event to log.</param>
         private void Log(MonitorEvent e)
@@ -217,5 +217,5 @@ namespace OEIMS.Sentinel.Service
 
             base.Dispose();
         }
-    }
+}
 }

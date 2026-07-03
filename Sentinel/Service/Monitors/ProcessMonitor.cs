@@ -4,7 +4,7 @@ using OEIMS.Sentinel.Service.Domain.Platform;
 namespace OEIMS.Sentinel.Service.Monitors;
 
 /// <summary>
-/// Internal event kind used to build professor-facing process monitor messages.
+/// Internal event kind used to build professor process monitor messages.
 /// </summary>
 internal enum ProcessEvent
 {
@@ -23,25 +23,21 @@ internal enum ProcessEvent
 /// Detects forbidden processes and tries to stop them during the exam.
 /// </summary>
 /// <remarks>
-/// This monitor is reactive: it checks already-running forbidden processes when it starts and also watches for new ones.
+/// This monitor checks already running forbidden processes when it starts and also watches for new ones.
 /// <para>
-/// Difference from <c>ProcessBlocker</c>: <c>ProcessMonitor</c> detects and kills processes that are running.
+/// The difference from <c>ProcessBlocker</c> is that <c>ProcessMonitor</c> detects and kills processes that are running.
 /// <c>ProcessBlocker</c> tries to prevent future launches through Windows mitigation. They are intentionally complementary.
 /// </para>
 /// </remarks>
 /// <param name="processSource">
-/// Platform boundary used to watch process starts and kill matching processes. Tests replace it with a fake source.
+/// Platform boundary used to watch process starts and kill matching processes.
 /// </param>
 internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
 {
-    /// <summary>
-    /// Name used in monitor events and logs.
-    /// </summary>
     public string Name => nameof(ProcessMonitor);
 
     private readonly SemaphoreSlim _killLock = new(1, 1);
 
-    // ponytail: hard-coded for the academic prototype; move to configuration when more processes are supported.
     private readonly HashSet<string> _forbiddenProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
         "slack"
@@ -51,7 +47,7 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
     /// Starts process monitoring until cancellation.
     /// </summary>
     /// <param name="onEvent">
-    /// Callback that receives warnings for successful kills and failed kill attempts.
+    /// Callback that receives warnings for successful and failed kills attempts.
     /// </param>
     /// <param name="ct">
     /// Cancellation token used by the Service to stop the monitor.
@@ -82,7 +78,7 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
     }
 
     /// <summary>
-    /// Handles one process-start notification from the platform source.
+    /// Handles one notification of a process starting from the platform source.
     /// </summary>
     /// <param name="process">Process that has just started.</param>
     /// <param name="onEvent">Callback used to publish monitor events.</param>
@@ -236,7 +232,7 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
     }
 
     /// <summary>
-    /// Converts process names such as <c>SLACK.exe</c> and <c>C:\\...\\Slack.exe</c> into <c>slack</c>.
+    /// Converts process names such as <c>PROGRAM.exe</c> and <c>C:\\...\\Program.exe</c> into <c>program</c>.
     /// </summary>
     /// <param name="processName">Process name or executable path reported by the process source.</param>
     /// <returns>Lowercase executable name without extension.</returns>

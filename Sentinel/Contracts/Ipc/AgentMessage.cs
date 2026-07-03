@@ -4,7 +4,7 @@ namespace Contracts.Ipc;
 /// Message sent through the Agent event pipe.
 /// </summary>
 /// <param name="Type">
-/// Message kind. The Service uses this to decide whether the payload is a heartbeat or a monitor event.
+/// Message kind.
 /// </param>
 /// <param name="SentAt">
 /// UTC timestamp created by the Agent when the message is sent.

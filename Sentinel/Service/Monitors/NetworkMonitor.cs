@@ -1,5 +1,5 @@
-using System.Net.NetworkInformation;
 using Contracts;
+using System.Net.NetworkInformation;
 
 namespace OEIMS.Sentinel.Service.Monitors;
 
@@ -41,18 +41,26 @@ internal sealed record NetworkState(
 /// </remarks>
 internal sealed class NetworkMonitor : IMonitor
 {
-    /// <summary>
-    /// Name used in monitor events and logs.
-    /// </summary>
     public string Name => nameof(NetworkMonitor);
 
     private static readonly HashSet<NetworkInterfaceType> AllowedPhysicalTypes =
     [
+        // Wired internet connection, usually through an Ethernet cable.
         NetworkInterfaceType.Ethernet,
+
+        // Faster wired internet connection, usually through an Ethernet cable.
         NetworkInterfaceType.GigabitEthernet,
+
+        // Wi-Fi connection.
         NetworkInterfaceType.Wireless80211,
+
+        // Mobile network connection, such as 3G, 4G, or 5G.
         NetworkInterfaceType.Wwanpp,
+
+        // Mobile network connection, such as 3G, 4G, or 5G.
         NetworkInterfaceType.Wwanpp2,
+
+        // Wireless metropolitan network connection, similar to long-range wireless internet.
         NetworkInterfaceType.Wman
     ];
 
@@ -219,7 +227,7 @@ internal sealed class NetworkMonitor : IMonitor
     /// Checks if the current network state is acceptable before creating a baseline.
     /// </summary>
     /// <returns><c>true</c> when exactly one active physical interface is present.</returns>
-    public bool IsValidNetworkState()
+    public static bool IsValidNetworkState()
     {
         return IsValidNetworkState(GetCurrentNetworkState());
     }
@@ -363,13 +371,11 @@ internal sealed class NetworkMonitor : IMonitor
             .ToList();
 
         return new NetworkState(
-            ActiveInterfaces: activeInterfaces
-                .Select(ToActiveInterface)
-                .ToHashSet(),
-            ActivePhysicalInterfaces: activeInterfaces
+            ActiveInterfaces: [.. activeInterfaces.Select(ToActiveInterface)],
+            ActivePhysicalInterfaces: [.. activeInterfaces
                 .Where(IsPhysicalInterface)
-                .Select(ToActiveInterface)
-                .ToHashSet(),
+                .Select(ToActiveInterface)],
+            // <interface-name>-<gateway-address>|<interface-name>-<gateway-address>|...
             NetworkId: string.Join("|", activeInterfaces.Select(GetNetworkIdentity)));
     }
 
@@ -453,6 +459,7 @@ internal sealed class NetworkMonitor : IMonitor
     /// </summary>
     private static string GetNetworkIdentity(NetworkInterface networkInterface)
     {
+        // "<interface-name>-<gateway-address>" (e.g. "Wi-Fi-192.168.1.1")
         return $"{networkInterface.Name}-{GetGatewayAddress(networkInterface)}";
     }
 

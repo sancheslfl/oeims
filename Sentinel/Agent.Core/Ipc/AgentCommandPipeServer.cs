@@ -97,11 +97,6 @@ internal sealed class AgentCommandPipeServer(
         };
     }
 
-    /// <summary>
-    /// Handles the command that displays the exam identity code to the student.
-    /// </summary>
-    /// <param name="json">Raw command JSON.</param>
-    /// <param name="ct">Cancellation token passed to the overlay.</param>
     private async Task HandleShowExamIdentityCodeAsync(string json, CancellationToken ct)
     {
         var command = JsonSerializer.Deserialize<ShowExamIdentityCodeCommand>(

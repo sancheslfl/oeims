@@ -10,12 +10,12 @@ namespace Contracts
     public interface IMonitor : IDisposable
     {
         /// <summary>
-        /// Stable name used in logs, events, and professor-facing messages.
+        /// Name defined for the component.
         /// </summary>
         string Name { get; }
 
         /// <summary>
-        /// Starts monitoring until <paramref name="ct" /> is cancelled.
+        /// Entry point function that starts monitoring until <paramref name="ct" /> is cancelled.
         /// </summary>
         /// <param name="onEvent">
         /// Callback used to publish each event detected by the monitor.

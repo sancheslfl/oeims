@@ -6,17 +6,17 @@ namespace Contracts
     public enum Severity
     {
         /// <summary>
-        /// Normal information that helps explain the current state, such as a successful baseline initialization.
+        /// Normal information that helps explain the current state.
         /// </summary>
         Info,
 
         /// <summary>
-        /// Suspicious or unexpected behavior that should be visible to the professor but does not stop the system.
+        /// Suspicious behavior that should be visible to the professor but does not stop the system.
         /// </summary>
         Warning,
 
         /// <summary>
-        /// Serious failure where the monitoring flow cannot be trusted or continued safely.
+        /// Serious integrity offenses where the exam cannot be continued safely and might require exam invalidation.
         /// </summary>
         Critical
     }

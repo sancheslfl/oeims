@@ -8,12 +8,12 @@ namespace Contracts
     /// The server and UI use this to group events by source.
     /// </param>
     /// <param name="Message">
-    /// Human-readable explanation of what happened. Keep this clear enough for a professor to understand without reading logs.
+    /// Comprehensive explanation of what happened. Keep this clear enough for a professor to understand without reading logs.
     /// </param>
     /// <param name="Severity">
     /// Importance of the event. Use <see cref="Severity.Info" /> for normal state changes,
     /// <see cref="Severity.Warning" /> for suspicious or recoverable states, and
-    /// <see cref="Severity.Critical" /> only when the exam integrity flow cannot continue safely.
+    /// <see cref="Severity.Critical" /> only when the exam cannot continue safely.
     /// </param>
     public record MonitorEvent(string MonitorName, string Message, Severity Severity);
 }
