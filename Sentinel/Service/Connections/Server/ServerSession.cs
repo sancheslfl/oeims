@@ -85,17 +85,16 @@ internal sealed class ServerSession
     {
         lock (_lock)
         {
-            if (_authorization is null)
-                return;
+            if (_authorization is not null)
+            {
+                _authorization = null;
+                _authorized = NewSignal();
 
-            _authorization = null;
-            _authorized = NewSignal();
+                _authorizationChanged.TrySetResult();
+                _authorizationChanged = NewSignal();
+            }
 
-            _authorizationChanged.TrySetResult();
-            _authorizationChanged = NewSignal();
-
-            if (File.Exists(_filePath))
-                File.Delete(_filePath);
+            DeletePersistedAuthorization();
         }
     }
 
@@ -197,6 +196,12 @@ internal sealed class ServerSession
             DataProtectionScope.LocalMachine);  // the same machine can decrypt it, less fragile for a Windows Service
 
         File.WriteAllBytes(_filePath, encrypted);
+    }
+
+    private void DeletePersistedAuthorization()
+    {
+        if (File.Exists(_filePath))
+            File.Delete(_filePath);
     }
 
     private static TaskCompletionSource NewSignal() =>
