@@ -3,12 +3,35 @@ using OEIMS.Sentinel.Service.Domain.Platform;
 
 namespace OEIMS.Sentinel.Service.Monitors;
 
+/// <summary>
+/// Internal event kind used to build professor process monitor messages.
+/// </summary>
 internal enum ProcessEvent
 {
+    /// <summary>
+    /// A forbidden process was found and killed.
+    /// </summary>
     ForbiddenProcessKilled,
+
+    /// <summary>
+    /// A forbidden process was found but could not be killed.
+    /// </summary>
     ForbiddenProcessKillFailed
 }
 
+/// <summary>
+/// Detects forbidden processes and tries to stop them during the exam.
+/// </summary>
+/// <remarks>
+/// This monitor checks already running forbidden processes when it starts and also watches for new ones.
+/// <para>
+/// The difference from <c>ProcessBlocker</c> is that <c>ProcessMonitor</c> detects and kills processes that are running.
+/// <c>ProcessBlocker</c> tries to prevent future launches through Windows mitigation. They are intentionally complementary.
+/// </para>
+/// </remarks>
+/// <param name="processSource">
+/// Platform boundary used to watch process starts and kill matching processes.
+/// </param>
 internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
 {
     public string Name => nameof(ProcessMonitor);
@@ -20,6 +43,16 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
         "slack"
     };
 
+    /// <summary>
+    /// Starts process monitoring until cancellation.
+    /// </summary>
+    /// <param name="onEvent">
+    /// Callback that receives warnings for successful and failed kills attempts.
+    /// </param>
+    /// <param name="ct">
+    /// Cancellation token used by the Service to stop the monitor.
+    /// </param>
+    /// <returns>A task that completes when monitoring stops.</returns>
     public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
     {
         try
@@ -44,6 +77,12 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
         }
     }
 
+    /// <summary>
+    /// Handles one notification of a process starting from the platform source.
+    /// </summary>
+    /// <param name="process">Process that has just started.</param>
+    /// <param name="onEvent">Callback used to publish monitor events.</param>
+    /// <param name="ct">Cancellation token used to stop the kill attempt.</param>
     private async Task KillIfForbiddenProcessAsync(
         ProcessInfo process,
         Func<MonitorEvent, Task> onEvent,
@@ -60,6 +99,11 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
         await KillProcessByNameAsync(processName, onEvent, ct);
     }
 
+    /// <summary>
+    /// Checks the current process list when the monitor starts.
+    /// </summary>
+    /// <param name="onEvent">Callback used to publish monitor events.</param>
+    /// <param name="ct">Cancellation token used to stop the scan.</param>
     private async Task KillForbiddenProcessesAsync(
         Func<MonitorEvent, Task> onEvent,
         CancellationToken ct)
@@ -72,6 +116,12 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
         }
     }
 
+    /// <summary>
+    /// Kills all process instances matching a forbidden process name and reports the outcome.
+    /// </summary>
+    /// <param name="processName">Normalized forbidden process name.</param>
+    /// <param name="onEvent">Callback used to publish monitor events.</param>
+    /// <param name="ct">Cancellation token used to stop the operation.</param>
     private async Task KillProcessByNameAsync(
         string processName,
         Func<MonitorEvent, Task> onEvent,
@@ -139,6 +189,14 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
         }
     }
 
+    /// <summary>
+    /// Builds the final event sent to the Service pipeline.
+    /// </summary>
+    /// <param name="eventType">Process event category.</param>
+    /// <param name="processName">Process name shown in the message.</param>
+    /// <param name="count">Number of process instances represented by the message.</param>
+    /// <param name="errorMessage">Optional failure reason.</param>
+    /// <returns>A warning monitor event describing the kill result.</returns>
     private MonitorEvent CreateMonitorEvent(
         ProcessEvent eventType,
         string processName,
@@ -173,6 +231,11 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
         };
     }
 
+    /// <summary>
+    /// Converts process names such as <c>PROGRAM.exe</c> and <c>C:\\...\\Program.exe</c> into <c>program</c>.
+    /// </summary>
+    /// <param name="processName">Process name or executable path reported by the process source.</param>
+    /// <returns>Lowercase executable name without extension.</returns>
     private static string NormalizeProcessName(string processName)
     {
         return Path
@@ -181,6 +244,9 @@ internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
             .ToLowerInvariant();
     }
 
+    /// <summary>
+    /// Releases monitor resources and the platform process source.
+    /// </summary>
     public void Dispose()
     {
         _killLock.Dispose();

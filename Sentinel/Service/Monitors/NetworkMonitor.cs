@@ -1,30 +1,66 @@
-using System.Net.NetworkInformation;
 using Contracts;
+using System.Net.NetworkInformation;
 
 namespace OEIMS.Sentinel.Service.Monitors;
 
+/// <summary>
+/// Network interface considered active by the Service.
+/// </summary>
+/// <param name="Id">Stable operating system identifier for the interface.</param>
+/// <param name="Name">Human-readable interface name shown in monitor messages.</param>
 internal sealed record ActiveInterface(string Id, string Name);
 
+/// <summary>
+/// Network violation ready to be emitted as a monitor event.
+/// </summary>
+/// <param name="Key">
+/// Deduplication key. Equal keys mean the same violation is still happening and should not be spammed.
+/// </param>
+/// <param name="Event">Professor-facing event that explains the violation.</param>
 internal sealed record NetworkViolation(
     string Key,
     MonitorEvent Event);
 
+/// <summary>
+/// Snapshot of the current network state used for baseline comparison.
+/// </summary>
+/// <param name="ActiveInterfaces">All active non-loopback interfaces with a gateway.</param>
+/// <param name="ActivePhysicalInterfaces">Active interfaces that are considered physical network adapters.</param>
+/// <param name="NetworkId">Simple identity of the connected network, based on interface name and gateway.</param>
 internal sealed record NetworkState(
     HashSet<ActiveInterface> ActiveInterfaces,
     HashSet<ActiveInterface> ActivePhysicalInterfaces,
     string NetworkId);
 
+/// <summary>
+/// Validates the student's network before the exam and detects suspicious network changes during the exam.
+/// </summary>
+/// <remarks>
+/// The rule is intentionally strict: exactly one active physical interface is allowed.
+/// This rejects VPNs, virtual adapters, multiple simultaneous connections, and interface changes after the baseline is created.
+/// </remarks>
 internal sealed class NetworkMonitor : IMonitor
 {
     public string Name => nameof(NetworkMonitor);
 
     private static readonly HashSet<NetworkInterfaceType> AllowedPhysicalTypes =
     [
+        // Wired internet connection, usually through an Ethernet cable.
         NetworkInterfaceType.Ethernet,
+
+        // Faster wired internet connection, usually through an Ethernet cable.
         NetworkInterfaceType.GigabitEthernet,
+
+        // Wi-Fi connection.
         NetworkInterfaceType.Wireless80211,
+
+        // Mobile network connection, such as 3G, 4G, or 5G.
         NetworkInterfaceType.Wwanpp,
+
+        // Mobile network connection, such as 3G, 4G, or 5G.
         NetworkInterfaceType.Wwanpp2,
+
+        // Wireless metropolitan network connection, similar to long-range wireless internet.
         NetworkInterfaceType.Wman
     ];
 
@@ -32,15 +68,28 @@ internal sealed class NetworkMonitor : IMonitor
     private string? _lastViolationKey;
     private bool _started;
 
+    /// <summary>
+    /// Raised whenever Windows reports a network address or availability change.
+    /// </summary>
     public event Action? NetworkChanged;
+
+    /// <summary>
+    /// Raised when the current network state violates the exam baseline.
+    /// </summary>
     public event Action<MonitorEvent>? NetworkViolationDetected;
 
+    /// <summary>
+    /// Captures the current valid network state as the exam baseline.
+    /// </summary>
     public void InitializeBaseline()
     {
         _baseline = GetCurrentNetworkState();
         _lastViolationKey = null;
     }
 
+    /// <summary>
+    /// Subscribes to Windows network change notifications.
+    /// </summary>
     public void Start()
     {
         if (_started)
@@ -55,6 +104,9 @@ internal sealed class NetworkMonitor : IMonitor
         _started = true;
     }
 
+    /// <summary>
+    /// Unsubscribes from Windows network change notifications and clears monitor state.
+    /// </summary>
     public void Stop()
     {
         if (!_started)
@@ -78,12 +130,18 @@ internal sealed class NetworkMonitor : IMonitor
         HandleNetworkChange();
     }
 
+    /// <summary>
+    /// Handles one Windows network notification.
+    /// </summary>
     private void HandleNetworkChange()
     {
         NetworkChanged?.Invoke();
         CheckNetworkViolation();
     }
 
+    /// <summary>
+    /// Compares the current network state with the baseline and emits only new violations.
+    /// </summary>
     private void CheckNetworkViolation()
     {
         if (_baseline is null)
@@ -105,6 +163,10 @@ internal sealed class NetworkMonitor : IMonitor
         NetworkViolationDetected?.Invoke(violation.Event);
     }
 
+    /// <summary>
+    /// Returns the current violation, if the active network no longer matches the baseline rules.
+    /// </summary>
+    /// <returns>A violation event or <c>null</c> when the network is still valid.</returns>
     private NetworkViolation? GetCurrentViolation()
     {
         if (_baseline is null)
@@ -161,11 +223,21 @@ internal sealed class NetworkMonitor : IMonitor
         };
     }
 
-    public bool IsValidNetworkState()
+    /// <summary>
+    /// Checks if the current network state is acceptable before creating a baseline.
+    /// </summary>
+    /// <returns><c>true</c> when exactly one active physical interface is present.</returns>
+    public static bool IsValidNetworkState()
     {
         return IsValidNetworkState(GetCurrentNetworkState());
     }
 
+    /// <summary>
+    /// Runs the pre-exam network gate.
+    /// </summary>
+    /// <param name="onEvent">Callback used to report waiting, warning, and success messages.</param>
+    /// <param name="ct">Cancellation token used when the service stops before the exam starts.</param>
+    /// <returns>A task that completes after a valid baseline is initialized.</returns>
     public async Task StartPreExamAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
     {
         Start();
@@ -209,6 +281,12 @@ internal sealed class NetworkMonitor : IMonitor
         }
     }
 
+    /// <summary>
+    /// Starts exam-time monitoring after the pre-exam baseline has been created.
+    /// </summary>
+    /// <param name="onEvent">Callback used to publish network violation events.</param>
+    /// <param name="ct">Cancellation token used when the exam ends or the service stops.</param>
+    /// <returns>A task that completes when exam-time monitoring stops.</returns>
     public async Task StartAsync(Func<MonitorEvent, Task> onEvent, CancellationToken ct)
     {
         if (_baseline is null)
@@ -236,6 +314,9 @@ internal sealed class NetworkMonitor : IMonitor
         }
     }
 
+    /// <summary>
+    /// Sends a monitor event without letting callback failures crash the Windows network callback.
+    /// </summary>
     private static async Task NotifyAsync(
         MonitorEvent monitorEvent,
         Func<MonitorEvent, Task> onEvent)
@@ -250,6 +331,10 @@ internal sealed class NetworkMonitor : IMonitor
         }
     }
 
+    /// <summary>
+    /// Waits until the current network becomes valid again.
+    /// </summary>
+    /// <param name="ct">Cancellation token used to stop waiting.</param>
     private async Task WaitForValidNetworkAsync(CancellationToken ct)
     {
         if (IsValidNetworkState())
@@ -275,6 +360,10 @@ internal sealed class NetworkMonitor : IMonitor
         }
     }
 
+    /// <summary>
+    /// Reads the current operating system network state.
+    /// </summary>
+    /// <returns>A snapshot used for validation and baseline comparison.</returns>
     private static NetworkState GetCurrentNetworkState()
     {
         var activeInterfaces = NetworkInterface.GetAllNetworkInterfaces()
@@ -282,13 +371,11 @@ internal sealed class NetworkMonitor : IMonitor
             .ToList();
 
         return new NetworkState(
-            ActiveInterfaces: activeInterfaces
-                .Select(ToActiveInterface)
-                .ToHashSet(),
-            ActivePhysicalInterfaces: activeInterfaces
+            ActiveInterfaces: [.. activeInterfaces.Select(ToActiveInterface)],
+            ActivePhysicalInterfaces: [.. activeInterfaces
                 .Where(IsPhysicalInterface)
-                .Select(ToActiveInterface)
-                .ToHashSet(),
+                .Select(ToActiveInterface)],
+            // <interface-name>-<gateway-address>|<interface-name>-<gateway-address>|...
             NetworkId: string.Join("|", activeInterfaces.Select(GetNetworkIdentity)));
     }
 
@@ -327,6 +414,9 @@ internal sealed class NetworkMonitor : IMonitor
         return current.NetworkId != baseline.NetworkId;
     }
 
+    /// <summary>
+    /// Determines whether an interface should count as active for exam policy.
+    /// </summary>
     private static bool IsActiveInterface(NetworkInterface networkInterface)
     {
         return networkInterface.OperationalStatus == OperationalStatus.Up &&
@@ -334,11 +424,17 @@ internal sealed class NetworkMonitor : IMonitor
                HasGateway(networkInterface);
     }
 
+    /// <summary>
+    /// Determines whether an interface type is accepted as physical for this project.
+    /// </summary>
     private static bool IsPhysicalInterface(NetworkInterface networkInterface)
     {
         return AllowedPhysicalTypes.Contains(networkInterface.NetworkInterfaceType);
     }
 
+    /// <summary>
+    /// Checks whether the interface has at least one gateway.
+    /// </summary>
     private static bool HasGateway(NetworkInterface networkInterface)
     {
         try
@@ -358,8 +454,12 @@ internal sealed class NetworkMonitor : IMonitor
             networkInterface.Name);
     }
 
+    /// <summary>
+    /// Builds a simple network identity for detecting network changes on the same interface.
+    /// </summary>
     private static string GetNetworkIdentity(NetworkInterface networkInterface)
     {
+        // "<interface-name>-<gateway-address>" (e.g. "Wi-Fi-192.168.1.1")
         return $"{networkInterface.Name}-{GetGatewayAddress(networkInterface)}";
     }
 
@@ -380,6 +480,9 @@ internal sealed class NetworkMonitor : IMonitor
         }
     }
 
+    /// <summary>
+    /// Formats interface names for messages shown to professors and logs.
+    /// </summary>
     private static string FormatInterfaces(IEnumerable<ActiveInterface> interfaces)
     {
         var names = interfaces
@@ -393,6 +496,9 @@ internal sealed class NetworkMonitor : IMonitor
             : string.Join(", ", names);
     }
 
+    /// <summary>
+    /// Stops the monitor and unsubscribes from Windows network events.
+    /// </summary>
     public void Dispose()
     {
         Stop();
