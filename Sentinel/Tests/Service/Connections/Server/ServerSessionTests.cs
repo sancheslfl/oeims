@@ -41,6 +41,18 @@ public sealed class ServerSessionTests
             restored.GetAuthorization());
     }
 
+    [Fact(DisplayName = "An invalid persisted authorization is deleted when the session starts")]
+    public void AnInvalidPersistedAuthorizationIsDeletedWhenTheSessionStarts()
+    {
+        using var file = TempSessionFile.Create();
+        File.WriteAllText(file.Path, "not protected data");
+
+        var session = CreateSession(file.Path);
+
+        Assert.False(session.IsAuthorized);
+        Assert.False(File.Exists(file.Path));
+    }
+
     [Fact(DisplayName = "Clearing the session removes authorization and releases change waiters")]
     public async Task ClearingTheSessionRemovesAuthorizationAndReleasesChangeWaiters()
     {
