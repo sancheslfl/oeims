@@ -215,7 +215,6 @@ class ParticipantServiceTest {
 
     private fun sessions() = fakeSessions.sessions
 
-    // Pull the signed join token back out of the verification link the email carried.
     private fun capturedToken(): EmailJoinToken {
         val link = fakeEmailSender.lastLink ?: error("No verification email was sent")
         val encoded = link.substringAfter("token=")
@@ -341,7 +340,6 @@ class ParticipantServiceTest {
 
     @Test
     fun `verifyJoin throws UnauthorizedException when the token signature is invalid`() {
-        // A structurally valid JWT signed with the wrong secret must not verify.
         val forged = JWT.create()
             .withIssuer("oeims-test")
             .withAudience("email-join")

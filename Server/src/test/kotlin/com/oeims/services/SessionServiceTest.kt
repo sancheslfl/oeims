@@ -112,7 +112,6 @@ class SessionServiceTest {
             return sessions.values.filter { it.status in open }
         }
 
-        // Email-join flow is owned by ParticipantService; unused here.
         override suspend fun createEmailJoin(
             sessionId: UUID,
             email: String,

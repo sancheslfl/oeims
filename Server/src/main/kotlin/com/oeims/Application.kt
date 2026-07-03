@@ -8,6 +8,7 @@ import com.oeims.config.configureEmail
 import com.oeims.config.configureOpenApi
 import com.oeims.config.configureRouting
 import com.oeims.config.configureSecurity
+import com.oeims.models.EmailSender
 import com.oeims.repositories.*
 import com.oeims.services.*
 import com.oeims.connections.SseBroadcaster
@@ -34,7 +35,8 @@ import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
 
-fun Application.module() {
+// emailSender defaults to the SMTP sender built from config; tests inject a fake.
+fun Application.module(emailSender: EmailSender? = null) {
     // CORS
     install(CORS) {
         allowHost("localhost:5173")
@@ -118,7 +120,7 @@ fun Application.module() {
     val heartbeatConfig = configureHeartbeat()
 
     // Email service
-    val smtpEmailSender = configureEmail()
+    val smtpEmailSender = emailSender ?: configureEmail()
 
     // Realtime
     val sseBroadcaster = SseBroadcaster()

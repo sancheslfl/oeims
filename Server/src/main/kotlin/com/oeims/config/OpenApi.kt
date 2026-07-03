@@ -9,10 +9,9 @@ private const val OPENAPI_RESOURCE = "openapi.yaml"
 private val YAML_CONTENT_TYPE = ContentType("application", "yaml")
 
 fun Application.configureOpenApi() {
-    // Load the spec once from the classpath so it fails fast on startup if missing.
-    val spec = object {}.javaClass.classLoader.getResourceAsStream(OPENAPI_RESOURCE)
-        ?.bufferedReader()?.use { it.readText() }
-        ?: error("OpenAPI spec '$OPENAPI_RESOURCE' not found on the classpath")
+    // The spec is bundled into the jar as a classpath resource; load it once at startup.
+    val spec = environment.classLoader.getResource(OPENAPI_RESOURCE)?.readText()
+        ?: throw IllegalStateException("OpenAPI spec '$OPENAPI_RESOURCE' not found on the classpath")
 
     routing {
         get("/docs") {
