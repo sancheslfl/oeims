@@ -11,7 +11,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<InternalsVisibleTo Include="Sentinel.Tests" />
+		<InternalsVisibleTo Include="Tests" />
 	</ItemGroup>
 
 	<ItemGroup>
