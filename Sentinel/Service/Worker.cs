@@ -6,6 +6,20 @@ using OEIMS.Sentinel.Service.Monitors;
 
 namespace OEIMS.Sentinel.Service
 {
+    /// <summary>
+    /// Main background service that starts mitigators, validates pre-exam state, and runs monitoring components.
+    /// </summary>
+    /// <remarks>
+    /// This is the Service orchestration point. It does not contain monitor policy itself; it wires monitors,
+    /// mitigators, Agent IPC, heartbeat, and server communication together.
+    /// </remarks>
+    /// <param name="monitors">All local monitors registered by dependency injection.</param>
+    /// <param name="mitigators">All mitigators registered by dependency injection.</param>
+    /// <param name="serverConfig">Server connection settings and feature flags.</param>
+    /// <param name="wsClient">WebSocket client used to send Service and Agent monitor events to the backend.</param>
+    /// <param name="agentPipeServer">Pipe server used to receive Agent messages.</param>
+    /// <param name="heartbeatSender">Periodic Service heartbeat sender.</param>
+    /// <param name="logger">Worker logger.</param>
     internal class Worker(
         IEnumerable<IMonitor> monitors,
         IEnumerable<IMitigator> mitigators,
@@ -19,6 +33,10 @@ namespace OEIMS.Sentinel.Service
         private readonly IReadOnlyList<IMonitor> _monitors = monitors.ToList();
         private readonly IReadOnlyList<IMitigator> _mitigators = mitigators.ToList();
 
+        /// <summary>
+        /// Starts the full Sentinel Service runtime.
+        /// </summary>
+        /// <param name="stoppingToken">Cancellation token triggered by Windows Service shutdown.</param>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             foreach (var mitigator in _mitigators)
@@ -71,6 +89,12 @@ namespace OEIMS.Sentinel.Service
             await Task.WhenAll(tasks);
         }
 
+        /// <summary>
+        /// Runs one long-lived component with consistent lifecycle logging and failure handling.
+        /// </summary>
+        /// <param name="name">Component name shown in logs.</param>
+        /// <param name="runAsync">Function that starts the component.</param>
+        /// <param name="ct">Cancellation token used to stop the component.</param>
         private async Task RunComponentAsync(
             string name,
             Func<CancellationToken, Task> runAsync,
@@ -95,12 +119,20 @@ namespace OEIMS.Sentinel.Service
             }
         }
 
+        /// <summary>
+        /// Handles local-only events that should be logged but not sent to the backend.
+        /// </summary>
+        /// <param name="e">Monitor event produced before the exam connection flow starts.</param>
         private Task OnLocalEvent(MonitorEvent e)
         {
             Log(e);
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Handles monitor events that should be logged and sent to the backend when connected.
+        /// </summary>
+        /// <param name="e">Monitor event from the Service or Agent.</param>
         private async Task OnEvent(MonitorEvent e)
         {
             Log(e);
@@ -109,6 +141,10 @@ namespace OEIMS.Sentinel.Service
                 await wsClient.SendEventAsync(e, CancellationToken.None);
         }
 
+        /// <summary>
+        /// Handles messages received from the Agent event pipe.
+        /// </summary>
+        /// <param name="message">Heartbeat or monitor event sent by the Agent.</param>
         private async Task OnAgentMessage(AgentPipeMessage message)
         {
             switch (message.Type)
@@ -133,6 +169,10 @@ namespace OEIMS.Sentinel.Service
             }
         }
 
+        /// <summary>
+        /// Writes one monitor event to the correct log level.
+        /// </summary>
+        /// <param name="e">Event to log.</param>
         private void Log(MonitorEvent e)
         {
             switch (e.Severity)
@@ -155,12 +195,18 @@ namespace OEIMS.Sentinel.Service
             }
         }
 
+        /// <summary>
+        /// Stops the worker and releases the WebSocket client.
+        /// </summary>
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
             await base.StopAsync(cancellationToken);
             await wsClient.DisposeAsync();
         }
 
+        /// <summary>
+        /// Disposes all mitigators and monitors owned by the worker.
+        /// </summary>
         public override void Dispose()
         {
             foreach (var mitigator in _mitigators)
