@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -20,7 +20,7 @@ internal sealed record ServerAuthorization(
  */
 internal sealed class ServerSession
 {
-    private static readonly string FilePath = Path.Combine(
+    private static readonly string DefaultFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
         "OEIMS",
         "Sentinel",
@@ -28,6 +28,7 @@ internal sealed class ServerSession
 
     private readonly Lock _lock = new();
     private readonly ILogger<ServerSession> _logger;
+    private readonly string _filePath;
 
     private TaskCompletionSource _authorized = NewSignal();
     private TaskCompletionSource _authorizationChanged = NewSignal();
@@ -35,8 +36,14 @@ internal sealed class ServerSession
     private ServerAuthorization? _authorization;
 
     public ServerSession(ILogger<ServerSession> logger)
+        : this(logger, DefaultFilePath)
+    {
+    }
+
+    internal ServerSession(ILogger<ServerSession> logger, string filePath)
     {
         _logger = logger;
+        _filePath = filePath;
         Load();
     }
 
@@ -87,8 +94,8 @@ internal sealed class ServerSession
             _authorizationChanged.TrySetResult();
             _authorizationChanged = NewSignal();
 
-            if (File.Exists(FilePath))
-                File.Delete(FilePath);
+            if (File.Exists(_filePath))
+                File.Delete(_filePath);
         }
     }
 
@@ -131,12 +138,12 @@ internal sealed class ServerSession
 
     private void Load()
     {
-        if (!File.Exists(FilePath))
+        if (!File.Exists(_filePath))
             return;
 
         try
         {
-            var encrypted = File.ReadAllBytes(FilePath);
+            var encrypted = File.ReadAllBytes(_filePath);
             var bytes = ProtectedData.Unprotect(
                 encrypted,
                 null,
@@ -177,9 +184,9 @@ internal sealed class ServerSession
      *   The authorization data to persist.
      *   </param>
      */
-    private static void Save(ServerAuthorization authorization)
+    private void Save(ServerAuthorization authorization)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
 
         var bytes = Encoding.UTF8.GetBytes(
             JsonSerializer.Serialize(authorization));
@@ -189,7 +196,7 @@ internal sealed class ServerSession
             null,
             DataProtectionScope.LocalMachine);  // the same machine can decrypt it, less fragile for a Windows Service
 
-        File.WriteAllBytes(FilePath, encrypted);
+        File.WriteAllBytes(_filePath, encrypted);
     }
 
     private static TaskCompletionSource NewSignal() =>
