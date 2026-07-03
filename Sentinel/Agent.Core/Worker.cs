@@ -9,8 +9,9 @@ namespace OEIMS.Sentinel.Agent;
 /// Main background worker for the Sentinel Agent process.
 /// </summary>
 /// <remarks>
-/// The Agent runs in the student desktop session. It applies Agent-side mitigations, starts Agent-side monitors,
-/// sends monitor events to the Service, and listens for commands from the Service.
+/// This is the Agent orchestration point. The Agent runs in the student desktop session 
+/// which means it can interact with the user's desktop session and consequently, interact with GUI. 
+/// Its only reponsability is to wire monitors, mitigators and Service IPC together.
 /// </remarks>
 /// <param name="monitors">Agent-side monitors registered by dependency injection.</param>
 /// <param name="mitigators">Agent-side mitigators registered by dependency injection.</param>
@@ -29,7 +30,7 @@ internal sealed class Worker(
     private readonly IReadOnlyList<IMitigator> _mitigators = mitigators.ToList();
 
     /// <summary>
-    /// Starts the Agent runtime until the process is stopped.
+    /// Starts the Sentinel Agent.
     /// </summary>
     /// <param name="stoppingToken">Cancellation token triggered by host shutdown.</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -77,7 +78,7 @@ internal sealed class Worker(
     }
 
     /// <summary>
-    /// Runs one long-lived Agent component with consistent lifecycle logging.
+    /// Runs one long-lived component with additional logging and failure handling.
     /// </summary>
     /// <param name="name">Component name shown in logs.</param>
     /// <param name="runAsync">Function that starts the component.</param>

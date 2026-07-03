@@ -89,7 +89,7 @@ namespace OEIMS.Sentinel.Service
         }
 
         /// <summary>
-        /// Runs one long-lived component with consistent lifecycle logging and failure handling.
+        /// Runs one long-lived component with additional logging and failure handling.
         /// </summary>
         /// <param name="name">Component name shown in logs.</param>
         /// <param name="runAsync">Function that starts the component.</param>
