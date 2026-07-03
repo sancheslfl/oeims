@@ -42,23 +42,23 @@ internal sealed class AgentEventPipeServer(
                 PipeTransmissionMode.Byte,
                 PipeOptions.Asynchronous);
 
-            logger.LogInformation("Waiting for Agent pipe connection...");
+            logger.LogDebug("Waiting for Agent pipe connection...");
 
             try
             {
                 await pipe.WaitForConnectionAsync(ct);
 
-                logger.LogInformation("Agent connected.");
+                logger.LogDebug("Agent connected.");
 
                 await ReadMessagesAsync(pipe, onMessage, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                logger.LogInformation("Agent pipe server cancelled.");
+                logger.LogDebug("Agent pipe server cancelled.");
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Agent pipe connection failed.");
+                logger.LogDebug(ex, "Agent pipe connection failed.");
             }
         }
     }
@@ -91,7 +91,7 @@ internal sealed class AgentEventPipeServer(
             }
             catch (JsonException ex)
             {
-                logger.LogWarning(ex, "Invalid Agent pipe message ignored.");
+                logger.LogDebug(ex, "Invalid Agent pipe message ignored.");
                 continue;
             }
 
@@ -101,6 +101,6 @@ internal sealed class AgentEventPipeServer(
             await onMessage(message);
         }
 
-        logger.LogWarning("Agent disconnected.");
+        logger.LogDebug("Agent disconnected.");
     }
 }

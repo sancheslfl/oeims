@@ -42,7 +42,7 @@ namespace OEIMS.Sentinel.Service
             foreach (var mitigator in _mitigators)
             {
                 mitigator.Apply();
-                logger.LogInformation("Mitigator applied: {name}", mitigator.Name);
+                logger.LogDebug("Mitigator applied: {name}", mitigator.Name);
             }
 
             var networkMonitor = _monitors.OfType<NetworkMonitor>().Single();
@@ -77,8 +77,7 @@ namespace OEIMS.Sentinel.Service
             else
             {
                 logger.LogWarning(
-                    "No server config found so running without server connection. " +
-                    "Set Server:ApiBaseUrl, Server:RealtimeBaseUrl, Server:Token and Server:ParticipantId in appsettings.json.");
+                    "No server config found so running without server connection. Check the Server section in appsettings.json.");
             }
 
             tasks.AddRange(_monitors.Select(monitor => RunComponentAsync(
@@ -102,15 +101,15 @@ namespace OEIMS.Sentinel.Service
         {
             try
             {
-                logger.LogInformation("Starting component: {name}", name);
+                logger.LogDebug("Starting component: {name}", name);
 
                 await runAsync(ct);
 
-                logger.LogInformation("Component stopped: {name}", name);
+                logger.LogDebug("Component stopped: {name}", name);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                logger.LogInformation("Component cancelled: {name}", name);
+                logger.LogDebug("Component cancelled: {name}", name);
             }
             catch (Exception ex)
             {
@@ -150,13 +149,13 @@ namespace OEIMS.Sentinel.Service
             switch (message.Type)
             {
                 case AgentMessageType.Heartbeat:
-                    logger.LogInformation("Agent heartbeat received at {sentAt}", message.SentAt);
+                    logger.LogDebug("Agent heartbeat received at {sentAt}", message.SentAt);
                     break;
 
                 case AgentMessageType.Event:
                     if (message.Event is null)
                     {
-                        logger.LogWarning("Agent event message ignored because Event was null.");
+                        logger.LogDebug("Agent event message ignored because Event was null.");
                         return;
                     }
 
@@ -164,7 +163,7 @@ namespace OEIMS.Sentinel.Service
                     break;
 
                 default:
-                    logger.LogWarning("Unknown Agent pipe message type: {type}", message.Type);
+                    logger.LogDebug("Unknown Agent pipe message type: {type}", message.Type);
                     break;
             }
         }
@@ -217,5 +216,5 @@ namespace OEIMS.Sentinel.Service
 
             base.Dispose();
         }
-}
+    }
 }

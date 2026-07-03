@@ -65,13 +65,13 @@ internal sealed class AgentEventPipeClient(
         }
         catch (IOException ex)
         {
-            logger.LogWarning(ex, "Agent pipe disconnected.");
+            logger.LogDebug(ex, "Agent pipe disconnected.");
 
             DisposeConnection();
         }
         catch (TimeoutException ex)
         {
-            logger.LogWarning(ex, "Agent pipe connection timed out.");
+            logger.LogDebug(ex, "Agent pipe connection timed out.");
 
             DisposeConnection();
         }
@@ -98,7 +98,7 @@ internal sealed class AgentEventPipeClient(
             PipeDirection.Out,
             PipeOptions.Asynchronous);
 
-        logger.LogInformation("Connecting to Service pipe...");
+        logger.LogDebug("Connecting to Service pipe...");
 
         await _pipe.ConnectAsync(timeout: 2_000, ct);
 
@@ -107,7 +107,7 @@ internal sealed class AgentEventPipeClient(
             AutoFlush = true
         };
 
-        logger.LogInformation("Connected to Service pipe.");
+        logger.LogDebug("Connected to Service pipe.");
     }
 
     /// <summary>
