@@ -111,8 +111,11 @@ internal sealed class AgentEventPipeClient(
     }
 
     /// <summary>
-    /// Closes the current pipe connection and writer.
+    /// Closes only the active pipe connection and clears cached connection state.
     /// </summary>
+    /// <remarks>
+    /// The client remains usable after this. A later send will open a new pipe connection.
+    /// </remarks>
     private void DisposeConnection()
     {
         _writer?.Dispose();
@@ -123,8 +126,11 @@ internal sealed class AgentEventPipeClient(
     }
 
     /// <summary>
-    /// Releases pipe resources and prevents concurrent writes during disposal.
+    /// Shuts down the client after any active write finishes.
     /// </summary>
+    /// <remarks>
+    /// This is final cleanup for the whole client, including the synchronization primitive used to serialize writes.
+    /// </remarks>
     public async ValueTask DisposeAsync()
     {
         await _writeLock.WaitAsync();
