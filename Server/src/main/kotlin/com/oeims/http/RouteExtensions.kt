@@ -3,10 +3,10 @@ package com.oeims.http
 import com.auth0.jwt.interfaces.Claim
 import com.oeims.models.UnauthorizedException
 import com.oeims.models.ValidationException
-import io.ktor.server.application.ApplicationCall
-import io.ktor.server.auth.authentication
-import io.ktor.server.auth.jwt.JWTPrincipal
-import java.util.UUID
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
+import java.util.*
 
 /**
  * Returns the authenticated user's UUID from the JWT principal.

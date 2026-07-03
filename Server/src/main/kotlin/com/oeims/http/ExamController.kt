@@ -2,8 +2,8 @@ package com.oeims.http
 
 import com.oeims.models.dto.CreateExamRequest
 import com.oeims.models.toExamId
-import com.oeims.models.toProfessorId
 import com.oeims.models.toExamTitle
+import com.oeims.models.toProfessorId
 import com.oeims.services.ExamService
 import io.ktor.http.*
 import io.ktor.server.auth.*

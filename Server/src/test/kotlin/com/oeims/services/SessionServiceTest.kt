@@ -1,16 +1,17 @@
 package com.oeims.services
 
+import com.oeims.connections.SseBroadcaster
 import com.oeims.models.ConflictException
+import com.oeims.models.ConnectionStatus
 import com.oeims.models.ForbiddenException
 import com.oeims.models.NotFoundException
-import com.oeims.models.ConnectionStatus
 import com.oeims.models.SessionStatus
 import com.oeims.models.UserRole
 import com.oeims.models.toExamId
 import com.oeims.models.toProfessorId
+import com.oeims.models.toSessionCode
 import com.oeims.models.toSessionId
 import com.oeims.models.toStudentId
-import com.oeims.models.toSessionCode
 import com.oeims.repositories.ExamRecord
 import com.oeims.repositories.ParticipantRecord
 import com.oeims.repositories.SessionRecord
@@ -19,17 +20,39 @@ import com.oeims.repositories.interfaces.IExamRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.repositories.interfaces.IUserRepository
-import com.oeims.connections.SseBroadcaster
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Instant
 import java.util.*
+import kotlin.Boolean
+import kotlin.Int
+import kotlin.String
+import kotlin.Unit
+import kotlin.code
+import kotlin.collections.List
+import kotlin.collections.MutableSet
+import kotlin.collections.all
+import kotlin.collections.any
+import kotlin.collections.copy
+import kotlin.collections.emptyList
+import kotlin.collections.filter
+import kotlin.collections.find
+import kotlin.collections.getOrPut
+import kotlin.collections.listOf
+import kotlin.collections.maxByOrNull
+import kotlin.collections.mutableListOf
+import kotlin.collections.mutableMapOf
+import kotlin.collections.mutableSetOf
+import kotlin.collections.set
+import kotlin.collections.toList
+import kotlin.sequences.all
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.text.all
 
 class SessionServiceTest {
 

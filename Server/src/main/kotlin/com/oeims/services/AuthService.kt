@@ -1,14 +1,8 @@
 package com.oeims.services
 
 import com.auth0.jwt.JWT
-import com.oeims.models.ConflictException
-import com.oeims.models.UnauthorizedException
-import com.oeims.models.Email
-import com.oeims.models.Password
-import com.oeims.models.UserRole
+import com.oeims.models.*
 import com.oeims.models.dto.AuthResponse
-import com.oeims.models.UserId
-import com.oeims.models.toUserId
 import com.oeims.repositories.interfaces.IUserRepository
 import org.mindrot.jbcrypt.BCrypt
 import java.time.Instant

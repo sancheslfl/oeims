@@ -5,7 +5,7 @@ import com.oeims.models.toParticipantId
 import com.oeims.models.toSeverity
 import com.oeims.services.EventService
 import com.oeims.services.ParticipantService
-import io.ktor.server.application.log
+import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*

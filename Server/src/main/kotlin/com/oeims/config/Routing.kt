@@ -1,19 +1,11 @@
 package com.oeims.config
 
 import com.oeims.connections.SentinelWebSocketManager
-import com.oeims.http.*
-import com.oeims.models.dto.ErrorResponse
-import com.oeims.services.AuthService
-import com.oeims.services.EventService
-import com.oeims.services.ExamService
-import com.oeims.services.SessionService
 import com.oeims.connections.SseBroadcaster
-import com.oeims.models.ConflictException
-import com.oeims.models.ForbiddenException
-import com.oeims.models.NotFoundException
-import com.oeims.models.UnauthorizedException
-import com.oeims.models.ValidationException
-import com.oeims.services.ParticipantService
+import com.oeims.http.*
+import com.oeims.models.*
+import com.oeims.models.dto.ErrorResponse
+import com.oeims.services.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.statuspages.*

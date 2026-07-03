@@ -1,7 +1,11 @@
 package com.oeims.services
 
-import com.oeims.models.NotFoundException
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.SseChannels
+import com.oeims.connections.SseEvent
+import com.oeims.connections.SseMessage
 import com.oeims.models.ConnectionStatus
+import com.oeims.models.NotFoundException
 import com.oeims.models.SessionStatus
 import com.oeims.models.Severity
 import com.oeims.models.toParticipantId
@@ -12,10 +16,6 @@ import com.oeims.repositories.SessionRecord
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
-import com.oeims.connections.SseBroadcaster
-import com.oeims.connections.SseChannels
-import com.oeims.connections.SseEvent
-import com.oeims.connections.SseMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.onSubscription
@@ -27,6 +27,19 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Instant
 import java.util.*
+import kotlin.Boolean
+import kotlin.String
+import kotlin.Unit
+import kotlin.UnsupportedOperationException
+import kotlin.code
+import kotlin.collections.List
+import kotlin.collections.copy
+import kotlin.collections.emptyList
+import kotlin.collections.filter
+import kotlin.collections.find
+import kotlin.collections.mutableListOf
+import kotlin.collections.mutableMapOf
+import kotlin.collections.set
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull

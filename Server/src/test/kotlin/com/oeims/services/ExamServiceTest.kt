@@ -1,8 +1,8 @@
 package com.oeims.services
 
+import com.oeims.models.ExamTitle
 import com.oeims.models.NotFoundException
 import com.oeims.models.ValidationException
-import com.oeims.models.ExamTitle
 import com.oeims.models.toExamId
 import com.oeims.models.toProfessorId
 import com.oeims.repositories.ExamRecord

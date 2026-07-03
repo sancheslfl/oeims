@@ -1,16 +1,10 @@
 package com.oeims.http
 
+import com.oeims.models.*
 import com.oeims.models.dto.CreateSessionRequest
 import com.oeims.models.dto.EmailJoinRequest
 import com.oeims.models.dto.JoinSessionRequest
 import com.oeims.models.dto.VerifyJoinRequest
-import com.oeims.models.toExamId
-import com.oeims.models.toProfessorId
-import com.oeims.models.toSessionId
-import com.oeims.models.toAllowedEmailDomain
-import com.oeims.models.toEmail
-import com.oeims.models.toJwtToken
-import com.oeims.models.toSessionCode
 import com.oeims.services.EventService
 import com.oeims.services.ParticipantService
 import com.oeims.services.SessionService

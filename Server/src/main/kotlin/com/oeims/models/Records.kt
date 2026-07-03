@@ -5,7 +5,7 @@ import com.oeims.models.dto.ExamResponse
 import com.oeims.models.dto.ParticipantResponse
 import com.oeims.models.dto.SessionResponse
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 data class ExamRecord(
     val id: UUID,

@@ -1,6 +1,5 @@
 package com.oeims.models.dto
 
-import com.oeims.models.Severity
 import kotlinx.serialization.Serializable
 
 

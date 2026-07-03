@@ -1,6 +1,6 @@
 package com.oeims.models
 
-import java.util.UUID
+import java.util.*
 
 @JvmInline
 value class ExamId(val value: UUID)

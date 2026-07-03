@@ -2,11 +2,11 @@ package com.oeims.connections
 
 import com.oeims.models.ExamIdentityCode
 import com.oeims.models.dto.SentinelEventMessage
-import io.ktor.server.websocket.DefaultWebSocketServerSession
+import io.ktor.server.websocket.*
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.util.UUID
+import java.util.*
 
 const val MAX_FRAME_BYTES: Long = 8 * 1024    // 8 KB
 

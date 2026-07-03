@@ -1,11 +1,7 @@
 package com.oeims.services
 
-import com.oeims.models.NotFoundException
-import com.oeims.models.ValidationException
-import com.oeims.models.ExamTitle
+import com.oeims.models.*
 import com.oeims.models.dto.ExamResponse
-import com.oeims.models.ExamId
-import com.oeims.models.ProfessorId
 import com.oeims.repositories.interfaces.IExamRepository
 
 class ExamService(

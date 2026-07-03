@@ -1,7 +1,7 @@
 package com.oeims.config
 
-import io.ktor.http.Url
-import io.ktor.server.config.ApplicationConfig
+import io.ktor.http.*
+import io.ktor.server.config.*
 
 // TODO: Turn into the interface for envs
 object Environment {

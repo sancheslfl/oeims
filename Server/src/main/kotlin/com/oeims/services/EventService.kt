@@ -1,19 +1,13 @@
 package com.oeims.services
 
-import com.oeims.models.NotFoundException
-import com.oeims.models.SessionStatus
-import com.oeims.models.Severity
-import com.oeims.models.dto.EventResponse
-import com.oeims.models.ParticipantId
-import com.oeims.models.SessionId
-import com.oeims.models.toSessionId
-import com.oeims.repositories.interfaces.IEventRepository
-import com.oeims.repositories.interfaces.IParticipantRepository
-import com.oeims.repositories.interfaces.ISessionRepository
 import com.oeims.connections.SseBroadcaster
 import com.oeims.connections.SseChannels
 import com.oeims.connections.SseEvent
-import com.oeims.models.EventRecord
+import com.oeims.models.*
+import com.oeims.models.dto.EventResponse
+import com.oeims.repositories.interfaces.IEventRepository
+import com.oeims.repositories.interfaces.IParticipantRepository
+import com.oeims.repositories.interfaces.ISessionRepository
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.time.Instant

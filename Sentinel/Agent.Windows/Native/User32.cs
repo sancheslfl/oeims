@@ -4,6 +4,7 @@ using System.Text;
 
 namespace OEIMS.Sentinel.Agent.Native;
 
+
 internal static partial class User32
 {
     private const string LibraryName = "user32.dll";
