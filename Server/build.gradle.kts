@@ -1,6 +1,6 @@
-val ktor_version: String by project
-val kotlin_version: String by project
-val exposed_version: String by project
+val ktorVersion = providers.gradleProperty("ktor_version")
+val kotlinVersion = providers.gradleProperty("kotlin_version")
+val exposedVersion = providers.gradleProperty("exposed_version")
 
 plugins {
     kotlin("jvm") version "2.4.0"
@@ -21,25 +21,25 @@ repositories {
 
 dependencies {
     // Ktor server
-    implementation("io.ktor:ktor-server-core:$ktor_version")
-    implementation("io.ktor:ktor-server-config-yaml:$ktor_version")
-    implementation("io.ktor:ktor-server-netty:$ktor_version")
-    implementation("io.ktor:ktor-server-websockets:$ktor_version")
-    implementation("io.ktor:ktor-server-auth:$ktor_version")
-    implementation("io.ktor:ktor-server-auth-jwt:$ktor_version")
-    implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-    implementation("io.ktor:ktor-server-call-logging:$ktor_version")
-    implementation("io.ktor:ktor-server-call-id:$ktor_version")
-    implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
-    implementation("io.ktor:ktor-server-status-pages:$ktor_version")
-    implementation("io.ktor:ktor-server-cors:$ktor_version")
-    implementation("io.ktor:ktor-server-sse:${ktor_version}")               // SSE
+    implementation("io.ktor:ktor-server-core:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-config-yaml:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-netty:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-websockets:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-auth:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-auth-jwt:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-content-negotiation:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-call-logging:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-call-id:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-rate-limit:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-status-pages:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-cors:${ktorVersion.get()}")
+    implementation("io.ktor:ktor-server-sse:${ktorVersion.get()}")               // SSE
 
     // Exposed ORM
-    implementation("org.jetbrains.exposed:exposed-core:$exposed_version")
-    implementation("org.jetbrains.exposed:exposed-jdbc:$exposed_version")
-    implementation("org.jetbrains.exposed:exposed-java-time:$exposed_version")
+    implementation("org.jetbrains.exposed:exposed-core:${exposedVersion.get()}")
+    implementation("org.jetbrains.exposed:exposed-jdbc:${exposedVersion.get()}")
+    implementation("org.jetbrains.exposed:exposed-java-time:${exposedVersion.get()}")
 
     // SQLite
     implementation("org.xerial:sqlite-jdbc:3.47.0.0")
@@ -58,10 +58,10 @@ dependencies {
     implementation("org.eclipse.angus:jakarta.mail:2.0.5")
 
     // Testing
-    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
-    testImplementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-    testImplementation("io.ktor:ktor-client-websockets:$ktor_version")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:$kotlin_version")
+    testImplementation("io.ktor:ktor-server-test-host:${ktorVersion.get()}")
+    testImplementation("io.ktor:ktor-client-content-negotiation:${ktorVersion.get()}")
+    testImplementation("io.ktor:ktor-client-websockets:${ktorVersion.get()}")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:${kotlinVersion.get()}")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
