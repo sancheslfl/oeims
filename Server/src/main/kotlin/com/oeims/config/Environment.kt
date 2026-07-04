@@ -12,7 +12,8 @@ object Environment {
 
     fun configure(config: ApplicationConfig) {
         val frontendBaseUrl = Url(
-            config.property("app.frontend.base-url")
+            System.getenv("FRONTEND_BASE_URL")
+                ?: config.property("app.frontend.base-url")
                 .getString()
                 .trimEnd('/')
         )
