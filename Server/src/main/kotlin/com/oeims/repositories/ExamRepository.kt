@@ -1,5 +1,6 @@
 package com.oeims.repositories
 
+import com.oeims.models.ExamRecord
 import com.oeims.models.Exams
 import com.oeims.repositories.interfaces.IExamRepository
 import kotlinx.coroutines.Dispatchers
@@ -9,15 +10,6 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 import java.util.*
-
-data class ExamRecord(
-    val id: UUID,
-    val createdBy: UUID,
-    val title: String,
-    val description: String?,
-    val durationMins: Int,
-    val createdAt: Instant
-)
 
 class ExamRepository : IExamRepository {
 

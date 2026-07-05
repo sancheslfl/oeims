@@ -1,12 +1,7 @@
 package com.oeims.services
 
-import com.oeims.models.NotFoundException
-import com.oeims.models.ValidationException
-import com.oeims.models.ExamTitle
+import com.oeims.models.*
 import com.oeims.models.dto.ExamResponse
-import com.oeims.models.ids.ExamId
-import com.oeims.models.ids.ProfessorId
-import com.oeims.repositories.ExamRecord
 import com.oeims.repositories.interfaces.IExamRepository
 
 class ExamService(
@@ -38,13 +33,4 @@ class ExamService(
     suspend fun getExamById(id: ExamId): ExamResponse =
         examRepository.findById(id.value)?.toResponse()
             ?: throw NotFoundException("Exam not found")
-
-    private fun ExamRecord.toResponse() = ExamResponse(
-        id = id.toString(),
-        createdBy = createdBy.toString(),
-        title = title,
-        description = description,
-        durationMins = durationMins,
-        createdAt = createdAt.toString()
-    )
 }

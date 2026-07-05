@@ -1,10 +1,10 @@
 package com.oeims.http
 
-import com.oeims.models.ids.toProfessorId
-import com.oeims.services.SessionService
 import com.oeims.connections.SseBroadcaster
 import com.oeims.connections.SseChannel
 import com.oeims.connections.SseChannels
+import com.oeims.models.toProfessorId
+import com.oeims.services.SessionService
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
@@ -12,7 +12,7 @@ import io.ktor.sse.*
 import io.ktor.util.cio.*
 import io.ktor.utils.io.*
 
-fun Route.sseRoutes(
+fun Route.sse(
     sessionService: SessionService,
     sseBroadcaster: SseBroadcaster
 ) {

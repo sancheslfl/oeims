@@ -3,15 +3,33 @@ using Microsoft.Win32;
 
 namespace OEIMS.Sentinel.Service.Mitigators
 {
+    /// <summary>
+    /// Prevents known forbidden executables from launching during the exam.
+    /// </summary>
+    /// <remarks>
+    /// This is a mitigation, not a monitor. It changes local Windows state so a forbidden executable is redirected
+    /// through Image File Execution Options.
+    /// <para>
+    /// Correlation with <c>ProcessMonitor</c>: <c>ProcessBlocker</c> tries to prevent future launches,
+    /// while <c>ProcessMonitor</c> detects and kills processes that are already running or still manage to start.
+    /// </para>
+    /// </remarks>
     internal class ProcessBlocker : IMitigator
     {
+        /// <summary>
+        /// Name used in logs and diagnostics.
+        /// </summary>
         public string Name => nameof(ProcessBlocker);
 
+        // ponytail: hard-coded for the academic prototype; move to configuration when more processes are supported.
         private readonly string[] _forbiddenProcesses =
         [
             "slack"
         ];
 
+        /// <summary>
+        /// Common installation folders scanned for forbidden executables.
+        /// </summary>
         private readonly string[] _scanLocations =
         [
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -24,6 +42,9 @@ namespace OEIMS.Sentinel.Service.Mitigators
 
         private const string RegistryPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\";
 
+        /// <summary>
+        /// Scans known locations and blocks each forbidden executable found.
+        /// </summary>
         public void Apply()
         {
             foreach (var location in _scanLocations)
@@ -42,6 +63,10 @@ namespace OEIMS.Sentinel.Service.Mitigators
             }
         }
 
+        /// <summary>
+        /// Blocks one executable by adding a Windows Image File Execution Options debugger entry.
+        /// </summary>
+        /// <param name="path">Full path to the executable found in the scan.</param>
         private void BlockExecutable(string path)
         {
             var filename = Path.GetFileName(path);
@@ -53,6 +78,9 @@ namespace OEIMS.Sentinel.Service.Mitigators
             _blockedPaths.Add(filename);
         }
 
+        /// <summary>
+        /// Removes registry entries created by <see cref="Apply" />.
+        /// </summary>
         public void Dispose()
         {
             foreach (var fileName in _blockedPaths)

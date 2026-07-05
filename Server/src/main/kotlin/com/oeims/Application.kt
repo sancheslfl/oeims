@@ -1,17 +1,13 @@
 package com.oeims
 
 import com.auth0.jwt.JWT
-import com.oeims.config.Environment
+import com.oeims.config.*
+import com.oeims.connections.MAX_FRAME_BYTES
+import com.oeims.connections.SentinelWebSocketManager
+import com.oeims.connections.SseBroadcaster
 import com.oeims.http.AUTH_COOKIE_NAME
-import com.oeims.config.configureDatabase
-import com.oeims.config.configureEmail
-import com.oeims.config.configureOpenApi
-import com.oeims.config.configureRouting
-import com.oeims.config.configureSecurity
 import com.oeims.repositories.*
 import com.oeims.services.*
-import com.oeims.connections.SseBroadcaster
-import com.oeims.connections.WebSocketBroadcaster
 import io.ktor.http.*
 import io.ktor.http.auth.*
 import io.ktor.serialization.kotlinx.json.*
@@ -28,6 +24,7 @@ import io.ktor.server.sse.*
 import io.ktor.server.websocket.*
 import kotlinx.serialization.json.Json
 import org.slf4j.event.Level
+import java.time.Clock
 import java.util.*
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -35,9 +32,12 @@ import kotlin.time.Duration.Companion.seconds
 fun main(args: Array<String>): Unit = EngineMain.main(args)
 
 fun Application.module() {
+    // Environment variables
+    Environment.configure(environment.config)
+
     // CORS
     install(CORS) {
-        allowHost("localhost:5173")
+        allowHost(Environment.frontendBaseUrl.hostWithPort)
         allowCredentials = true
 
         allowMethod(HttpMethod.Get)
@@ -93,47 +93,53 @@ fun Application.module() {
     install(WebSockets) {
         pingPeriod = 30.seconds
         timeout = 60.seconds
-        maxFrameSize = 64 * 1024L  // 64 KB
+        maxFrameSize = MAX_FRAME_BYTES
     }
 
     // SSE
     install(SSE)
 
-    // App variables
-    Environment.configure(environment.config)
-
     // Database
     configureDatabase()
+
+    // TODO: Check if the dependency graph is correct
+    // Clock
+    val clock = Clock.systemDefaultZone()
 
     // Repositories
     val userRepository = UserRepository()
     val examRepository = ExamRepository()
-    val sessionRepository = SessionRepository()
+    val sessionRepository = SessionRepository(clock)
     val participantRepository = ParticipantRepository()
     val eventRepository = EventRepository()
 
     // Config
     val authJwtSettings = configureAuthJwt()
-    val sessionJwtSettings = SessionJwtSettings(configureEmailJoinJwt(), authJwtSettings)
+    val sessionJwtSettings = SessionJwtSettings(configureEmailVerificationJwt(), authJwtSettings)
     val heartbeatConfig = configureHeartbeat()
 
     // Email service
     val smtpEmailSender = configureEmail()
 
+    // Json Serializer
+    val json = Json {
+        encodeDefaults = true   // include default values when the server sends messages
+    }
+
     // Realtime
     val sseBroadcaster = SseBroadcaster()
-    val webSocketBroadcaster = WebSocketBroadcaster()
+    val webSocketManager = SentinelWebSocketManager(json = json)
 
     // Services
     val authService = AuthService(userRepository, authJwtSettings)
     val examService = ExamService(examRepository)
-    val sessionService = SessionService(sessionRepository, examRepository, sseBroadcaster)
+    val sessionService = SessionService(sessionRepository, examRepository, participantRepository, eventRepository, sseBroadcaster)
     val participantService = ParticipantService(
         participantRepository,
         sessionRepository,
         sessionJwtSettings,
         sseBroadcaster,
-        webSocketBroadcaster,
+        webSocketManager,
         smtpEmailSender
     )
     val eventService = EventService(eventRepository, participantRepository, sessionRepository, sseBroadcaster)
@@ -150,7 +156,7 @@ fun Application.module() {
         participantService,
         eventService,
         sseBroadcaster,
-        webSocketBroadcaster
+        webSocketManager,
     )
 
     // API Docs

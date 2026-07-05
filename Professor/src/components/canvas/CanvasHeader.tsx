@@ -1,25 +1,39 @@
-import type {SessionResponse} from "../../types";
-import {useCanvasSession} from "./CanvasSessionContext.ts";
-
+import type { SessionResponse } from "../../types";
+import {
+    type PendingSessionOperation,
+    useCanvasSession,
+} from "./CanvasSessionContext.ts";
 
 type CanvasHeaderProps = {
     title: string;
     realtimeError: string;
 };
 
+type SessionAction = {
+    label: string;
+    disabled: boolean;
+    run: () => Promise<void>;
+};
+
 export function CanvasHeader({ title, realtimeError }: CanvasHeaderProps) {
     const {
         session,
-        canStartSession,
-        canEndSession,
-        isStarting,
-        isEnding,
+        pendingOperation,
         error: sessionError,
         startCurrentSession,
         endCurrentSession,
+        downloadCurrentReport,
     } = useCanvasSession();
 
     const error = sessionError || realtimeError;
+
+    const sessionAction = getSessionAction({
+        session,
+        pendingOperation,
+        startCurrentSession,
+        endCurrentSession,
+        downloadCurrentReport,
+    });
 
     return (
         <div className="flex items-start justify-between gap-4">
@@ -40,30 +54,66 @@ export function CanvasHeader({ title, realtimeError }: CanvasHeaderProps) {
             </div>
 
             <div className="flex gap-3">
-                {canStartSession && (
+                {sessionAction && (
                     <button
                         type="button"
                         className="app-button"
-                        disabled={isStarting}
-                        onClick={() => void startCurrentSession()}
+                        disabled={sessionAction.disabled}
+                        onClick={() => void sessionAction.run()}
                     >
-                        {isStarting ? "Starting..." : "Begin session"}
-                    </button>
-                )}
-
-                {canEndSession && (
-                    <button
-                        type="button"
-                        className="app-button"
-                        disabled={isEnding}
-                        onClick={() => void endCurrentSession()}
-                    >
-                        {isEnding ? "Ending..." : "End session"}
+                        {sessionAction.label}
                     </button>
                 )}
             </div>
         </div>
     );
+}
+
+type SessionActionArgs = {
+    session: SessionResponse | undefined;
+    pendingOperation: PendingSessionOperation;
+    startCurrentSession: () => Promise<void>;
+    endCurrentSession: () => Promise<void>;
+    downloadCurrentReport: () => Promise<void>;
+};
+
+function getSessionAction({
+                              session,
+                              pendingOperation,
+                              startCurrentSession,
+                              endCurrentSession,
+                              downloadCurrentReport,
+                          }: SessionActionArgs): SessionAction | undefined {
+    const isBusy = pendingOperation !== null;
+
+    switch (session?.status) {
+        case "PENDING":
+            return {
+                label: pendingOperation === "start" ? "Starting..." : "Begin session",
+                disabled: isBusy,
+                run: startCurrentSession,
+            };
+
+        case "ACTIVE":
+            return {
+                label: pendingOperation === "end" ? "Ending..." : "End session",
+                disabled: isBusy,
+                run: endCurrentSession,
+            };
+
+        case "ENDED":
+            return {
+                label:
+                    pendingOperation === "download"
+                        ? "Downloading..."
+                        : "Download report",
+                disabled: isBusy,
+                run: downloadCurrentReport,
+            };
+
+        default:
+            return undefined;
+    }
 }
 
 function getSessionStatusLabel(session?: SessionResponse) {

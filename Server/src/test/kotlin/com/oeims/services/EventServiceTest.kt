@@ -1,21 +1,21 @@
 package com.oeims.services
 
-import com.oeims.models.NotFoundException
+import com.oeims.connections.SseBroadcaster
+import com.oeims.connections.SseChannels
+import com.oeims.connections.SseEvent
+import com.oeims.connections.SseMessage
 import com.oeims.models.ConnectionStatus
+import com.oeims.models.NotFoundException
 import com.oeims.models.SessionStatus
 import com.oeims.models.Severity
-import com.oeims.models.ids.toParticipantId
-import com.oeims.models.ids.toSessionId
+import com.oeims.models.toParticipantId
+import com.oeims.models.toSessionId
 import com.oeims.repositories.EventRecord
 import com.oeims.repositories.ParticipantRecord
 import com.oeims.repositories.SessionRecord
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
-import com.oeims.connections.SseBroadcaster
-import com.oeims.connections.SseChannels
-import com.oeims.connections.SseEvent
-import com.oeims.connections.SseMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.onSubscription
@@ -27,6 +27,19 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Instant
 import java.util.*
+import kotlin.Boolean
+import kotlin.String
+import kotlin.Unit
+import kotlin.UnsupportedOperationException
+import kotlin.code
+import kotlin.collections.List
+import kotlin.collections.copy
+import kotlin.collections.emptyList
+import kotlin.collections.filter
+import kotlin.collections.find
+import kotlin.collections.mutableListOf
+import kotlin.collections.mutableMapOf
+import kotlin.collections.set
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -131,12 +144,12 @@ class EventServiceTest {
         )
     }
 
-    // ── handleEvent ───────────────────────────────────────────────────────────
+    // ── create ───────────────────────────────────────────────────────────
 
     @Test
     fun `handleEvent returns response with correct fields`() = runBlocking {
         val response =
-            service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "Window lost focus", Severity.WARNING)
+            service.create(participantId.toParticipantId(), "FocusMonitor", "Window lost focus", Severity.WARNING)
 
         assertNotNull(response)
         assertEquals(participantId.toString(), response.participantId)
@@ -149,7 +162,7 @@ class EventServiceTest {
 
     @Test
     fun `handleEvent persists the event`() = runBlocking {
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
         assertEquals(1, fakeEvents.events.size)
         assertEquals("msg", fakeEvents.events[0].message)
@@ -168,7 +181,7 @@ class EventServiceTest {
         }
 
         subscribed.await()
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
         val message = withTimeout(1_000) { received.receive() }
         job.cancel()
@@ -180,7 +193,7 @@ class EventServiceTest {
     fun `handleEvent returns null when session is not ACTIVE`() = runBlocking {
         fakeSessions.sessions[sessionId] = fakeSessions.sessions[sessionId]!!.copy(status = SessionStatus.PENDING)
 
-        val response = service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
+        val response = service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
         assertNull(response)
     }
@@ -189,7 +202,7 @@ class EventServiceTest {
     fun `handleEvent throws NotFoundException when participant does not exist`() {
         assertThrows<NotFoundException> {
             runBlocking {
-                service.handleEvent(
+                service.create(
                     UUID.randomUUID().toParticipantId(),
                     "FocusMonitor",
                     "msg",
@@ -203,7 +216,7 @@ class EventServiceTest {
     fun `handleEvent does not persist when session is not ACTIVE`() = runBlocking {
         fakeSessions.sessions[sessionId] = fakeSessions.sessions[sessionId]!!.copy(status = SessionStatus.PENDING)
 
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
         assertTrue(fakeEvents.events.isEmpty())
     }
@@ -212,8 +225,8 @@ class EventServiceTest {
 
     @Test
     fun `getSessionEvents returns all events for the session`() = runBlocking {
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "first", Severity.INFO)
-        service.handleEvent(participantId.toParticipantId(), "ClipboardMonitor", "second", Severity.WARNING)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "first", Severity.INFO)
+        service.create(participantId.toParticipantId(), "ClipboardMonitor", "second", Severity.WARNING)
 
         val results = service.getSessionEvents(sessionId.toSessionId())
 
@@ -229,7 +242,7 @@ class EventServiceTest {
 
     @Test
     fun `getSessionEvents returns responses with correct severity strings`() = runBlocking {
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.CRITICAL)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.CRITICAL)
 
         val results = service.getSessionEvents(sessionId.toSessionId())
 

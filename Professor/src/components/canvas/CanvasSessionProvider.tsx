@@ -1,8 +1,11 @@
 import { type ReactNode, useState } from "react";
 import type { SessionResponse } from "../../types";
 import { useAuth } from "../../AuthContext";
-import { endSession, startSession } from "../../api/sessions";
-import { CanvasSessionContext } from "./CanvasSessionContext";
+import { endSession, getSessionReport, startSession } from "../../api/sessions";
+import {
+    CanvasSessionContext,
+    type PendingSessionOperation,
+} from "./CanvasSessionContext";
 
 type CanvasSessionProviderProps = {
     openedSession: SessionResponse | undefined;
@@ -16,71 +19,89 @@ export function CanvasSessionProvider({
     const { auth } = useAuth();
 
     const [sessionOverride, setSessionOverride] = useState<SessionResponse | null>(null);
-    const [isStarting, setIsStarting] = useState(false);
-    const [isEnding, setIsEnding] = useState(false);
+    const [pendingOperation, setPendingOperation] =
+        useState<PendingSessionOperation>(null);
     const [error, setError] = useState("");
 
-    const canUseSessionOverride =
-        sessionOverride &&
-        openedSession &&
-        sessionOverride.id === openedSession.id &&
-        openedSession.status !== "ENDED";
+    const session =
+        openedSession
+            ? sessionOverride?.id === openedSession.id
+                ? sessionOverride
+                : openedSession
+            : sessionOverride ?? undefined;
 
-    const session = canUseSessionOverride ? sessionOverride : openedSession;
-
-    const canStartSession = session?.status === "PENDING";
-    const canEndSession = session?.status === "ACTIVE";
-
-    async function startCurrentSession() {
-        if (!auth || !session) {
-            return;
-        }
-
+    async function runSessionOperation(
+        operation: Exclude<PendingSessionOperation, null>,
+        execute: () => Promise<void>,
+    ) {
         setError("");
-        setIsStarting(true);
+        setPendingOperation(operation);
 
         try {
-            const started = await startSession(session.id, auth.token);
-            setSessionOverride(started);
+            await execute();
         } catch (error) {
             setError(error instanceof Error ? error.message : "Unexpected error.");
         } finally {
-            setIsStarting(false);
+            setPendingOperation(null);
         }
     }
 
-    async function endCurrentSession() {
+    function startCurrentSession() {
         if (!auth || !session) {
-            return;
+            return Promise.resolve();
         }
 
-        setError("");
-        setIsEnding(true);
+        return runSessionOperation("start", async () => {
+            setSessionOverride(await startSession(session.id, auth.token));
+        });
+    }
 
-        try {
-            const ended = await endSession(session.id, auth.token);
-            setSessionOverride(ended);
-        } catch (error) {
-            setError(error instanceof Error ? error.message : "Unexpected error.");
-        } finally {
-            setIsEnding(false);
+    function endCurrentSession() {
+        if (!auth || !session) {
+            return Promise.resolve();
         }
+
+        return runSessionOperation("end", async () => {
+            setSessionOverride(await endSession(session.id, auth.token));
+        });
+    }
+
+    function downloadCurrentReport() {
+        if (!auth || !session) {
+            return Promise.resolve();
+        }
+
+        return runSessionOperation("download", async () => {
+            const report = await getSessionReport(session.id, auth.token);
+            downloadBlob(report, `oeims-session-${session.id}.txt`);
+        });
     }
 
     return (
         <CanvasSessionContext.Provider
             value={{
                 session,
-                canStartSession,
-                canEndSession,
-                isStarting,
-                isEnding,
+                pendingOperation,
                 error,
                 startCurrentSession,
                 endCurrentSession,
+                downloadCurrentReport,
             }}
         >
             {children}
         </CanvasSessionContext.Provider>
     );
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+
+    try {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+    } finally {
+        URL.revokeObjectURL(url);
+    }
 }

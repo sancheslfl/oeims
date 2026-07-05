@@ -197,17 +197,34 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
 
     private static void RunMessageLoop(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested)
+        var loopThread = Kernel32.GetCurrentThreadId();
+
+        User32.PeekMessage(
+            out _,
+            IntPtr.Zero,
+            WinEventConstants.WM_APP_STOP,
+            WinEventConstants.WM_APP_STOP,
+            WinEventConstants.PM_NOREMOVE
+        );
+
+        using var registration = ct.Register(() =>
         {
-            if (User32.PeekMessage(out var msg, IntPtr.Zero, 0, 0, WinEventConstants.PM_REMOVE))
-            {
-                User32.TranslateMessage(ref msg);
-                User32.DispatchMessage(ref msg);
-            }
-            else
-            {
-                ct.WaitHandle.WaitOne(100);
-            }
+            User32.PostThreadMessage(loopThread, WinEventConstants.WM_APP_STOP, 0, 0);
+        });
+
+        while (true)
+        {
+            var res = User32.GetMessage(out var msg, IntPtr.Zero, 0, 0);
+
+            if (res <= 0)   // error or WM_QUIT 
+                break;
+
+            if (ct.IsCancellationRequested)
+                break;
+
+            User32.TranslateMessage(ref msg);
+            User32.DispatchMessage(ref msg);
+
         }
     }
 

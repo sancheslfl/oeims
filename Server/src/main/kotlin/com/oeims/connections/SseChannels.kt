@@ -1,7 +1,7 @@
 package com.oeims.connections
 
-import com.oeims.models.ids.SessionId
-import com.oeims.models.ids.toSessionId
+import com.oeims.models.SessionId
+import com.oeims.models.toSessionId
 
 @JvmInline
 value class SseChannel(val value: String)

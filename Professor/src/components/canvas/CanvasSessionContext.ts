@@ -1,19 +1,19 @@
 import { createContext, useContext } from "react";
 import type { SessionResponse } from "../../types";
 
-export type CanvasSessionContextValue = {
+export type PendingSessionOperation = "start" | "end" | "download" | null;
+
+type CanvasSessionContextValue = {
     session: SessionResponse | undefined;
-    canStartSession: boolean;
-    canEndSession: boolean;
-    isStarting: boolean;
-    isEnding: boolean;
+    pendingOperation: PendingSessionOperation;
     error: string;
     startCurrentSession: () => Promise<void>;
     endCurrentSession: () => Promise<void>;
+    downloadCurrentReport: () => Promise<void>;
 };
 
 export const CanvasSessionContext =
-    createContext<CanvasSessionContextValue | null>(null);
+    createContext<CanvasSessionContextValue | undefined>(undefined);
 
 /**
  * Custom hook to access the CanvasSessionContext that owns state related
@@ -26,9 +26,7 @@ export function useCanvasSession() {
     const context = useContext(CanvasSessionContext);
 
     if (!context) {
-        throw new Error(
-            "useCanvasSession must be used inside CanvasSessionProvider.",
-        );
+        throw new Error("useCanvasSession must be used inside CanvasSessionProvider.");
     }
 
     return context;

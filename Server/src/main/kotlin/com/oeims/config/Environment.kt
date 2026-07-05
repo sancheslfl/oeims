@@ -1,17 +1,27 @@
 package com.oeims.config
 
-import io.ktor.server.config.ApplicationConfig
+import io.ktor.http.*
+import io.ktor.server.config.*
 
+// TODO: Turn into the interface for envs
 object Environment {
-    private lateinit var _frontendBaseUrl: String
+    private lateinit var _frontendBaseUrl: Url
 
-    val frontendBaseUrl: String
+    val frontendBaseUrl: Url
         get() = _frontendBaseUrl
 
     fun configure(config: ApplicationConfig) {
-        _frontendBaseUrl = config
-            .property("app.frontend.base-url")
-            .getString()
-            .trimEnd('/')
+        val frontendBaseUrl = Url(
+            System.getenv("FRONTEND_BASE_URL")
+                ?: config.property("app.frontend.base-url")
+                .getString()
+                .trimEnd('/')
+        )
+
+        require(frontendBaseUrl.host.isNotBlank()) {
+            "app.frontend.base-url must include a host"
+        }
+
+        _frontendBaseUrl = frontendBaseUrl
     }
 }

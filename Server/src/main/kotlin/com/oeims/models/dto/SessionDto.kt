@@ -27,6 +27,7 @@ data class SessionResponse(
     val endedAt: String?
 )
 
+// TODO: Reassess this
 @Serializable
 data class JoinSessionRequest(
     val code: String

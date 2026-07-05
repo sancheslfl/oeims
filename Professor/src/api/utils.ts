@@ -10,6 +10,8 @@ type ApiErrorResponse = {
   error: string;
 };
 
+type ApiResponseType = "json" | "blob";
+
 export async function apiFetch<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -17,7 +19,10 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers);
 
-  if (!headers.has("Content-Type")) {
+  const isJsonRequestWithoutContentType =
+      typeof options.body === "string" && !headers.has("Content-Type");
+
+  if (isJsonRequestWithoutContentType) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -42,21 +47,49 @@ export async function apiFetch<T>(
     return undefined as T;
   }
 
-  return await res.json() as T;
+  switch (getApiResponseType(res)) {
+    case "json":
+      return await res.json() as T;
+    case "blob":
+      return await res.blob() as T;
+  }
 }
 
 async function getApiErrorMessage(res: Response): Promise<string> {
-  try {
-    const body = await res.json() as ApiErrorResponse;
+  if (getApiResponseType(res) === "json") {
+    try {
+      const body = await res.json() as ApiErrorResponse;
 
-    if (typeof body.error === "string") {
-      return body.error;
+      if (typeof body.error === "string") {
+        return body.error;
+      }
+    } catch {
+      // invalid JSON error body.
     }
-  } catch {
-    // invalid error body.
   }
 
-  return `It seems a strange error occurred. Please try again later.`;
+  try {
+    const text = await res.text();
+
+    if (text) {
+      return text;
+    }
+  } catch {
+    // unreadable error body.
+  }
+
+  return "It seems a strange error occurred. Please try again later.";
+}
+
+function getApiResponseType(res: Response): ApiResponseType {
+  const contentType = res.headers.get("Content-Type") ?? "";
+
+  if (contentType.includes("application/json") || contentType.includes("+json")) {
+    return "json";
+  }
+
+  // in our current API non-JSON responses are downloadable files
+  return "blob";
 }
 
 export function createEventSource(eventId: string): EventSource {

@@ -22,15 +22,3 @@ data class AuthResponse(
     val email: String,
     val role: String
 )
-
-
-/**
- * public static getToken(String token) { this.token = token }
- * public static setToken()
- *
- *
- * AuthResponse.getToken()
- * AuthResponse.token
- *
- * AuthResponse(43627643267, 1, miguel@gmail.com, STUDENT).copy(email = tomas@gmail.com)
- */
