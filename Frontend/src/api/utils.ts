@@ -1,11 +1,5 @@
 export const API_URL = import.meta.env.VITE_API_URL;
 
-let onAuthError: (() => void) | null = null;
-
-export function registerAuthErrorHandler(fn: () => void) {
-    onAuthError = fn;
-}
-
 type ApiErrorResponse = {
   error: string;
 };
@@ -37,9 +31,6 @@ export async function apiFetch<T>(
   });
 
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      onAuthError?.();
-    }
     throw new Error(await getApiErrorMessage(res));
   }
 

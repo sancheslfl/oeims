@@ -37,14 +37,12 @@ class EventRepositoryTest {
         val participantRepo = ParticipantRepository()
 
         val professorId = userRepo.create("prof@isel.pt", UserRole.PROFESSOR, "hash").id
-        val student1Id = userRepo.create("student1@alunos.isel.pt", UserRole.STUDENT, "hash").id
-        val student2Id = userRepo.create("student2@alunos.isel.pt", UserRole.STUDENT, "hash").id
         val examId = examRepo.create(professorId, "Networks", null, 90).id
-        sessionId = sessionRepo.create(examId, professorId, "EVT001").id
+        sessionId = sessionRepo.create(examId, professorId, "EVT001", "alunos.isel.pt")!!.id
         sessionRepo.updateStatus(sessionId, SessionStatus.ACTIVE)
 
-        participantId = participantRepo.create(sessionId, student1Id).id
-        otherParticipantId = participantRepo.create(sessionId, student2Id).id
+        participantId = participantRepo.create(sessionId, "student1@alunos.isel.pt").id
+        otherParticipantId = participantRepo.create(sessionId, "student2@alunos.isel.pt").id
 
         eventRepository = EventRepository()
     }
@@ -59,7 +57,7 @@ class EventRepositoryTest {
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns record with correct fields`() = runBlocking {
+    fun `create returns record with correct fields`(): Unit = runBlocking {
         val event = eventRepository.create(participantId, "FocusMonitor", "Window lost focus", Severity.WARNING)
 
         assertEquals(participantId, event.participantId)
@@ -171,10 +169,9 @@ class EventRepositoryTest {
         val partRepo2 = ParticipantRepository()
 
         val prof2Id = userRepo2.create("prof2@isel.pt", UserRole.PROFESSOR, "hash").id
-        val student3Id = userRepo2.create("student3@alunos.isel.pt", UserRole.STUDENT, "hash").id
         val exam2Id = examRepo2.create(prof2Id, "Algebra", null, 60).id
-        val session2Id = sessionRepo2.create(exam2Id, prof2Id, "OTH002").id
-        val part2Id = partRepo2.create(session2Id, student3Id).id
+        val session2Id = sessionRepo2.create(exam2Id, prof2Id, "OTH002", "alunos.isel.pt")!!.id
+        val part2Id = partRepo2.create(session2Id, "student3@alunos.isel.pt").id
 
         eventRepository.create(part2Id, "FocusMonitor", "other session", Severity.INFO)
         eventRepository.create(participantId, "FocusMonitor", "this session", Severity.INFO)

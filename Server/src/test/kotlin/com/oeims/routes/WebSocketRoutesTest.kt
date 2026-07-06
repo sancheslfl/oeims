@@ -12,58 +12,28 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * WebSocket-layer tests for the two channels:
- *
- *   /ws/daemon/{participantId}   — student daemon sends monitoring events
- *   /ws/console/{sessionId}      — professor receives live event broadcasts
- *
- * ## The end-to-end broadcast test
- *
- * The console test coordinates two concurrent WebSocket connections:
- * 1. A professor connects and waits for frames via [launch].
- * 2. A [delay] gives the server-side `flow.collect` coroutine time to subscribe
- *    to the [kotlinx.coroutines.flow.SharedFlow] before anything is emitted.
- * 3. The daemon then sends an event, which is persisted and broadcast.
- * 4. The professor's connection receives the broadcast frame.
- *
- * The 100 ms delay is the standard synchronisation point for SharedFlow tests:
- * the flow has no replay, so the subscriber must exist before the first emit.
- */
 class WebSocketRoutesTest : BaseRouteTest() {
 
-    // ── Clients ───────────────────────────────────────────────────────────────
-
-    /** Client with WebSocket support only — used for frame-level tests. */
     private fun ApplicationTestBuilder.wsClient() = createClient {
         install(WebSockets)
     }
-
-    // ── Setup ─────────────────────────────────────────────────────────────────
 
     private data class Ctx(
         val profToken: String,
         val studentToken: String,
         val sessionId: String,
-        val participantId: String
+        val participantId: String,
+        val code: String
     )
 
-    /**
-     * Registers a professor and a student, creates an exam + session, and has the
-     * student join, returning all tokens and IDs needed by the tests.
-     */
     private suspend fun ApplicationTestBuilder.setup(): Ctx {
         val http = jsonClient()
 
         val prof = http.post("/auth/register") {
             contentType(ContentType.Application.Json)
             setBody(RegisterRequest("prof@isel.pt", "password123", "PROFESSOR"))
-        }.body<AuthResponse>()
-
-        val student = http.post("/auth/register") {
-            contentType(ContentType.Application.Json)
-            setBody(RegisterRequest("student@isel.pt", "password123", "STUDENT"))
         }.body<AuthResponse>()
 
         val exam = http.post("/exams") {
@@ -75,18 +45,14 @@ class WebSocketRoutesTest : BaseRouteTest() {
         val session = http.post("/sessions") {
             bearerAuth(prof.token)
             contentType(ContentType.Application.Json)
-            setBody(CreateSessionRequest(exam.id))
+            setBody(CreateSessionRequest(exam.id, "isel.pt"))
         }.body<SessionResponse>()
 
         http.post("/sessions/${session.id}/start") { bearerAuth(prof.token) }
 
-        val join = http.post("/sessions/join") {
-            bearerAuth(student.token)
-            contentType(ContentType.Application.Json)
-            setBody(JoinSessionRequest(session.code))
-        }.body<JoinSessionResponse>()
+        val joined = joinAsParticipant(session.code, "student@isel.pt")
 
-        return Ctx(prof.token, student.token, session.id, join.participantId)
+        return Ctx(prof.token, joined.token, session.id, joined.participantId, session.code)
     }
 
     // ── Daemon channel ────────────────────────────────────────────────────────
@@ -99,8 +65,8 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "Window lost focus", "Warning",)))
-            delay(50)   // let the server process the frame before we close
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "Window lost focus", "Warning")))
+            delay(50.milliseconds)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
 
@@ -123,10 +89,9 @@ class WebSocketRoutesTest : BaseRouteTest() {
             bearerAuth(ctx.studentToken)
         }) {
             send("this is not valid json {{{")
-            delay(50)
-            // Send a valid frame afterwards — connection must still be alive
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "valid msg", "Info",)))
-            delay(50)
+            delay(50.milliseconds)
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "valid msg", "Info")))
+            delay(50.milliseconds)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
 
@@ -134,7 +99,6 @@ class WebSocketRoutesTest : BaseRouteTest() {
             bearerAuth(ctx.profToken)
         }.body<List<EventResponse>>()
 
-        // Only the valid frame produced an event; the malformed one was silently dropped
         assertEquals(1, events.size)
         assertEquals("INFO", events[0].severity)
     }
@@ -147,11 +111,10 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "msg", "NotARealSeverity",)))
-            delay(50)
-            // Valid frame after the bad one — connection must still be alive
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "valid msg", "Critical",)))
-            delay(50)
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "msg", "NotARealSeverity")))
+            delay(50.milliseconds)
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "valid msg", "Critical")))
+            delay(50.milliseconds)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
 
@@ -171,10 +134,10 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "lost focus", "Info",)))
-            send(Json.encodeToString(SentinelEventMessage("ClipboardMonitor", "clipboard access", "Warning",)))
-            send(Json.encodeToString(SentinelEventMessage("ProcessMonitor", "unknown process", "Critical",)))
-            delay(50)
+            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "lost focus", "Info")))
+            send(Json.encodeToString(SentinelEventMessage("ClipboardMonitor", "clipboard access", "Warning")))
+            send(Json.encodeToString(SentinelEventMessage("ProcessMonitor", "unknown process", "Critical")))
+            delay(50.milliseconds)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
 
@@ -189,11 +152,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
     fun `daemon connection is closed with VIOLATED_POLICY when a different student connects`() = routeTest {
         val ctx = setup()
 
-        // Register a second student who does NOT own this participant
-        val other = jsonClient().post("/auth/register") {
-            contentType(ContentType.Application.Json)
-            setBody(RegisterRequest("other@isel.pt", "password123", "STUDENT"))
-        }.body<AuthResponse>()
+        val other = joinAsParticipant(ctx.code, "other@isel.pt")
 
         var receivedCloseReason: CloseReason? = null
 

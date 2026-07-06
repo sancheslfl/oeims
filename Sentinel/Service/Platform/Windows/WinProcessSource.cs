@@ -5,7 +5,7 @@ using OEIMS.Sentinel.Service.Domain.Platform;
 
 namespace OEIMS.Sentinel.Service.Platform.Windows;
 
-internal sealed class WindowsProcessSource : IProcessSource
+internal sealed class WinProcessSource : IProcessSource
 {
     private ManagementEventWatcher? _watcher;
     private EventArrivedEventHandler? _eventHandler;
@@ -165,7 +165,7 @@ internal sealed class WindowsProcessSource : IProcessSource
         }
         catch
         {
-            // ignore because shutdown errors does not affect the user experience
+            // ignore because shutdown errors should not be exposed to the user
         }
 
         if (_eventHandler is not null)
