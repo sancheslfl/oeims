@@ -40,7 +40,10 @@ class SessionServiceTest {
 
         override suspend fun findLatestOpenBySupervisor(supervisorId: UUID): SessionRecord? =
             sessions.values
-                .filter { it.status != SessionStatus.ENDED && isSupervisor(it.id, supervisorId) }
+                .filter {
+                    it.status != SessionStatus.ENDED &&
+                        (it.supervisorId == supervisorId || supervisors[it.id]?.contains(supervisorId) == true)
+                }
                 .maxByOrNull { it.createdAt }
 
         override suspend fun create(examId: UUID, supervisorId: UUID, code: String, allowedEmailDomain: String): SessionRecord? {
