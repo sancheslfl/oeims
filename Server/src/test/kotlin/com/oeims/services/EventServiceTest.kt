@@ -4,12 +4,7 @@ import com.oeims.models.NotFoundException
 import com.oeims.models.ConnectionStatus
 import com.oeims.models.SessionStatus
 import com.oeims.models.Severity
-import com.oeims.models.ids.toParticipantId
-import com.oeims.models.ids.toSessionId
-import com.oeims.repositories.EmailJoinRecord
-import com.oeims.repositories.EventRecord
-import com.oeims.repositories.ParticipantRecord
-import com.oeims.repositories.SessionRecord
+
 import com.oeims.repositories.interfaces.IEventRepository
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
@@ -17,6 +12,12 @@ import com.oeims.connections.SseBroadcaster
 import com.oeims.connections.SseChannels
 import com.oeims.connections.SseEvent
 import com.oeims.connections.SseMessage
+import com.oeims.models.EventRecord
+import com.oeims.models.ParticipantRecord
+import com.oeims.models.SessionJoinRecord
+import com.oeims.models.SessionRecord
+import com.oeims.models.toParticipantId
+import com.oeims.models.toSessionId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.onSubscription
@@ -36,9 +37,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class EventServiceTest {
 
-    // ── Fakes ─────────────────────────────────────────────────────────────────
-
-    private inner class FakeParticipantRepository : IParticipantRepository {
+    private class FakeParticipantRepository : IParticipantRepository {
         val participants = mutableListOf<ParticipantRecord>()
 
         override suspend fun findById(id: UUID): ParticipantRecord? = participants.find { it.id == id }
@@ -75,7 +74,7 @@ class EventServiceTest {
             participants.any { it.id == participantId }
     }
 
-    private inner class FakeEventRepository : IEventRepository {
+    private class FakeEventRepository : IEventRepository {
         val events = mutableListOf<EventRecord>()
 
         override suspend fun create(
@@ -94,10 +93,14 @@ class EventServiceTest {
         override suspend fun findByParticipant(participantId: UUID): List<EventRecord> =
             events.filter { it.participantId == participantId }
 
+        override suspend fun findByParticipants(participantIds: List<UUID>): List<EventRecord> =
+            if (participantIds.isEmpty()) emptyList()
+            else events.filter { it.participantId in participantIds }
+
         override suspend fun findBySession(sessionId: UUID): List<EventRecord> = events
     }
 
-    private inner class FakeSessionRepository : ISessionRepository {
+    private class FakeSessionRepository : ISessionRepository {
         val sessions = mutableMapOf<UUID, SessionRecord>()
 
         override suspend fun findById(id: UUID): SessionRecord? = sessions[id]
@@ -115,16 +118,22 @@ class EventServiceTest {
         override suspend fun addSupervisor(sessionId: UUID, userId: UUID) {}
         override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean = false
         override suspend fun findAllActive(): List<SessionRecord> = emptyList()
+        override suspend fun updateJoinVerification(id: UUID, verifiedAt: Instant): Boolean {
+            TODO("Not yet implemented")
+        }
 
-        override suspend fun createEmailJoin(
+        override suspend fun findJoinRequestByJwtId(jwtId: String): SessionJoinRecord? {
+            TODO("Not yet implemented")
+        }
+
+        override suspend fun createJoinRequest(
             sessionId: UUID,
             email: String,
             jwtId: String,
-            expiresAt: Instant,
-        ): EmailJoinRecord = throw UnsupportedOperationException()
-
-        override suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord? = null
-        override suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean = false
+            expiresAt: Instant
+        ): SessionJoinRecord {
+            TODO("Not yet implemented")
+        }
     }
 
     // ── Setup ─────────────────────────────────────────────────────────────────
@@ -162,12 +171,11 @@ class EventServiceTest {
         )
     }
 
-    // ── handleEvent ───────────────────────────────────────────────────────────
 
     @Test
-    fun `handleEvent returns response with correct fields`(): Unit = runBlocking {
+    fun `create event returns response with correct fields`(): Unit = runBlocking {
         val response =
-            service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "Window lost focus", Severity.WARNING)
+            service.create(participantId.toParticipantId(), "FocusMonitor", "Window lost focus", Severity.WARNING)
 
         assertNotNull(response)
         assertEquals(participantId.toString(), response.participantId)
@@ -179,15 +187,15 @@ class EventServiceTest {
     }
 
     @Test
-    fun `handleEvent persists the event`() = runBlocking {
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
+    fun `create event persists the event`() = runBlocking {
+        service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
         assertEquals(1, fakeEvents.events.size)
         assertEquals("msg", fakeEvents.events[0].message)
     }
 
     @Test
-    fun `handleEvent publishes to the correct SSE channel`() = runBlocking {
+    fun `create event publishes to the correct SSE channel`() = runBlocking {
         val sseChannel = SseChannels.session(sessionId.toSessionId())
         val received = Channel<SseMessage>(Channel.UNLIMITED)
         val subscribed = CompletableDeferred<Unit>()
@@ -199,7 +207,7 @@ class EventServiceTest {
         }
 
         subscribed.await()
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
         val message = withTimeout(1_000.milliseconds) { received.receive() }
         job.cancel()
@@ -208,19 +216,19 @@ class EventServiceTest {
     }
 
     @Test
-    fun `handleEvent returns null when session is not ACTIVE`() = runBlocking {
+    fun `create event returns null when session is not ACTIVE`() = runBlocking {
         fakeSessions.sessions[sessionId] = fakeSessions.sessions[sessionId]!!.copy(status = SessionStatus.PENDING)
 
-        val response = service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
+        val response = service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
         assertNull(response)
     }
 
     @Test
-    fun `handleEvent throws NotFoundException when participant does not exist`() {
+    fun `create event throws NotFoundException when participant does not exist`() {
         assertThrows<NotFoundException> {
             runBlocking {
-                service.handleEvent(
+                service.create(
                     UUID.randomUUID().toParticipantId(),
                     "FocusMonitor",
                     "msg",
@@ -231,10 +239,10 @@ class EventServiceTest {
     }
 
     @Test
-    fun `handleEvent does not persist when session is not ACTIVE`() = runBlocking {
+    fun `create event does not persist when session is not ACTIVE`() = runBlocking {
         fakeSessions.sessions[sessionId] = fakeSessions.sessions[sessionId]!!.copy(status = SessionStatus.PENDING)
 
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.INFO)
 
         assertTrue(fakeEvents.events.isEmpty())
     }
@@ -243,8 +251,8 @@ class EventServiceTest {
 
     @Test
     fun `getSessionEvents returns all events for the session`() = runBlocking {
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "first", Severity.INFO)
-        service.handleEvent(participantId.toParticipantId(), "ClipboardMonitor", "second", Severity.WARNING)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "first", Severity.INFO)
+        service.create(participantId.toParticipantId(), "ClipboardMonitor", "second", Severity.WARNING)
 
         val results = service.getSessionEvents(sessionId.toSessionId())
 
@@ -260,7 +268,7 @@ class EventServiceTest {
 
     @Test
     fun `getSessionEvents returns responses with correct severity strings`() = runBlocking {
-        service.handleEvent(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.CRITICAL)
+        service.create(participantId.toParticipantId(), "FocusMonitor", "msg", Severity.CRITICAL)
 
         val results = service.getSessionEvents(sessionId.toSessionId())
 

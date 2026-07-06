@@ -4,26 +4,16 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.oeims.config.Environment
 import com.oeims.connections.SseBroadcaster
-import com.oeims.connections.WebSocketBroadcaster
-import com.oeims.models.ConflictException
 import com.oeims.models.ConnectionStatus
-import com.oeims.models.Email
-import com.oeims.models.EmailJoinToken
 import com.oeims.models.EmailSender
-import com.oeims.models.ForbiddenException
-import com.oeims.models.NotFoundException
+import com.oeims.models.ParticipantRecord
+import com.oeims.models.SessionJoinRecord
+import com.oeims.models.SessionRecord
 import com.oeims.models.SessionStatus
-import com.oeims.models.UnauthorizedException
-import com.oeims.models.ids.toParticipantId
-import com.oeims.models.ids.toSessionId
-import com.oeims.models.toEmailJoinToken
-import com.oeims.models.toSessionCode
-import com.oeims.repositories.EmailJoinRecord
-import com.oeims.repositories.ParticipantRecord
-import com.oeims.repositories.SessionRecord
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import io.ktor.server.config.MapApplicationConfig
+import io.ktor.server.plugins.NotFoundException
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -88,7 +78,7 @@ class ParticipantServiceTest {
 
     private class FakeSessionRepository : ISessionRepository {
         val sessions = mutableMapOf<UUID, SessionRecord>()
-        val emailJoins = mutableListOf<EmailJoinRecord>()
+        val emailJoins = mutableListOf<SessionJoinRecord>()
 
         override suspend fun findById(id: UUID): SessionRecord? = sessions[id]
         override suspend fun findByCode(code: String): SessionRecord? = sessions.values.find { it.code == code }
@@ -111,8 +101,8 @@ class ParticipantServiceTest {
             email: String,
             jwtId: String,
             expiresAt: Instant,
-        ): EmailJoinRecord {
-            val record = EmailJoinRecord(
+        ): SessionJoinRecord {
+            val record = SessionJoinRecord(
                 id = UUID.randomUUID(),
                 sessionId = sessionId,
                 email = email,
@@ -125,7 +115,7 @@ class ParticipantServiceTest {
             return record
         }
 
-        override suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord? =
+        override suspend fun findEmailJoinByJwtId(jwtId: String): SessionJoinRecord? =
             emailJoins.find { it.jwtId == jwtId }
 
         override suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean {
