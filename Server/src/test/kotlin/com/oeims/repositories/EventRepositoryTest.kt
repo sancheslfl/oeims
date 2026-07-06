@@ -1,6 +1,5 @@
 package com.oeims.repositories
 
-import com.oeims.models.ConnectionStatus
 import com.oeims.models.Events
 import com.oeims.models.Exams
 import com.oeims.models.Participants
@@ -49,9 +48,16 @@ class EventRepositoryTest {
         database.close()
     }
 
+    private suspend fun createEvent(
+        participantId: UUID,
+        monitorName: String,
+        message: String,
+        severity: Severity,
+    ) = eventRepository.create(participantId, monitorName, message, severity, null)
+
     @Test
     fun `create returns record with correct fields`(): Unit = runBlocking {
-        val event = eventRepository.create(participantId, "FocusMonitor", "Window lost focus", Severity.WARNING)
+        val event = createEvent(participantId, "FocusMonitor", "Window lost focus", Severity.WARNING)
 
         assertEquals(participantId, event.participantId)
         assertEquals("FocusMonitor", event.monitorName)
@@ -63,9 +69,9 @@ class EventRepositoryTest {
 
     @Test
     fun `create stores all severity levels correctly`() = runBlocking {
-        val info = eventRepository.create(participantId, "ProcessMonitor", "proc started", Severity.INFO)
-        val warning = eventRepository.create(participantId, "FocusMonitor", "focus lost", Severity.WARNING)
-        val critical = eventRepository.create(participantId, "ClipboardMonitor", "clipboard", Severity.CRITICAL)
+        val info = createEvent(participantId, "ProcessMonitor", "proc started", Severity.INFO)
+        val warning = createEvent(participantId, "FocusMonitor", "focus lost", Severity.WARNING)
+        val critical = createEvent(participantId, "ClipboardMonitor", "clipboard", Severity.CRITICAL)
 
         assertEquals(Severity.INFO, info.severity)
         assertEquals(Severity.WARNING, warning.severity)
@@ -74,9 +80,9 @@ class EventRepositoryTest {
 
     @Test
     fun `findByParticipant returns only events for that participant`() = runBlocking {
-        eventRepository.create(participantId, "FocusMonitor", "A", Severity.INFO)
-        eventRepository.create(participantId, "FocusMonitor", "B", Severity.INFO)
-        eventRepository.create(otherParticipantId, "FocusMonitor", "C", Severity.INFO)
+        createEvent(participantId, "FocusMonitor", "A", Severity.INFO)
+        createEvent(participantId, "FocusMonitor", "B", Severity.INFO)
+        createEvent(otherParticipantId, "FocusMonitor", "C", Severity.INFO)
 
         val results = eventRepository.findByParticipant(participantId)
 
@@ -86,9 +92,9 @@ class EventRepositoryTest {
 
     @Test
     fun `findByParticipant returns events ordered by occurredAt ascending`() = runBlocking {
-        eventRepository.create(participantId, "FocusMonitor", "first", Severity.INFO)
-        eventRepository.create(participantId, "ClipboardMonitor", "second", Severity.WARNING)
-        eventRepository.create(participantId, "ProcessMonitor", "third", Severity.CRITICAL)
+        createEvent(participantId, "FocusMonitor", "first", Severity.INFO)
+        createEvent(participantId, "ClipboardMonitor", "second", Severity.WARNING)
+        createEvent(participantId, "ProcessMonitor", "third", Severity.CRITICAL)
 
         val results = eventRepository.findByParticipant(participantId)
 
@@ -99,8 +105,8 @@ class EventRepositoryTest {
 
     @Test
     fun `findBySession returns events from all participants in the session`() = runBlocking {
-        eventRepository.create(participantId, "FocusMonitor", "from p1", Severity.INFO)
-        eventRepository.create(otherParticipantId, "FocusMonitor", "from p2", Severity.WARNING)
+        createEvent(participantId, "FocusMonitor", "from p1", Severity.INFO)
+        createEvent(otherParticipantId, "FocusMonitor", "from p2", Severity.WARNING)
 
         val results = eventRepository.findBySession(sessionId)
 
@@ -118,8 +124,8 @@ class EventRepositoryTest {
         val otherSessionId = sessionRepo.create(examId, professorId, "OTH002", "alunos.isel.pt")!!.id
         val otherSessionParticipantId = participantRepo.create(otherSessionId, "student3@alunos.isel.pt").id
 
-        eventRepository.create(otherSessionParticipantId, "FocusMonitor", "other session", Severity.INFO)
-        eventRepository.create(participantId, "FocusMonitor", "this session", Severity.INFO)
+        createEvent(otherSessionParticipantId, "FocusMonitor", "other session", Severity.INFO)
+        createEvent(participantId, "FocusMonitor", "this session", Severity.INFO)
 
         val results = eventRepository.findBySession(sessionId)
 
