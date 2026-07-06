@@ -1,33 +1,33 @@
 package com.oeims.services
 
+import com.oeims.models.ExamRecord
 import com.oeims.models.ExamTitle
 import com.oeims.models.NotFoundException
 import com.oeims.models.ValidationException
 import com.oeims.models.toExamId
 import com.oeims.models.toProfessorId
-import com.oeims.repositories.ExamRecord
 import com.oeims.repositories.interfaces.IExamRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExamServiceTest {
-
-    // ── Fake ─────────────────────────────────────────────────────────────────
-
-    private inner class FakeExamRepository : IExamRepository {
+    private class FakeExamRepository : IExamRepository {
         val exams = mutableListOf<ExamRecord>()
 
         override suspend fun findById(id: UUID): ExamRecord? = exams.find { it.id == id }
+
         override suspend fun findAll(): List<ExamRecord> = exams.toList()
+
         override suspend fun findByTitle(title: String): List<ExamRecord> = exams.filter { it.title == title }
+
         override suspend fun findByProfessor(professorId: UUID): List<ExamRecord> =
             exams.filter { it.createdBy == professorId }
 
@@ -35,15 +35,13 @@ class ExamServiceTest {
             createdBy: UUID,
             title: String,
             description: String?,
-            durationMins: Int
+            durationMins: Int,
         ): ExamRecord {
             val record = ExamRecord(UUID.randomUUID(), createdBy, title, description, durationMins, Instant.now())
             exams.add(record)
             return record
         }
     }
-
-    // ── Setup ─────────────────────────────────────────────────────────────────
 
     private lateinit var fakeRepo: FakeExamRepository
     private lateinit var service: ExamService
@@ -60,8 +58,6 @@ class ExamServiceTest {
         private val TITLE_B = ExamTitle("LEIC-SO T2 F.1.12")
         private val TITLE_C = ExamTitle("MEIC-RCP EN A.1.01")
     }
-
-    // ── createExam ────────────────────────────────────────────────────────────
 
     @Test
     fun `createExam returns response with correct fields`(): Unit = runBlocking {
@@ -103,8 +99,6 @@ class ExamServiceTest {
         }
     }
 
-    // ── getExamsByTitle ───────────────────────────────────────────────────────
-
     @Test
     fun `getExamsByTitle returns all exams with that title`() = runBlocking {
         service.createExam(professorId.toProfessorId(), TITLE_A, null, 90)
@@ -133,8 +127,6 @@ class ExamServiceTest {
         }
     }
 
-    // ── getAllExams ───────────────────────────────────────────────────────────
-
     @Test
     fun `getAllExams returns all exams`() = runBlocking {
         val other = UUID.randomUUID()
@@ -152,8 +144,6 @@ class ExamServiceTest {
 
         assertTrue(results.isEmpty())
     }
-
-    // ── getExamById ───────────────────────────────────────────────────────────
 
     @Test
     fun `getExamById returns exam when it exists`() = runBlocking {
