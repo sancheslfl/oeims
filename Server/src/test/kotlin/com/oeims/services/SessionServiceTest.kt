@@ -9,7 +9,7 @@ import com.oeims.models.ids.toExamId
 import com.oeims.models.ids.toProfessorId
 import com.oeims.models.ids.toSessionId
 import com.oeims.models.toSessionCode
-import com.oeims.repositories.EmailJoinRecord
+import com.oeims.repositories.SessionJoinRecord
 import com.oeims.repositories.ExamRecord
 import com.oeims.repositories.SessionRecord
 import com.oeims.repositories.interfaces.IExamRepository
@@ -117,9 +117,9 @@ class SessionServiceTest {
             email: String,
             jwtId: String,
             expiresAt: Instant,
-        ): EmailJoinRecord = throw UnsupportedOperationException()
+        ): SessionJoinRecord = throw UnsupportedOperationException()
 
-        override suspend fun findEmailJoinByJwtId(jwtId: String): EmailJoinRecord? = null
+        override suspend fun findEmailJoinByJwtId(jwtId: String): SessionJoinRecord? = null
         override suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean = false
     }
 
