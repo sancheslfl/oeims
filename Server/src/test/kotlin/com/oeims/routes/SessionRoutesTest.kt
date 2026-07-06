@@ -6,21 +6,12 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import org.junit.jupiter.api.Test
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * HTTP-layer tests for the session lifecycle:
- *
- *   POST   /sessions               — professor creates session (PENDING)
- *   GET    /sessions/{id}          — professor reads session
- *   POST   /sessions/{id}/start    — professor moves session to ACTIVE
- *   POST   /sessions/{id}/end      — professor moves session to ENDED
- *   POST   /sessions/join          — student joins by code
- *   GET    /sessions/{id}/participants
- *   GET    /sessions/{id}/events
- */
 class SessionRoutesTest : BaseRouteTest() {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -41,11 +32,11 @@ class SessionRoutesTest : BaseRouteTest() {
     }.body()
 
     private suspend fun ApplicationTestBuilder.createSession(
-        professorToken: String, examId: String
+        professorToken: String, examId: String, allowedEmailDomain: String = "isel.pt"
     ): SessionResponse = jsonClient().post("/sessions") {
         bearerAuth(professorToken)
         contentType(ContentType.Application.Json)
-        setBody(CreateSessionRequest(examId))
+        setBody(CreateSessionRequest(examId, allowedEmailDomain))
     }.body()
 
     private suspend fun ApplicationTestBuilder.startSession(
@@ -56,13 +47,25 @@ class SessionRoutesTest : BaseRouteTest() {
         professorToken: String, sessionId: String
     ) = jsonClient().post("/sessions/$sessionId/end") { bearerAuth(professorToken) }
 
-    private suspend fun ApplicationTestBuilder.joinSession(
-        studentToken: String, code: String
-    ) = jsonClient().post("/sessions/join") {
-        bearerAuth(studentToken)
+    private suspend fun ApplicationTestBuilder.requestJoin(
+        code: String, email: String
+    ) = jsonClient().post("/sessions/$code/join") {
         contentType(ContentType.Application.Json)
-        setBody(JoinSessionRequest(code))
+        setBody(EmailJoinRequest(email))
     }
+
+    private suspend fun ApplicationTestBuilder.verifyJoin(
+        token: String
+    ) = jsonClient().post("/sessions/join/verify") {
+        contentType(ContentType.Application.Json)
+        setBody(VerifyJoinRequest(token))
+    }
+
+    private fun tokenFromEmail(): String =
+        URLDecoder.decode(
+            (capturingEmailSender.lastLink ?: error("No verification email was captured")).substringAfter("token="),
+            StandardCharsets.UTF_8
+        )
 
     private suspend fun ApplicationTestBuilder.joinAsAdditionalSupervisor(
         professorToken: String, code: String
@@ -83,7 +86,7 @@ class SessionRoutesTest : BaseRouteTest() {
         val response = client.post("/sessions") {
             bearerAuth(prof.token)
             contentType(ContentType.Application.Json)
-            setBody(CreateSessionRequest(exam.id))
+            setBody(CreateSessionRequest(exam.id, "isel.pt"))
         }
 
         assertEquals(HttpStatusCode.Created, response.status)
@@ -132,7 +135,7 @@ class SessionRoutesTest : BaseRouteTest() {
         val response = client.post("/sessions") {
             bearerAuth(prof.token)
             contentType(ContentType.Application.Json)
-            setBody(CreateSessionRequest("00000000-0000-0000-0000-000000000000"))
+            setBody(CreateSessionRequest("00000000-0000-0000-0000-000000000000", "isel.pt"))
         }
 
         assertEquals(HttpStatusCode.NotFound, response.status)
@@ -258,86 +261,84 @@ class SessionRoutesTest : BaseRouteTest() {
         assertEquals(HttpStatusCode.Forbidden, response.status)
     }
 
-    // ── POST /sessions/join ───────────────────────────────────────────────────
+    // ── POST /sessions/{code}/join  +  POST /sessions/join/verify ─────────────
 
     @Test
-    fun `student joins a PENDING session by code and receives 200`() = routeTest {
+    fun `requesting to join a PENDING session returns 202 and verifying yields a participant`() = routeTest {
         val prof = register("prof@isel.pt", "password123", "PROFESSOR")
-        val student = register("student@isel.pt", "password123", "STUDENT")
-        val exam = createExam(prof.token, "LEIC-AED T1 C.3.07")
-        val session = createSession(prof.token, exam.id)
+        val session = createSession(prof.token, createExam(prof.token).id)
 
-        val response = joinSession(student.token, session.code)
+        val request = requestJoin(session.code, "student@isel.pt")
+        assertEquals(HttpStatusCode.Accepted, request.status)
 
-        assertEquals(HttpStatusCode.OK, response.status)
-        val body = response.body<JoinSessionResponse>()
-        assertEquals(session.id, body.sessionId)
-        assertEquals("LEIC-AED T1 C.3.07", body.examTitle)
+        val verify = verifyJoin(tokenFromEmail())
+        assertEquals(HttpStatusCode.OK, verify.status)
+        assertTrue(verify.body<VerifyJoinResponse>().participantId.isNotBlank())
     }
 
     @Test
-    fun `student joins an ACTIVE session by code and receives 200`() = routeTest {
+    fun `requesting to join an ACTIVE session returns 202 and verifying returns 200`() = routeTest {
         val prof = register("prof@isel.pt", "password123", "PROFESSOR")
-        val student = register("student@isel.pt", "password123", "STUDENT")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
 
-        val response = joinSession(student.token, session.code)
-
-        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpStatusCode.Accepted, requestJoin(session.code, "student@isel.pt").status)
+        assertEquals(HttpStatusCode.OK, verifyJoin(tokenFromEmail()).status)
     }
 
     @Test
-    fun `joining with a wrong code returns 404`() = routeTest {
-        val student = register("student@isel.pt", "password123", "STUDENT")
-
-        val response = joinSession(student.token, "XXXXXX")
+    fun `requesting to join with a wrong code returns 404`() = routeTest {
+        val response = requestJoin("XXXXXX", "student@isel.pt")
 
         assertEquals(HttpStatusCode.NotFound, response.status)
     }
 
     @Test
-    fun `joining an ENDED session returns 409`() = routeTest {
+    fun `requesting to join an ENDED session returns 409`() = routeTest {
         val prof = register("prof@isel.pt", "password123", "PROFESSOR")
-        val student = register("student@isel.pt", "password123", "STUDENT")
         val session = createSession(prof.token, createExam(prof.token).id)
         startSession(prof.token, session.id)
         endSession(prof.token, session.id)
 
-        val response = joinSession(student.token, session.code)
+        val response = requestJoin(session.code, "student@isel.pt")
 
         assertEquals(HttpStatusCode.Conflict, response.status)
     }
 
     @Test
-    fun `joining the same session twice is idempotent and returns 200 both times`() = routeTest {
+    fun `requesting to join with an email outside the allowed domain returns 403`() = routeTest {
         val prof = register("prof@isel.pt", "password123", "PROFESSOR")
-        val student = register("student@isel.pt", "password123", "STUDENT")
         val session = createSession(prof.token, createExam(prof.token).id)
 
-        val first = joinSession(student.token, session.code)
-        val second = joinSession(student.token, session.code)
+        val response = requestJoin(session.code, "intruder@gmail.com")
 
-        assertEquals(HttpStatusCode.OK, first.status)
-        assertEquals(HttpStatusCode.OK, second.status)
-        // Same participant returned both times
-        assertEquals(
-            first.body<JoinSessionResponse>().participantId,
-            second.body<JoinSessionResponse>().participantId
-        )
+        assertEquals(HttpStatusCode.Forbidden, response.status)
     }
 
     @Test
-    fun `joining without a token returns 403`() = routeTest {
+    fun `requesting to join an already-joined email is accepted and creates no second participant`() = routeTest {
         val prof = register("prof@isel.pt", "password123", "PROFESSOR")
         val session = createSession(prof.token, createExam(prof.token).id)
 
-        val response = jsonClient().post("/sessions/join") {
+        joinAsParticipant(session.code, "student@isel.pt")
+
+        val second = requestJoin(session.code, "student@isel.pt")
+        assertEquals(HttpStatusCode.Accepted, second.status)
+
+        val participants = jsonClient().get("/sessions/${session.id}/participants") {
+            bearerAuth(prof.token)
+        }.body<List<ParticipantResponse>>()
+        assertEquals(1, participants.size)
+    }
+
+    @Test
+    fun `verifying with a malformed token returns 400`() = routeTest {
+        val response = jsonClient().post("/sessions/join/verify") {
             contentType(ContentType.Application.Json)
-            setBody(JoinSessionRequest(session.code))
+            setBody(VerifyJoinRequest("not-a-jwt"))
         }
 
-        assertEquals(HttpStatusCode.Forbidden, response.status)
+        assertEquals(HttpStatusCode.BadRequest, response.status)
     }
 
     // ── GET /sessions/active ──────────────────────────────────────────────────
@@ -447,11 +448,9 @@ class SessionRoutesTest : BaseRouteTest() {
     @Test
     fun `professor lists participants and sees all students who have joined`() = routeTest {
         val prof = register("prof@isel.pt", "password123", "PROFESSOR")
-        val student1 = register("s1@isel.pt", "password123", "STUDENT")
-        val student2 = register("s2@isel.pt", "password123", "STUDENT")
         val session = createSession(prof.token, createExam(prof.token).id)
-        joinSession(student1.token, session.code)
-        joinSession(student2.token, session.code)
+        joinAsParticipant(session.code, "s1@isel.pt")
+        joinAsParticipant(session.code, "s2@isel.pt")
 
         val response = jsonClient().get("/sessions/${session.id}/participants") {
             bearerAuth(prof.token)
@@ -461,8 +460,8 @@ class SessionRoutesTest : BaseRouteTest() {
         val body = response.body<List<ParticipantResponse>>()
         assertEquals(2, body.size)
         val emails = body.map { it.email }
-        assert("s1@isel.pt" in emails)
-        assert("s2@isel.pt" in emails)
+        assertTrue("s1@isel.pt" in emails)
+        assertTrue("s2@isel.pt" in emails)
     }
 
     @Test

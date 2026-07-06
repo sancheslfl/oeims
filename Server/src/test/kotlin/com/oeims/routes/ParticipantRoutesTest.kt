@@ -26,18 +26,8 @@ class ParticipantRoutesTest : BaseRouteTest() {
         setBody(RegisterRequest(email, password, role))
     }.body()
 
-    /**
-     * Full setup: creates a professor, a student, an exam, a session, and has the
-     * student join the session.
-     *
-     * @return Triple(professorToken, studentToken, participantId)
-     */
-    private suspend fun ApplicationTestBuilder.setup(
-        profEmail: String = "prof@isel.pt",
-        studentEmail: String = "student@isel.pt"
-    ): Triple<String, String, String> {
-        val prof = register(profEmail, "password123", "PROFESSOR")
-        val student = register(studentEmail, "password123", "STUDENT")
+    private suspend fun ApplicationTestBuilder.createProfAndSession(): Pair<String, SessionResponse> {
+        val prof = register("prof@isel.pt", "password123", "PROFESSOR")
 
         val exam = jsonClient().post("/exams") {
             bearerAuth(prof.token)
@@ -48,16 +38,19 @@ class ParticipantRoutesTest : BaseRouteTest() {
         val session = jsonClient().post("/sessions") {
             bearerAuth(prof.token)
             contentType(ContentType.Application.Json)
-            setBody(CreateSessionRequest(exam.id))
+            setBody(CreateSessionRequest(exam.id, "isel.pt"))
         }.body<SessionResponse>()
 
-        val join = jsonClient().post("/sessions/join") {
-            bearerAuth(student.token)
-            contentType(ContentType.Application.Json)
-            setBody(JoinSessionRequest(session.code))
-        }.body<JoinSessionResponse>()
+        return prof.token to session
+    }
 
-        return Triple(prof.token, student.token, join.participantId)
+    // Returns (professorToken, studentSentinelToken, participantId).
+    private suspend fun ApplicationTestBuilder.setup(
+        studentEmail: String = "student@isel.pt"
+    ): Triple<String, String, String> {
+        val (profToken, session) = createProfAndSession()
+        val joined = joinAsParticipant(session.code, studentEmail)
+        return Triple(profToken, joined.token, joined.participantId)
     }
 
     // ── POST /participants/{id}/heartbeat ─────────────────────────────────────
@@ -95,11 +88,12 @@ class ParticipantRoutesTest : BaseRouteTest() {
 
     @Test
     fun `a different student cannot send a heartbeat for another student's participant`() = routeTest {
-        val (_, _, participantId) = setup(studentEmail = "student1@isel.pt")
-        val otherStudent = register("student2@isel.pt", "password123", "STUDENT")
+        val (_, session) = createProfAndSession()
+        val victim = joinAsParticipant(session.code, "student1@isel.pt")
+        val attacker = joinAsParticipant(session.code, "student2@isel.pt")
 
-        val response = jsonClient().post("/participants/$participantId/heartbeat") {
-            bearerAuth(otherStudent.token)
+        val response = jsonClient().post("/participants/${victim.participantId}/heartbeat") {
+            bearerAuth(attacker.token)
         }
 
         assertEquals(HttpStatusCode.Forbidden, response.status)
@@ -107,10 +101,10 @@ class ParticipantRoutesTest : BaseRouteTest() {
 
     @Test
     fun `heartbeat for a non-existent participant returns 404`() = routeTest {
-        val student = register("student@isel.pt", "password123", "STUDENT")
+        val (_, studentToken, _) = setup()
 
         val response = jsonClient().post("/participants/00000000-0000-0000-0000-000000000000/heartbeat") {
-            bearerAuth(student.token)
+            bearerAuth(studentToken)
         }
 
         assertEquals(HttpStatusCode.NotFound, response.status)
@@ -118,10 +112,10 @@ class ParticipantRoutesTest : BaseRouteTest() {
 
     @Test
     fun `heartbeat with a malformed participant UUID returns 400`() = routeTest {
-        val student = register("student@isel.pt", "password123", "STUDENT")
+        val (_, studentToken, _) = setup()
 
         val response = jsonClient().post("/participants/not-a-uuid/heartbeat") {
-            bearerAuth(student.token)
+            bearerAuth(studentToken)
         }
 
         assertEquals(HttpStatusCode.BadRequest, response.status)

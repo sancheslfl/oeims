@@ -50,7 +50,7 @@ class ExamRepositoryTest {
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns record with correct fields`() = runBlocking {
+    fun `create returns record with correct fields`(): Unit = runBlocking {
         val exam = examRepository.create(professorId, "Operating Systems", "OS exam", 90)
 
         assertEquals("Operating Systems", exam.title)

@@ -39,7 +39,7 @@ class UserRepositoryTest {
     // ── create ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `create returns record with correct fields`() = runBlocking {
+    fun `create returns record with correct fields`(): Unit = runBlocking {
         val user = repository.create("student@alunos.isel.pt", UserRole.STUDENT, "hashedpassword")
 
         assertEquals("student@alunos.isel.pt", user.email)

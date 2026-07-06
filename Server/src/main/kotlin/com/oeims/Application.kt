@@ -6,6 +6,12 @@ import com.oeims.connections.MAX_FRAME_BYTES
 import com.oeims.connections.SentinelWebSocketManager
 import com.oeims.connections.SseBroadcaster
 import com.oeims.http.AUTH_COOKIE_NAME
+import com.oeims.config.configureDatabase
+import com.oeims.config.configureEmail
+import com.oeims.config.configureOpenApi
+import com.oeims.config.configureRouting
+import com.oeims.config.configureSecurity
+import com.oeims.models.EmailSender
 import com.oeims.repositories.*
 import com.oeims.services.*
 import io.ktor.http.*
@@ -31,7 +37,7 @@ import kotlin.time.Duration.Companion.seconds
 
 fun main(args: Array<String>): Unit = EngineMain.main(args)
 
-fun Application.module() {
+fun Application.module(emailSender: EmailSender? = null) {
     // Environment variables
     Environment.configure(environment.config)
 
@@ -119,7 +125,7 @@ fun Application.module() {
     val heartbeatConfig = configureHeartbeat()
 
     // Email service
-    val smtpEmailSender = configureEmail()
+    val smtpEmailSender = emailSender ?: configureEmail()
 
     // Json Serializer
     val json = Json {

@@ -1,7 +1,8 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {Navigate} from "react-router-dom";
 import {USER_ROLES, type UserRole} from "./types";
+import {registerAuthErrorHandler} from "./api/utils.ts";
 
 export type AuthUser = {
   id: string;
@@ -35,6 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
   });
+
+  useEffect(() => {
+    registerAuthErrorHandler(() => {
+      sessionStorage.removeItem(AUTH_STORAGE_KEY);
+      window.location.href = '/';
+    });
+  }, []);
 
   function setAuth(auth: AuthUser) {
     sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
