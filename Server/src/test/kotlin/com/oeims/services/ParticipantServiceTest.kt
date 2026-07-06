@@ -3,17 +3,12 @@ package com.oeims.services
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.oeims.config.Environment
+import com.oeims.connections.SentinelWebSocketManager
 import com.oeims.connections.SseBroadcaster
-import com.oeims.models.ConnectionStatus
-import com.oeims.models.EmailSender
-import com.oeims.models.ParticipantRecord
-import com.oeims.models.SessionJoinRecord
-import com.oeims.models.SessionRecord
-import com.oeims.models.SessionStatus
+import com.oeims.models.*
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import io.ktor.server.config.MapApplicationConfig
-import io.ktor.server.plugins.NotFoundException
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -22,106 +17,73 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
-import java.util.*
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import java.util.UUID
+import kotlin.test.*
 
 class ParticipantServiceTest {
-
-    // ── Fakes ─────────────────────────────────────────────────────────────────
-
     private class FakeParticipantRepository : IParticipantRepository {
         val participants = mutableListOf<ParticipantRecord>()
 
         override suspend fun findById(id: UUID): ParticipantRecord? = participants.find { it.id == id }
-        override suspend fun findBySession(sessionId: UUID): List<ParticipantRecord> =
-            participants.filter { it.sessionId == sessionId }
-
-        override suspend fun findByExamIdentityCode(examIdentityCode: String): ParticipantRecord? =
-            participants.find { it.examIdentityCode == examIdentityCode }
-
-        override suspend fun findByEmailAndSession(email: String, sessionId: UUID): ParticipantRecord? =
-            participants.find { it.email == email && it.sessionId == sessionId }
-
-        override suspend fun findConnectedBySession(sessionId: UUID): List<ParticipantRecord> =
-            participants.filter { it.sessionId == sessionId && it.connectionStatus == ConnectionStatus.CONNECTED }
+        override suspend fun findBySession(sessionId: UUID): List<ParticipantRecord> = participants.filter { it.sessionId == sessionId }
+        override suspend fun findByExamIdentityCode(examIdentityCode: String): ParticipantRecord? = participants.find { it.examIdentityCode == examIdentityCode }
+        override suspend fun findByEmailAndSession(email: String, sessionId: UUID): ParticipantRecord? = participants.find { it.email == email && it.sessionId == sessionId }
+        override suspend fun findConnectedBySession(sessionId: UUID): List<ParticipantRecord> = participants.filter { it.sessionId == sessionId && it.connectionStatus == ConnectionStatus.CONNECTED }
 
         override suspend fun create(sessionId: UUID, email: String): ParticipantRecord {
-            val record = ParticipantRecord(
-                id = UUID.randomUUID(),
-                sessionId = sessionId,
-                email = email,
-                examIdentityCode = null,
-                connectionStatus = ConnectionStatus.DISCONNECTED,
-                lastHeartbeat = null,
-                joinedAt = Instant.now()
-            )
+            val record = ParticipantRecord(UUID.randomUUID(), sessionId, email, null, ConnectionStatus.DISCONNECTED, null, Instant.now())
             participants.add(record)
             return record
         }
 
-        override suspend fun updateHeartbeat(id: UUID): Boolean = participants.any { it.id == id }
-        override suspend fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean =
-            participants.any { it.id == id }
+        override suspend fun updateHeartbeat(id: UUID): Boolean = update(id) {
+            it.copy(connectionStatus = ConnectionStatus.CONNECTED, lastHeartbeat = Instant.now())
+        }
+
+        override suspend fun updateConnectionStatus(id: UUID, status: ConnectionStatus): Boolean = update(id) {
+            it.copy(connectionStatus = status)
+        }
 
         override suspend fun updateTimedOut(threshold: Instant): List<ParticipantRecord> = emptyList()
 
-        override suspend fun updateExamIdentityCode(participantId: UUID, examIdentityCode: String): Boolean {
-            val idx = participants.indexOfFirst { it.id == participantId }
-            if (idx == -1 || participants[idx].examIdentityCode != null) return false
-            participants[idx] = participants[idx].copy(examIdentityCode = examIdentityCode)
+        override suspend fun updateExamIdentityCode(participantId: UUID, examIdentityCode: String): Boolean = update(participantId) {
+            if (it.examIdentityCode != null) it else it.copy(examIdentityCode = examIdentityCode)
+        }
+
+        private fun update(id: UUID, transform: (ParticipantRecord) -> ParticipantRecord): Boolean {
+            val index = participants.indexOfFirst { it.id == id }
+            if (index == -1) return false
+            participants[index] = transform(participants[index])
             return true
         }
     }
 
     private class FakeSessionRepository : ISessionRepository {
         val sessions = mutableMapOf<UUID, SessionRecord>()
-        val emailJoins = mutableListOf<SessionJoinRecord>()
+        val joins = mutableListOf<SessionJoinRecord>()
 
         override suspend fun findById(id: UUID): SessionRecord? = sessions[id]
         override suspend fun findByCode(code: String): SessionRecord? = sessions.values.find { it.code == code }
         override suspend fun findBySupervisor(supervisorId: UUID): List<SessionRecord> = emptyList()
         override suspend fun findLatestOpenBySupervisor(supervisorId: UUID): SessionRecord? = null
-        override suspend fun create(
-            examId: UUID,
-            supervisorId: UUID,
-            code: String,
-            allowedEmailDomain: String,
-        ): SessionRecord = throw UnsupportedOperationException()
-
+        override suspend fun create(examId: UUID, supervisorId: UUID, code: String, allowedEmailDomain: String): SessionRecord? = null
         override suspend fun updateStatus(id: UUID, status: SessionStatus): Boolean = false
-        override suspend fun addSupervisor(sessionId: UUID, userId: UUID) {}
+        override suspend fun addSupervisor(sessionId: UUID, userId: UUID) = Unit
         override suspend fun isSupervisor(sessionId: UUID, userId: UUID): Boolean = false
         override suspend fun findAllActive(): List<SessionRecord> = emptyList()
 
-        override suspend fun createEmailJoin(
-            sessionId: UUID,
-            email: String,
-            jwtId: String,
-            expiresAt: Instant,
-        ): SessionJoinRecord {
-            val record = SessionJoinRecord(
-                id = UUID.randomUUID(),
-                sessionId = sessionId,
-                email = email,
-                jwtId = jwtId,
-                expiresAt = expiresAt,
-                verifiedAt = null,
-                createdAt = Instant.now(),
-            )
-            emailJoins.add(record)
+        override suspend fun createJoinRequest(sessionId: UUID, email: String, jwtId: String, expiresAt: Instant): SessionJoinRecord {
+            val record = SessionJoinRecord(UUID.randomUUID(), sessionId, email, jwtId, expiresAt, null, Instant.now())
+            joins.add(record)
             return record
         }
 
-        override suspend fun findEmailJoinByJwtId(jwtId: String): SessionJoinRecord? =
-            emailJoins.find { it.jwtId == jwtId }
+        override suspend fun findJoinRequestByJwtId(jwtId: String): SessionJoinRecord? = joins.find { it.jwtId == jwtId }
 
-        override suspend fun updateEmailJoinVerification(id: UUID, verifiedAt: Instant): Boolean {
-            val idx = emailJoins.indexOfFirst { it.id == id }
-            if (idx == -1 || emailJoins[idx].verifiedAt != null) return false
-            emailJoins[idx] = emailJoins[idx].copy(verifiedAt = verifiedAt)
+        override suspend fun updateJoinVerification(id: UUID, verifiedAt: Instant): Boolean {
+            val index = joins.indexOfFirst { it.id == id }
+            if (index == -1 || joins[index].verifiedAt != null) return false
+            joins[index] = joins[index].copy(verifiedAt = verifiedAt)
             return true
         }
     }
@@ -136,28 +98,23 @@ class ParticipantServiceTest {
         }
     }
 
-    // ── Setup ─────────────────────────────────────────────────────────────────
-
-    private lateinit var fakeParticipants: FakeParticipantRepository
-    private lateinit var fakeSessions: FakeSessionRepository
-    private lateinit var fakeEmailSender: FakeEmailSender
+    private lateinit var participants: FakeParticipantRepository
+    private lateinit var sessions: FakeSessionRepository
+    private lateinit var emailSender: FakeEmailSender
     private lateinit var service: ParticipantService
-
     private lateinit var sessionId: UUID
+
     private val code = "ABC123"
-    private val domain = "alunos.isel.pt"
     private val studentEmail = "student1@alunos.isel.pt"
-
     private val algorithm = Algorithm.HMAC256("test-secret-key")
-
     private val jwtSettings = SessionJwtSettings(
-        emailJoin = JwtSettings(
+        emailVerification = JwtSettings(
             issuer = "oeims-test",
-            audience = "email-join",
-            realm = "email-join-realm",
+            audience = "email-verification",
+            realm = "email-verification-realm",
             expiration = Duration.ofMinutes(15),
             algorithm = algorithm,
-            purpose = "email_join",
+            purpose = "email_verification",
         ),
         sentinel = JwtSettings(
             issuer = "oeims-test",
@@ -171,31 +128,21 @@ class ParticipantServiceTest {
     @BeforeEach
     fun setup() {
         Environment.configure(MapApplicationConfig("app.frontend.base-url" to "http://localhost:5173"))
-
-        fakeParticipants = FakeParticipantRepository()
-        fakeSessions = FakeSessionRepository()
-        fakeEmailSender = FakeEmailSender()
-
-        service = ParticipantService(
-            participantRepository = fakeParticipants,
-            sessionRepository = fakeSessions,
-            jwtSettings = jwtSettings,
-            sseBroadcaster = SseBroadcaster(),
-            webSocketBroadcaster = WebSocketBroadcaster(),
-            emailSender = fakeEmailSender,
-        )
-
+        participants = FakeParticipantRepository()
+        sessions = FakeSessionRepository()
+        emailSender = FakeEmailSender()
+        service = ParticipantService(participants, sessions, jwtSettings, SseBroadcaster(), SentinelWebSocketManager(), emailSender)
         sessionId = UUID.randomUUID()
         putSession(SessionStatus.PENDING)
     }
 
     private fun putSession(status: SessionStatus) {
-        sessions()[sessionId] = SessionRecord(
+        sessions.sessions[sessionId] = SessionRecord(
             id = sessionId,
             examId = UUID.randomUUID(),
             supervisorId = UUID.randomUUID(),
             code = code,
-            allowedEmailDomain = domain,
+            allowedEmailDomain = "alunos.isel.pt",
             status = status,
             createdAt = Instant.now(),
             startedAt = if (status != SessionStatus.PENDING) Instant.now() else null,
@@ -203,47 +150,44 @@ class ParticipantServiceTest {
         )
     }
 
-    private fun sessions() = fakeSessions.sessions
-
-    private fun capturedToken(): EmailJoinToken {
-        val link = fakeEmailSender.lastLink ?: error("No verification email was sent")
+    private fun capturedToken(): JwtToken {
+        val link = emailSender.lastLink ?: error("No verification email was sent")
         val encoded = link.substringAfter("token=")
-        return URLDecoder.decode(encoded, StandardCharsets.UTF_8).toEmailJoinToken()
+        return JwtToken(URLDecoder.decode(encoded, StandardCharsets.UTF_8))
     }
-
-    // ── requestJoin ────────────────────────────────────────────────────────────
 
     @Test
     fun `requestJoin sends a verification email and records the pending join`() = runBlocking {
         val response = service.requestJoin(code.toSessionCode(), Email(studentEmail))
 
         assertEquals("Verification email sent", response.message)
-        assertEquals(1, fakeEmailSender.sentCount)
-        assertEquals(1, fakeSessions.emailJoins.size)
-        assertEquals(studentEmail, fakeSessions.emailJoins[0].email)
-        assertNull(fakeSessions.emailJoins[0].verifiedAt)
+        assertEquals(1, emailSender.sentCount)
+        assertEquals(studentEmail, sessions.joins.single().email)
+        assertNull(sessions.joins.single().verifiedAt)
     }
 
     @Test
-    fun `requestJoin returns already-joined message and sends no email when participant exists`() = runBlocking {
-        fakeParticipants.create(sessionId, studentEmail)
+    fun `requestJoin returns already joined when participant exists`() = runBlocking {
+        participants.create(sessionId, studentEmail)
 
         val response = service.requestJoin(code.toSessionCode(), Email(studentEmail))
 
         assertEquals("This email has already joined this session", response.message)
-        assertEquals(0, fakeEmailSender.sentCount)
-        assertTrue(fakeSessions.emailJoins.isEmpty())
+        assertEquals(0, emailSender.sentCount)
     }
 
     @Test
-    fun `requestJoin throws NotFoundException when the code does not exist`() {
+    fun `requestJoin validates session and email domain`() {
         assertThrows<NotFoundException> {
             runBlocking { service.requestJoin("ZZZZZZ".toSessionCode(), Email(studentEmail)) }
+        }
+        assertThrows<ForbiddenException> {
+            runBlocking { service.requestJoin(code.toSessionCode(), Email("intruder@gmail.com")) }
         }
     }
 
     @Test
-    fun `requestJoin throws ConflictException when the session has ended`() {
+    fun `requestJoin rejects ended sessions`() {
         putSession(SessionStatus.ENDED)
 
         assertThrows<ConflictException> {
@@ -252,104 +196,63 @@ class ParticipantServiceTest {
     }
 
     @Test
-    fun `requestJoin throws ForbiddenException when the email domain is not allowed`() {
-        assertThrows<ForbiddenException> {
-            runBlocking { service.requestJoin(code.toSessionCode(), Email("intruder@gmail.com")) }
-        }
-    }
-
-    // ── verifyJoin ───────────────────────────────────────────────────────────
-
-    @Test
-    fun `verifyJoin creates the participant and returns a sentinel token`() = runBlocking {
+    fun `verifyJoin creates the participant marks token used and returns a sentinel token`() = runBlocking {
         service.requestJoin(code.toSessionCode(), Email(studentEmail))
 
         val response = service.verifyJoin(capturedToken())
+        val created = participants.findByEmailAndSession(studentEmail, sessionId)
+        val decoded = JWT.decode(response.token)
 
-        val created = fakeParticipants.findByEmailAndSession(studentEmail, sessionId)
         assertNotNull(created)
         assertEquals(created.id.toString(), response.participantId)
-
-        val decoded = JWT.decode(response.token)
         assertEquals(created.id.toString(), decoded.getClaim("participantId").asString())
         assertEquals("STUDENT", decoded.getClaim("role").asString())
+        assertNotNull(sessions.joins.single().verifiedAt)
     }
 
     @Test
-    fun `verifyJoin marks the email join as verified`(): Unit = runBlocking {
-        service.requestJoin(code.toSessionCode(), Email(studentEmail))
-
-        service.verifyJoin(capturedToken())
-
-        assertNotNull(fakeSessions.emailJoins[0].verifiedAt)
-    }
-
-    @Test
-    fun `verifyJoin issues an exam identity code when the session is ACTIVE`(): Unit = runBlocking {
+    fun `verifyJoin issues an exam identity code when session is active`() = runBlocking {
         putSession(SessionStatus.ACTIVE)
         service.requestJoin(code.toSessionCode(), Email(studentEmail))
 
         val response = service.verifyJoin(capturedToken())
+        val participant = participants.findById(UUID.fromString(response.participantId))
 
-        val participant = fakeParticipants.findById(UUID.fromString(response.participantId))!!
-        assertNotNull(participant.examIdentityCode)
+        assertNotNull(participant?.examIdentityCode)
     }
 
     @Test
-    fun `verifyJoin throws ConflictException when the token was already used`() = runBlocking<Unit> {
+    fun `verifyJoin rejects reused unknown ended and invalid tokens`() = runBlocking {
         service.requestJoin(code.toSessionCode(), Email(studentEmail))
         val token = capturedToken()
         service.verifyJoin(token)
 
-        assertThrows<ConflictException> {
-            service.verifyJoin(token)
-        }
-    }
+        assertThrows<ConflictException> { service.verifyJoin(token) }
 
-    @Test
-    fun `verifyJoin throws NotFoundException when the join record is unknown`() = runBlocking<Unit> {
-        service.requestJoin(code.toSessionCode(), Email(studentEmail))
-        val token = capturedToken()
-        fakeSessions.emailJoins.clear()
+        sessions.joins.clear()
+        assertThrows<NotFoundException> { service.verifyJoin(token) }
 
-        assertThrows<NotFoundException> {
-            service.verifyJoin(token)
-        }
-    }
-
-    @Test
-    fun `verifyJoin throws ConflictException when the session ended before verification`() = runBlocking<Unit> {
-        service.requestJoin(code.toSessionCode(), Email(studentEmail))
-        val token = capturedToken()
+        service.requestJoin(code.toSessionCode(), Email("student2@alunos.isel.pt"))
+        val endedToken = capturedToken()
         putSession(SessionStatus.ENDED)
+        assertThrows<ConflictException> { service.verifyJoin(endedToken) }
 
-        assertThrows<ConflictException> {
-            service.verifyJoin(token)
-        }
-    }
-
-    @Test
-    fun `verifyJoin throws UnauthorizedException when the token signature is invalid`() {
         val forged = JWT.create()
             .withIssuer("oeims-test")
-            .withAudience("email-join")
+            .withAudience("email-verification")
             .withJWTId(UUID.randomUUID().toString())
             .withSubject(studentEmail)
-            .withClaim("purpose", "email_join")
+            .withClaim("purpose", "email_verification")
             .withClaim("sessionCode", code)
-            .sign(Algorithm.HMAC256("a-different-secret"))
+            .sign(Algorithm.HMAC256("different-secret"))
 
-        assertThrows<UnauthorizedException> {
-            runBlocking { service.verifyJoin(forged.toEmailJoinToken()) }
-        }
+        assertThrows<UnauthorizedException> { service.verifyJoin(JwtToken(forged)) }
     }
 
-    // ── getParticipants ─────────────────────────────────────────────────────
-
     @Test
-    fun `getParticipants returns all participants in the session`() = runBlocking {
-        fakeParticipants.create(sessionId, studentEmail)
-        fakeParticipants.create(sessionId, "student2@alunos.isel.pt")
+    fun `getParticipants returns all participants in a session`() = runBlocking {
+        participants.create(sessionId, studentEmail)
+        participants.create(sessionId, "student2@alunos.isel.pt")
 
         val results = service.getParticipants(sessionId.toSessionId())
 
@@ -358,29 +261,13 @@ class ParticipantServiceTest {
     }
 
     @Test
-    fun `getParticipants throws NotFoundException when the session does not exist`() {
-        assertThrows<NotFoundException> {
-            runBlocking { service.getParticipants(UUID.randomUUID().toSessionId()) }
-        }
-    }
+    fun `getParticipantById returns participant or null`() = runBlocking {
+        val created = participants.create(sessionId, studentEmail)
 
-    // ── getParticipantById ───────────────────────────────────────────────────
+        val found = service.getParticipantById(created.id.toParticipantId())
+        val missing = service.getParticipantById(UUID.randomUUID().toParticipantId())
 
-    @Test
-    fun `getParticipantById returns the participant when it exists`() = runBlocking {
-        val created = fakeParticipants.create(sessionId, studentEmail)
-
-        val result = service.getParticipantById(created.id.toParticipantId())
-
-        assertNotNull(result)
-        assertEquals(created.id.toString(), result.id)
-        assertEquals(studentEmail, result.email)
-    }
-
-    @Test
-    fun `getParticipantById returns null when the participant does not exist`() = runBlocking {
-        val result = service.getParticipantById(UUID.randomUUID().toParticipantId())
-
-        assertNull(result)
+        assertEquals(studentEmail, found?.email)
+        assertNull(missing)
     }
 }
