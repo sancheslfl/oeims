@@ -1,8 +1,8 @@
 import {
     type SubmitEventHandler,
     useEffect,
+    useReducer,
     useRef,
-    useState,
 } from "react";
 import type {ExamResponse, OpenedSession, SessionResponse} from "../../types";
 import {useAuth} from "../../AuthContext";
@@ -29,6 +29,86 @@ type ExamCardProps = {
     onOpenSession: (openedSession: OpenedSession) => void;
 };
 
+type ExamCardState = {
+    session: SessionResponse | undefined;
+    isExpanded: boolean;
+    isCreatingSession: boolean;
+    joinCode: string;
+    isJoining: boolean;
+    showJoinInput: boolean;
+    error: string;
+    copyAnimationKey: number;
+};
+
+type ExamCardAction =
+    | { type: "collapse" }
+    | { type: "expand" }
+    | { type: "createStarted" }
+    | { type: "createSucceeded"; session: SessionResponse }
+    | { type: "createFailed"; error: string }
+    | { type: "showJoinInput" }
+    | { type: "hideJoinInput" }
+    | { type: "joinCodeChanged"; joinCode: string }
+    | { type: "joinStarted" }
+    | { type: "joinSucceeded" }
+    | { type: "joinFailed"; error: string }
+    | { type: "copyStarted" }
+    | { type: "copySucceeded" }
+    | { type: "copyFailed"; error: string };
+
+function examCardReducer(
+    state: ExamCardState,
+    action: ExamCardAction,
+): ExamCardState {
+    switch (action.type) {
+        case "collapse":
+            return { ...state, isExpanded: false };
+        case "expand":
+            return { ...state, isExpanded: true };
+        case "createStarted":
+            return { ...state, error: "", isCreatingSession: true };
+        case "createSucceeded":
+            return {
+                ...state,
+                session: action.session,
+                isExpanded: true,
+                isCreatingSession: false,
+            };
+        case "createFailed":
+            return {
+                ...state,
+                error: action.error,
+                isCreatingSession: false,
+            };
+        case "showJoinInput":
+            return { ...state, showJoinInput: true };
+        case "hideJoinInput":
+            return {
+                ...state,
+                showJoinInput: false,
+                joinCode: "",
+                error: "",
+            };
+        case "joinCodeChanged":
+            return { ...state, joinCode: action.joinCode };
+        case "joinStarted":
+            return { ...state, error: "", isJoining: true };
+        case "joinSucceeded":
+            return { ...state, isJoining: false };
+        case "joinFailed":
+            return { ...state, error: action.error, isJoining: false };
+        case "copyStarted":
+            return { ...state, error: "" };
+        case "copySucceeded":
+            return {
+                ...state,
+                copyAnimationKey: state.copyAnimationKey + 1,
+            };
+        case "copyFailed":
+            return { ...state, error: action.error };
+    }
+}
+
 function ExamCard({
                       exam,
                       activeSession,
@@ -41,18 +121,32 @@ function ExamCard({
     const ownActiveSession =
         activeSession?.supervisorId === auth?.id ? activeSession : undefined;
 
-    const [session, setSession] = useState<SessionResponse | undefined>(
-        restoredSession ?? ownActiveSession,
+    const [state, dispatch] = useReducer(
+        examCardReducer,
+        undefined,
+        () => ({
+            session: restoredSession ?? ownActiveSession,
+            isExpanded: Boolean(restoredSession),
+            isCreatingSession: false,
+            joinCode: "",
+            isJoining: false,
+            showJoinInput: false,
+            error: "",
+            copyAnimationKey: 0,
+        }),
     );
-    const [isExpanded, setIsExpanded] = useState(Boolean(restoredSession));
-    const [isCreatingSession, setIsCreatingSession] = useState(false);
 
-    const [joinCode, setJoinCode] = useState("");
-    const [isJoining, setIsJoining] = useState(false);
-    const [showJoinInput, setShowJoinInput] = useState(false);
+    const {
+        session,
+        isExpanded,
+        isCreatingSession,
+        joinCode,
+        isJoining,
+        showJoinInput,
+        error,
+        copyAnimationKey,
+    } = state;
 
-    const [error, setError] = useState("");
-    const [copyAnimationKey, setCopyAnimationKey] = useState(0);
     const copyFeedbackTimeoutRef = useRef<number | undefined>(undefined);
 
     useEffect(() => {
@@ -66,20 +160,19 @@ function ExamCard({
 
     async function handleToggleSession() {
         if (isExpanded) {
-            setIsExpanded(false);
+            dispatch({ type: "collapse" });
             return;
         }
 
         if (openSession) {
-            setIsExpanded(true);
+            dispatch({ type: "expand" });
             onOpenSession({exam, session: openSession});
             return;
         }
 
         if (!auth) return;
 
-        setError("");
-        setIsCreatingSession(true);
+        dispatch({ type: "createStarted" });
 
         try {
             const createdSession = await createSession(
@@ -88,29 +181,26 @@ function ExamCard({
                 auth.token,
             );
 
-            setSession(createdSession);
-            setIsExpanded(true);
+            dispatch({ type: "createSucceeded", session: createdSession });
             saveLastSessionId(auth.id, createdSession.id);
 
             onOpenSession({exam, session: createdSession});
         } catch (error) {
             if (error instanceof Error) {
-                setError(error.message);
+                dispatch({ type: "createFailed", error: error.message });
             }
-        } finally {
-            setIsCreatingSession(false);
         }
     }
 
     async function handleCopyStudentLink(session: SessionResponse) {
-        setError("");
+        dispatch({ type: "copyStarted" });
 
         try {
             await copyToClipboard(buildStudentSessionLink(session.code));
-            setCopyAnimationKey((current) => current + 1);
+            dispatch({ type: "copySucceeded" });
         } catch (error) {
             if (error instanceof Error) {
-                setError(error.message);
+                dispatch({ type: "copyFailed", error: error.message });
             }
         }
     }
@@ -120,8 +210,7 @@ function ExamCard({
 
         if (!auth || !joinCode.trim()) return;
 
-        setError("");
-        setIsJoining(true);
+        dispatch({ type: "joinStarted" });
 
         try {
             const joinedSession = await joinSessionAsSupervisor(
@@ -130,14 +219,13 @@ function ExamCard({
             );
             const joinedExam = await getExam(joinedSession.examId, auth.token);
 
+            dispatch({ type: "joinSucceeded" });
             saveLastSessionId(auth.id, joinedSession.id);
             onOpenSession({exam: joinedExam, session: joinedSession});
         } catch (error) {
             if (error instanceof Error) {
-                setError(error.message);
+                dispatch({ type: "joinFailed", error: error.message });
             }
-        } finally {
-            setIsJoining(false);
         }
     };
 
@@ -174,7 +262,7 @@ function ExamCard({
                 <button
                     type="button"
                     className="app-button"
-                    onClick={() => setShowJoinInput(true)}
+                    onClick={() => dispatch({ type: "showJoinInput" })}
                 >
                     Join session
                 </button>
@@ -188,7 +276,10 @@ function ExamCard({
                         maxLength={6}
                         value={joinCode}
                         onChange={(event) =>
-                            setJoinCode(event.currentTarget.value.toUpperCase())
+                            dispatch({
+                                type: "joinCodeChanged",
+                                joinCode: event.currentTarget.value.toUpperCase(),
+                            })
                         }
                         autoFocus
                     />
@@ -205,11 +296,7 @@ function ExamCard({
                         <button
                             type="button"
                             className="app-button app-button-secondary flex-1"
-                            onClick={() => {
-                                setShowJoinInput(false);
-                                setJoinCode("");
-                                setError("");
-                            }}
+                            onClick={() => dispatch({ type: "hideJoinInput" })}
                         >
                             Cancel
                         </button>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 import type {EventResponse, ParticipantResponse, ParticipantStatusResponse, SessionResponse} from "../types";
 import {REALTIME_CHANNELS, REALTIME_EVENTS, useEventListener} from "./useEventListener.ts";
 import {getSessionEvents, getSessionParticipants} from "../api/sessions.ts";
@@ -21,26 +21,166 @@ export type SeverityFlash = {
     severity: EventResponse["severity"];
 };
 
+type CanvasRealtimeState = {
+    participantsState: ParticipantsState | null;
+    eventsState: EventsState | null;
+    error: string;
+    severityFlash: SeverityFlash | null;
+};
+
+type CanvasRealtimeAction =
+    | { type: "participantJoined"; sessionId: string; participant: ParticipantResponse }
+    | { type: "participantEventReceived"; sessionId: string; event: EventResponse }
+    | { type: "participantStatusUpdated"; sessionId: string; update: ParticipantStatusResponse }
+    | { type: "participantsLoaded"; sessionId: string; participants: ParticipantResponse[] }
+    | { type: "eventsLoaded"; sessionId: string; events: EventResponse[] }
+    | { type: "loadFailed"; error: string };
+
+const initialCanvasRealtimeState: CanvasRealtimeState = {
+    participantsState: null,
+    eventsState: null,
+    error: "",
+    severityFlash: null,
+};
+
+function canvasRealtimeReducer(
+    state: CanvasRealtimeState,
+    action: CanvasRealtimeAction,
+): CanvasRealtimeState {
+    switch (action.type) {
+        case "participantJoined": {
+            const currentParticipants =
+                state.participantsState?.sessionId === action.sessionId
+                    ? state.participantsState.participants
+                    : [];
+
+            return {
+                ...state,
+                participantsState: {
+                    sessionId: action.sessionId,
+                    participants: addParticipantIfMissing(
+                        currentParticipants,
+                        action.participant,
+                    ),
+                },
+            };
+        }
+
+        case "participantEventReceived": {
+            const currentEventsByParticipantId =
+                state.eventsState?.sessionId === action.sessionId
+                    ? state.eventsState.eventsByParticipantId
+                    : {};
+
+            const currentParticipantEvents =
+                currentEventsByParticipantId[action.event.participantId] ?? [];
+
+            return {
+                ...state,
+                eventsState: {
+                    sessionId: action.sessionId,
+                    eventsByParticipantId: {
+                        ...currentEventsByParticipantId,
+                        [action.event.participantId]: addEventIfMissing(
+                            currentParticipantEvents,
+                            action.event,
+                        ),
+                    },
+                },
+                severityFlash: {
+                    animationKey: state.severityFlash
+                        ? state.severityFlash.animationKey + 1
+                        : 1,
+                    participantId: action.event.participantId,
+                    severity: action.event.severity,
+                },
+            };
+        }
+
+        case "participantStatusUpdated": {
+            if (!state.participantsState || state.participantsState.sessionId !== action.sessionId) {
+                return state;
+            }
+
+            return {
+                ...state,
+                participantsState: {
+                    sessionId: state.participantsState.sessionId,
+                    participants: state.participantsState.participants.map((participant) =>
+                        participant.id === action.update.participantId
+                            ? {
+                                ...participant,
+                                connectionStatus: action.update.connectionStatus,
+                            }
+                            : participant,
+                    ),
+                },
+            };
+        }
+
+        case "participantsLoaded": {
+            const currentParticipants =
+                state.participantsState?.sessionId === action.sessionId
+                    ? state.participantsState.participants
+                    : [];
+
+            return {
+                ...state,
+                participantsState: {
+                    sessionId: action.sessionId,
+                    participants: mergeParticipants(
+                        action.participants,
+                        currentParticipants,
+                    ),
+                },
+                error: "",
+            };
+        }
+
+        case "eventsLoaded": {
+            const currentEventsByParticipantId =
+                state.eventsState?.sessionId === action.sessionId
+                    ? state.eventsState.eventsByParticipantId
+                    : {};
+
+            return {
+                ...state,
+                eventsState: {
+                    sessionId: action.sessionId,
+                    eventsByParticipantId: mergeEventsByParticipantId(
+                        groupEventsByParticipantId(action.events),
+                        currentEventsByParticipantId,
+                    ),
+                },
+                error: "",
+            };
+        }
+
+        case "loadFailed":
+            return { ...state, error: action.error };
+    }
+}
+
 export function useCanvasRealtimeData(
     token: string | undefined,
     session: SessionResponse | undefined,
 ) {
-    const [participantsState, setParticipantsState] = useState<ParticipantsState | null>(null);
-    const [eventsState, setEventsState] = useState<EventsState | null>(null);
-    const [error, setError] = useState("");
-    const [severityFlash, setSeverityFlash] = useState<SeverityFlash | null>(null);
+    const [state, dispatch] = useReducer(
+        canvasRealtimeReducer,
+        initialCanvasRealtimeState,
+    );
 
     const sessionId = session?.id;
     const sessionStatus = session?.status;
 
     const participants =
-        participantsState && participantsState.sessionId === sessionId
-            ? participantsState.participants
+        state.participantsState && state.participantsState.sessionId === sessionId
+            ? state.participantsState.participants
             : [];
 
     const eventsByParticipantId =
-        eventsState && eventsState.sessionId === sessionId
-            ? eventsState.eventsByParticipantId
+        state.eventsState && state.eventsState.sessionId === sessionId
+            ? state.eventsState.eventsByParticipantId
             : {};
 
     const eventId =
@@ -55,19 +195,10 @@ export function useCanvasRealtimeData(
                     return;
                 }
 
-                const participant = data as ParticipantResponse;
-
-                setParticipantsState((current) => {
-                    const currentParticipants =
-                        current?.sessionId === sessionId ? current.participants : [];
-
-                    return {
-                        sessionId,
-                        participants: addParticipantIfMissing(
-                            currentParticipants,
-                            participant,
-                        ),
-                    };
+                dispatch({
+                    type: "participantJoined",
+                    sessionId,
+                    participant: data as ParticipantResponse,
                 });
             },
 
@@ -76,34 +207,11 @@ export function useCanvasRealtimeData(
                     return;
                 }
 
-                const event = data as EventResponse;
-
-                setEventsState((current) => {
-                    const currentEventsByParticipantId =
-                        current?.sessionId === sessionId
-                            ? current.eventsByParticipantId
-                            : {};
-
-                    const currentParticipantEvents =
-                        currentEventsByParticipantId[event.participantId] ?? [];
-
-                    return {
-                        sessionId,
-                        eventsByParticipantId: {
-                            ...currentEventsByParticipantId,
-                            [event.participantId]: addEventIfMissing(
-                                currentParticipantEvents,
-                                event,
-                            ),
-                        },
-                    };
+                dispatch({
+                    type: "participantEventReceived",
+                    sessionId,
+                    event: data as EventResponse,
                 });
-
-                setSeverityFlash((current) => ({
-                    animationKey: current ? current.animationKey + 1 : 1,
-                    participantId: event.participantId,
-                    severity: event.severity,
-                }));
             },
 
             [REALTIME_EVENTS.ParticipantStatusUpdated]: (data: unknown) => {
@@ -111,24 +219,10 @@ export function useCanvasRealtimeData(
                     return;
                 }
 
-                const update = data as ParticipantStatusResponse;
-
-                setParticipantsState((current) => {
-                    if (!current || current.sessionId !== sessionId) {
-                        return current;
-                    }
-
-                    return {
-                        sessionId: current.sessionId,
-                        participants: current.participants.map((participant) =>
-                            participant.id === update.participantId
-                                ? {
-                                    ...participant,
-                                    connectionStatus: update.connectionStatus,
-                                }
-                                : participant,
-                        ),
-                    };
+                dispatch({
+                    type: "participantStatusUpdated",
+                    sessionId,
+                    update: data as ParticipantStatusResponse,
                 });
             },
         }),
@@ -149,24 +243,15 @@ export function useCanvasRealtimeData(
                 const loadedParticipants = await getSessionParticipants(sessionId, token);
 
                 if (!ignore) {
-                    setParticipantsState((current) => {
-                        const currentParticipants =
-                            current?.sessionId === sessionId ? current.participants : [];
-
-                        return {
-                            sessionId,
-                            participants: mergeParticipants(
-                                loadedParticipants,
-                                currentParticipants,
-                            ),
-                        };
+                    dispatch({
+                        type: "participantsLoaded",
+                        sessionId,
+                        participants: loadedParticipants,
                     });
-
-                    setError("");
                 }
             } catch (error) {
                 if (!ignore && error instanceof Error) {
-                    setError(error.message);
+                    dispatch({ type: "loadFailed", error: error.message });
                 }
             }
         }
@@ -190,26 +275,11 @@ export function useCanvasRealtimeData(
                 const events = await getSessionEvents(sessionId, token);
 
                 if (!ignore) {
-                    setEventsState((current) => {
-                        const currentEventsByParticipantId =
-                            current?.sessionId === sessionId
-                                ? current.eventsByParticipantId
-                                : {};
-
-                        return {
-                            sessionId,
-                            eventsByParticipantId: mergeEventsByParticipantId(
-                                groupEventsByParticipantId(events),
-                                currentEventsByParticipantId,
-                            ),
-                        };
-                    });
-
-                    setError("");
+                    dispatch({ type: "eventsLoaded", sessionId, events });
                 }
             } catch (error) {
                 if (!ignore && error instanceof Error) {
-                    setError(error.message);
+                    dispatch({ type: "loadFailed", error: error.message });
                 }
             }
         }
@@ -224,8 +294,8 @@ export function useCanvasRealtimeData(
     return {
         participants,
         eventsByParticipantId,
-        error,
-        severityFlash
+        error: state.error,
+        severityFlash: state.severityFlash,
     };
 }
 

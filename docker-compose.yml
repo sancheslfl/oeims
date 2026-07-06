@@ -10,9 +10,9 @@ services:
     expose:
       - "8080"
 
-  professor:
+  frontend:
     build:
-      context: ./Professor
+      context: ./Frontend
       args:
         VITE_API_URL: /api
     ports:
