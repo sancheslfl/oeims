@@ -68,7 +68,7 @@ internal static partial class User32
     /// <param name="nMaxCount">Maximum number of characters to copy, including the null terminator.</param>
     /// <returns>Number of characters copied, excluding the null terminator; zero if no text was copied.</returns>
     [DllImport(
-    "user32.dll",
+    LibraryName,
     EntryPoint = "GetWindowTextW",
     CharSet = CharSet.Unicode,
     ExactSpelling = true,
