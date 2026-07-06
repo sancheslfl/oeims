@@ -7,6 +7,24 @@ internal static class WinEventConstants
 
     public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
 
+    /// <summary>
+    /// Base value for application-defined private messages.
+    /// Prefer this for internal application messages.
+    /// </summary>
+    internal const uint WM_APP = 0x8000;
+
+    /// <summary>
+    /// Private message used only to wake the message loop when cancellation is requested.
+    /// It is not a foreground-window event.
+    /// </summary>
+    internal const uint WM_APP_STOP = WM_APP + 1;
+
+    /// <summary>
+    /// Tells PeekMessage to leave the message in the queue.
+    /// Useful when only forcing the thread message queue to exist.
+    /// </summary>
+    internal const uint PM_NOREMOVE = 0x0000;
+
     public const uint PM_REMOVE = 0x0001;
 
     public const int OBJID_WINDOW = 0;

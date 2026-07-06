@@ -1,0 +1,24 @@
+package com.oeims.http
+
+import com.oeims.models.toParticipantId
+import com.oeims.services.ParticipantService
+import io.ktor.http.*
+import io.ktor.server.auth.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+
+fun Route.participants(participantService: ParticipantService) {
+    authenticate("auth-student") {
+        post("/participants/{id}/heartbeat") {
+            val authenticatedParticipantId = call.participantId()
+            val participantId = call.uuidParam("id")
+
+            participantService.sendHeartbeat(
+                pid = participantId.toParticipantId(),
+                authenticatedPid= authenticatedParticipantId.toParticipantId()
+            )
+
+            call.respond(HttpStatusCode.NoContent)
+        }
+    }
+}

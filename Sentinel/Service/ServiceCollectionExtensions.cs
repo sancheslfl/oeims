@@ -1,4 +1,4 @@
-﻿using Contracts;
+using Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using OEIMS.Sentinel.Service.Connections.Agent;
@@ -12,14 +12,14 @@ namespace OEIMS.Sentinel.Service;
 
 internal static class ServiceCollectionExtensions
 {
-    internal static WebApplicationBuilder AddExamMonitoringService(
-        this WebApplicationBuilder builder)
+    internal static WebApplicationBuilder AddExamMonitoringService(this WebApplicationBuilder builder)
     {
         var services = builder.Services;
         var configuration = builder.Configuration;
         var environment = builder.Environment;
+        var isWindows = OperatingSystem.IsWindows();
 
-        if (environment.IsProduction())
+        if (environment.IsProduction() && isWindows)
         {
             services.AddWindowsService(options =>
             {
@@ -30,7 +30,8 @@ internal static class ServiceCollectionExtensions
             builder.Logging.AddEventLog();
         }
 
-        services.AddWindowsPlatform();
+        if (isWindows)
+            services.AddWindowsPlatform();
 
         services.AddSingleton<AgentEventPipeServer>();
         services.AddSingleton<AgentCommandPipeClient>();
@@ -58,7 +59,7 @@ internal static class ServiceCollectionExtensions
     internal static WebApplication UseExamMonitoringService(
         this WebApplication app)
     {
-        if (app.Environment.IsProduction())
+        if (app.Environment.IsProduction() && OperatingSystem.IsWindows())
             app.Services.GetRequiredService<SingleInstanceGuard>();
 
         app.UseCors();

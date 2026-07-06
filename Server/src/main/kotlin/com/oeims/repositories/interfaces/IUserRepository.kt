@@ -1,7 +1,7 @@
 package com.oeims.repositories.interfaces
 
+import com.oeims.models.UserRecord
 import com.oeims.models.UserRole
-import com.oeims.repositories.UserRecord
 import java.util.*
 
 interface IUserRepository {

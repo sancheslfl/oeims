@@ -6,7 +6,7 @@ public static class WinPlatformServiceCollectionExtensions
 {
     public static IServiceCollection AddWindowsPlatform(this IServiceCollection services)
     {
-        services.AddSingleton<IProcessSource, WindowsProcessSource>();
+        services.AddSingleton<IProcessSource, WinProcessSource>();
 
         return services;
     }

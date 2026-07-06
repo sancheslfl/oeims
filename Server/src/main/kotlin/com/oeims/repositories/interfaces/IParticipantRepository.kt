@@ -1,7 +1,7 @@
 package com.oeims.repositories.interfaces
 
 import com.oeims.models.ConnectionStatus
-import com.oeims.repositories.ParticipantRecord
+import com.oeims.models.ParticipantRecord
 import java.time.Instant
 import java.util.*
 

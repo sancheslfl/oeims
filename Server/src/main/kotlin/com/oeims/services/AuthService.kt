@@ -1,15 +1,8 @@
 package com.oeims.services
 
 import com.auth0.jwt.JWT
-import com.oeims.models.ConflictException
-import com.oeims.models.UnauthorizedException
-import com.oeims.models.ValidationException
-import com.oeims.models.Email
-import com.oeims.models.Password
-import com.oeims.models.UserRole
+import com.oeims.models.*
 import com.oeims.models.dto.AuthResponse
-import com.oeims.models.ids.UserId
-import com.oeims.models.ids.toUserId
 import com.oeims.repositories.interfaces.IUserRepository
 import org.mindrot.jbcrypt.BCrypt
 import java.time.Instant
@@ -23,8 +16,7 @@ class AuthService(
         if (userRepository.existsByEmail(email.address))
             throw ConflictException("Email already registered")
 
-        val userRole = runCatching { UserRole.valueOf(role.uppercase()) }
-            .getOrElse { throw ValidationException("Invalid role: $role") }
+        val userRole = UserRole.from(role)
 
         val hash = BCrypt.hashpw(password.value, BCrypt.gensalt())
         val user = userRepository.create(email.address, userRole, hash)
@@ -52,6 +44,7 @@ class AuthService(
         )
     }
 
+    // TODO: Move this generate token functions elsewhere (associate with JwtSettings maybe)
     private fun createAuthToken(userId: UserId, role: String, email: String): String =
         JWT.create()
             .withIssuer(jwtSettings.issuer)

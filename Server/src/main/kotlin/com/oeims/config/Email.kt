@@ -2,7 +2,7 @@ package com.oeims.config
 
 import com.oeims.models.EmailSender
 import com.oeims.models.SmtpEmailSender
-import io.ktor.server.application.Application
+import io.ktor.server.application.*
 
 private const val SMTP_PORT = 587
 private const val EMAIL_FROM = "OEIMS <no-reply@oeims.test>"

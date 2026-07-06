@@ -1,4 +1,4 @@
-﻿using System.IO.Pipes;
+using System.IO.Pipes;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Contracts.Ipc;
@@ -8,14 +8,17 @@ using OEIMS.Sentinel.Agent.Domain;
 namespace OEIMS.Sentinel.Agent.Ipc;
 
 /// <summary>
-/// Exposes the command pipe to the Sentinel Service to send commands to the Sentinel Agent.
+/// Receives commands sent by the Sentinel Service to the Sentinel Agent.
 /// </summary>
 /// <remarks>
-/// Communication:
-/// <code>
-/// Sentinel Service -> Sentinel Agent
-/// </code>
+/// Direction: Sentinel Service -> Sentinel Agent.
+/// <para>
+/// Commands are newline-delimited JSON messages. Unknown, incomplete, or malformed commands are ignored so a bad
+/// message does not kill the Agent command loop.
+/// </para>
 /// </remarks>
+/// <param name="overlay">UI boundary used when the Service asks the Agent to display an exam identity code.</param>
+/// <param name="logger">Logger used for malformed commands and pipe diagnostics.</param>
 internal sealed class AgentCommandPipeServer(
     IExamIdentityCodeOverlay overlay,
     ILogger<AgentCommandPipeServer> logger)
@@ -28,6 +31,11 @@ internal sealed class AgentCommandPipeServer(
         }
     };
 
+    /// <summary>
+    /// Starts accepting command pipe connections until cancellation.
+    /// </summary>
+    /// <param name="ct">Cancellation token used when the Agent shuts down.</param>
+    /// <returns>A task that completes when command handling stops.</returns>
     public async Task StartAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -62,11 +70,17 @@ internal sealed class AgentCommandPipeServer(
             }
             catch (JsonException ex)
             {
-                logger.LogWarning(ex, "Ignored malformed Agent command.");
+                logger.LogDebug(ex, "Ignored malformed Agent command.");
             }
         }
     }
 
+    /// <summary>
+    /// Reads the command type and dispatches to the matching handler.
+    /// </summary>
+    /// <param name="json">Raw command JSON read from the pipe.</param>
+    /// <param name="ct">Cancellation token used to stop command handling.</param>
+    /// <returns>A task that completes after the command is handled or ignored.</returns>
     private Task HandleCommandAsync(string json, CancellationToken ct)
     {
         using var document = JsonDocument.Parse(json);
@@ -91,7 +105,7 @@ internal sealed class AgentCommandPipeServer(
 
         if (command is null || string.IsNullOrWhiteSpace(command.Code))
         {
-            logger.LogWarning("Ignored empty exam identity code command.");
+            logger.LogDebug("Ignored empty exam identity code command.");
             return;
         }
 

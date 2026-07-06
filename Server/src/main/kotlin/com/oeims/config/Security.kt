@@ -9,7 +9,7 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.response.*
-import java.util.UUID
+import java.util.*
 
 fun Application.configureSecurity(jwtSettings: JwtSettings) {
     val verifier = jwtSettings.verifier

@@ -4,7 +4,7 @@ val exposedVersion = providers.gradleProperty("exposed_version")
 
 plugins {
     kotlin("jvm") version "2.4.0"
-    id("io.ktor.plugin") version "3.1.0"
+    id("io.ktor.plugin") version "3.5.0"
     kotlin("plugin.serialization") version "2.4.0"
 }
 
@@ -42,7 +42,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-java-time:${exposedVersion.get()}")
 
     // SQLite
-    implementation("org.xerial:sqlite-jdbc:3.47.0.0")
+    implementation("org.xerial:sqlite-jdbc:3.53.2.0")
 
     // Password hashing
     implementation("org.mindrot:jbcrypt:0.4")
@@ -64,6 +64,12 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:${kotlinVersion.get()}")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.named<JavaExec>("run") {
+    jvmArgs(
+        "--enable-native-access=ALL-UNNAMED",
+    )
 }
 
 tasks.test {
