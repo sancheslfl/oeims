@@ -19,7 +19,7 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
     private User32.WinEventDelegate? _foregroundCallback;
     private User32.WinEventDelegate? _nameChangeCallback;
 
-    public async Task<bool> StartAsync(Func<ActiveWindowInfo, Task> onChanged, CancellationToken ct)
+    public Task StartAsync(Func<ActiveWindowInfo, Task> onChanged, CancellationToken ct)
     {
         var completion = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -45,10 +45,9 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
 
         thread.Name = nameof(WinActiveWindowSource);
         thread.IsBackground = true;
-        thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
 
-        return await completion.Task;
+        return completion.Task;
     }
 
     private void RegisterHooks(Func<ActiveWindowInfo, Task> onChanged)
