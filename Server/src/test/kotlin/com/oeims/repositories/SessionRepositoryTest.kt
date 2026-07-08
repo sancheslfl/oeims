@@ -1,33 +1,34 @@
 package com.oeims.repositories
 
-import com.oeims.models.*
+import com.oeims.models.Exams
+import com.oeims.models.SessionJoins
+import com.oeims.models.SessionStatus
+import com.oeims.models.SessionSupervisors
+import com.oeims.models.Sessions
+import com.oeims.models.UserRole
+import com.oeims.models.Users
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.sql.DriverManager
-import java.util.*
-import kotlin.test.*
+import java.time.Clock
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SessionRepositoryTest {
-
+    private lateinit var database: TestDatabase
     private lateinit var sessionRepository: SessionRepository
     private lateinit var professorId: UUID
     private lateinit var otherProfessorId: UUID
     private lateinit var examId: UUID
-    private var keepAlive: java.sql.Connection? = null
 
     @BeforeEach
     fun setup() = runBlocking {
-        keepAlive = DriverManager.getConnection("jdbc:sqlite:file:testdb?mode=memory&cache=shared")
-        Database.connect(
-            url = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
-            driver = "org.sqlite.JDBC"
-        )
-        transaction { SchemaUtils.create(Users, Exams, Sessions, SessionSupervisors) }
+        database = TestDatabase(Users, Exams, Sessions, SessionSupervisors, SessionJoins).also { it.connect() }
 
         val userRepo = UserRepository()
         val examRepo = ExamRepository()
@@ -35,21 +36,16 @@ class SessionRepositoryTest {
         professorId = userRepo.create("prof1@isel.pt", UserRole.PROFESSOR, "hash").id
         otherProfessorId = userRepo.create("prof2@isel.pt", UserRole.PROFESSOR, "hash").id
         examId = examRepo.create(professorId, "Networks", null, 90).id
-
-        sessionRepository = SessionRepository()
+        sessionRepository = SessionRepository(Clock.systemUTC())
     }
 
     @AfterEach
     fun teardown() {
-        transaction { SchemaUtils.drop(SessionSupervisors, Sessions, Exams, Users) }
-        keepAlive?.close()
-        keepAlive = null
+        database.close()
     }
 
-    private suspend fun createSession(code: String, supervisor: UUID = professorId): SessionRecord =
+    private suspend fun createSession(code: String, supervisor: UUID = professorId) =
         sessionRepository.create(examId, supervisor, code, "alunos.isel.pt")!!
-
-    // ── create ────────────────────────────────────────────────────────────────
 
     @Test
     fun `create returns session with PENDING status`(): Unit = runBlocking {
@@ -72,8 +68,6 @@ class SessionRepositoryTest {
         assertTrue(s1.id != s2.id)
     }
 
-    // ── findById ──────────────────────────────────────────────────────────────
-
     @Test
     fun `findById returns session when id exists`() = runBlocking {
         val created = createSession("XYZ789")
@@ -92,8 +86,6 @@ class SessionRepositoryTest {
         assertNull(result)
     }
 
-    // ── findByCode ────────────────────────────────────────────────────────────
-
     @Test
     fun `findByCode returns session when code exists`() = runBlocking {
         createSession("CODE01")
@@ -110,8 +102,6 @@ class SessionRepositoryTest {
 
         assertNull(result)
     }
-
-    // ── findBySupervisor ──────────────────────────────────────────────────────
 
     @Test
     fun `findBySupervisor returns only sessions belonging to that professor`() = runBlocking {
@@ -131,8 +121,6 @@ class SessionRepositoryTest {
 
         assertTrue(results.isEmpty())
     }
-
-    // ── updateStatus ──────────────────────────────────────────────────────────
 
     @Test
     fun `updateStatus PENDING to ACTIVE sets startedAt and returns true`() = runBlocking {
@@ -167,8 +155,6 @@ class SessionRepositoryTest {
         assertFalse(updated)
     }
 
-    // ── findAllActive ─────────────────────────────────────────────────────────
-
     @Test
     fun `findAllActive returns PENDING and ACTIVE sessions`() = runBlocking {
         val s1 = createSession("ACT001")
@@ -192,8 +178,6 @@ class SessionRepositoryTest {
 
         assertTrue(result.isEmpty())
     }
-
-    // ── isSupervisor ──────────────────────────────────────────────────────────
 
     @Test
     fun `isSupervisor returns true for the session creator`() = runBlocking {
@@ -223,20 +207,14 @@ class SessionRepositoryTest {
         assertFalse(sessionRepository.isSupervisor(UUID.randomUUID(), professorId))
     }
 
-    // ── addSupervisor ─────────────────────────────────────────────────────────
-
     @Test
     fun `addSupervisor is idempotent when called twice for the same pair`() = runBlocking {
         val session = createSession("ADD001")
         sessionRepository.addSupervisor(session.id, otherProfessorId)
-
-        // second call must not throw (composite PK would normally reject a duplicate)
         sessionRepository.addSupervisor(session.id, otherProfessorId)
 
         assertTrue(sessionRepository.isSupervisor(session.id, otherProfessorId))
     }
-
-    // ── findLatestOpenBySupervisor (with access table) ────────────────────────
 
     @Test
     fun `findLatestOpenBySupervisor returns session when professor is the creator`() = runBlocking {

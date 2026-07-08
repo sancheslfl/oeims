@@ -6,9 +6,9 @@ import com.oeims.models.ConflictException
 import com.oeims.models.Email
 import com.oeims.models.Password
 import com.oeims.models.UnauthorizedException
+import com.oeims.models.UserRecord
 import com.oeims.models.UserRole
 import com.oeims.models.ValidationException
-import com.oeims.repositories.UserRecord
 import com.oeims.repositories.interfaces.IUserRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
@@ -16,25 +16,19 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Duration
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class AuthServiceTest {
-
-    // ── Fake ─────────────────────────────────────────────────────────────────
-
-    private inner class FakeUserRepository : IUserRepository {
+    private class FakeUserRepository : IUserRepository {
         val users = mutableListOf<UserRecord>()
 
-        override suspend fun findById(id: UUID): UserRecord? =
-            users.find { it.id == id }
+        override suspend fun findById(id: UUID): UserRecord? = users.find { it.id == id }
 
-        override suspend fun findByEmail(email: String): UserRecord? =
-            users.find { it.email == email }
+        override suspend fun findByEmail(email: String): UserRecord? = users.find { it.email == email }
 
-        override suspend fun existsByEmail(email: String): Boolean =
-            users.any { it.email == email }
+        override suspend fun existsByEmail(email: String): Boolean = users.any { it.email == email }
 
         override suspend fun create(email: String, role: UserRole, passwordHash: String): UserRecord {
             val record = UserRecord(UUID.randomUUID(), email, role, passwordHash, Instant.now())
@@ -42,8 +36,6 @@ class AuthServiceTest {
             return record
         }
     }
-
-    // ── Setup ─────────────────────────────────────────────────────────────────
 
     private val jwtSettings = JwtSettings(
         issuer = "test-issuer",
@@ -61,8 +53,6 @@ class AuthServiceTest {
         fakeRepo = FakeUserRepository()
         service = AuthService(fakeRepo, jwtSettings)
     }
-
-    // ── register ──────────────────────────────────────────────────────────────
 
     @Test
     fun `register returns response with correct email and role`(): Unit = runBlocking {
@@ -129,8 +119,6 @@ class AuthServiceTest {
         assertEquals("PROFESSOR", decoded.getClaim("role").asString())
     }
 
-    // ── login ─────────────────────────────────────────────────────────────────
-
     @Test
     fun `login returns response with correct email and role`(): Unit = runBlocking {
         service.register(Email("prof@isel.pt"), Password("securepass1"), "PROFESSOR")
@@ -174,16 +162,10 @@ class AuthServiceTest {
         service.register(Email("student@alunos.isel.pt"), Password("correct12"), "STUDENT")
 
         val wrongEmail = assertThrows<UnauthorizedException> {
-            service.login(
-                Email("nobody@isel.pt"),
-                Password("anything1")
-            )
+            service.login(Email("nobody@isel.pt"), Password("anything1"))
         }
         val wrongPassword = assertThrows<UnauthorizedException> {
-            service.login(
-                Email("student@alunos.isel.pt"),
-                Password("wrongpass1")
-            )
+            service.login(Email("student@alunos.isel.pt"), Password("wrongpass1"))
         }
 
         assertEquals(wrongEmail.message, wrongPassword.message)

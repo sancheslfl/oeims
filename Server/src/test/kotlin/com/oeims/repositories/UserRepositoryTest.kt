@@ -3,40 +3,30 @@ package com.oeims.repositories
 import com.oeims.models.UserRole
 import com.oeims.models.Users
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.sql.DriverManager
-import java.util.*
-import kotlin.test.*
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class UserRepositoryTest {
-
+    private lateinit var database: TestDatabase
     private lateinit var repository: UserRepository
-    private var keepAlive: java.sql.Connection? = null
 
     @BeforeEach
     fun setup() {
-        keepAlive = DriverManager.getConnection("jdbc:sqlite:file:testdb?mode=memory&cache=shared")
-        Database.connect(
-            url = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
-            driver = "org.sqlite.JDBC"
-        )
-        transaction { SchemaUtils.create(Users) }
+        database = TestDatabase(Users).also { it.connect() }
         repository = UserRepository()
     }
 
     @AfterEach
     fun teardown() {
-        transaction { SchemaUtils.drop(Users) }
-        keepAlive?.close()
-        keepAlive = null
+        database.close()
     }
-
-    // ── create ────────────────────────────────────────────────────────────────
 
     @Test
     fun `create returns record with correct fields`(): Unit = runBlocking {
@@ -56,8 +46,6 @@ class UserRepositoryTest {
 
         assertTrue(user1.id != user2.id)
     }
-
-    // ── findByEmail ───────────────────────────────────────────────────────────
 
     @Test
     fun `findByEmail returns user when email exists`() = runBlocking {
@@ -86,8 +74,6 @@ class UserRepositoryTest {
         assertNull(result)
     }
 
-    // ── findById ──────────────────────────────────────────────────────────────
-
     @Test
     fun `findById returns user when id exists`() = runBlocking {
         val created = repository.create("student@alunos.isel.pt", UserRole.STUDENT, "hash")
@@ -105,8 +91,6 @@ class UserRepositoryTest {
 
         assertNull(result)
     }
-
-    // ── existsByEmail ─────────────────────────────────────────────────────────
 
     @Test
     fun `existsByEmail returns true when email exists`() = runBlocking {
