@@ -24,7 +24,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
         monitorName: String,
         message: String,
         severity: String,
-    ): String = Json.encodeToString(
+    ): String = Json.encodeToString<SentinelEventMessage>(
         SentinelEventMessage(
             monitorName = monitorName,
             message = message,
