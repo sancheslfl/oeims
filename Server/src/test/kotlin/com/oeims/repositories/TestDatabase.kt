@@ -8,6 +8,13 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.util.UUID
 
+/**
+ * Tiny SQLite database helper for repository tests.
+ *
+ * Each test class gets its own shared in-memory database name, so tests do not
+ * accidentally reuse rows from another class. The open JDBC connection keeps the
+ * database alive until [close] is called.
+ */
 internal class TestDatabase(
     private vararg val tables: Table,
 ) {

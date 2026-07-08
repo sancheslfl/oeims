@@ -2,13 +2,12 @@ package com.oeims.services
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import com.oeims.config.Environment
+import com.oeims.config.TestEnvironment
 import com.oeims.connections.SentinelWebSocketManager
 import com.oeims.connections.SseBroadcaster
 import com.oeims.models.*
 import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
-import io.ktor.server.config.MapApplicationConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.BeforeEach
@@ -128,7 +127,7 @@ class ParticipantServiceTest {
 
     @BeforeEach
     fun setup() {
-        Environment.configure(MapApplicationConfig("app.frontend.base-url" to "http://localhost:5173"))
+        TestEnvironment.configure()
         participants = FakeParticipantRepository()
         sessions = FakeSessionRepository()
         emailSender = FakeEmailSender()
