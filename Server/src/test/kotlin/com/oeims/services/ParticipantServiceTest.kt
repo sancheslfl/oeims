@@ -10,6 +10,7 @@ import com.oeims.repositories.interfaces.IParticipantRepository
 import com.oeims.repositories.interfaces.ISessionRepository
 import io.ktor.server.config.MapApplicationConfig
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -131,7 +132,14 @@ class ParticipantServiceTest {
         participants = FakeParticipantRepository()
         sessions = FakeSessionRepository()
         emailSender = FakeEmailSender()
-        service = ParticipantService(participants, sessions, jwtSettings, SseBroadcaster(), SentinelWebSocketManager(), emailSender)
+        service = ParticipantService(
+            participantRepository = participants,
+            sessionRepository = sessions,
+            jwtSettings = jwtSettings,
+            sseBroadcaster = SseBroadcaster(),
+            webSocketManager = SentinelWebSocketManager(json = Json { encodeDefaults = true }),
+            emailSender = emailSender,
+        )
         sessionId = UUID.randomUUID()
         putSession(SessionStatus.PENDING)
     }
