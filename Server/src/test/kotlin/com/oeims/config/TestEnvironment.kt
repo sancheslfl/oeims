@@ -2,6 +2,12 @@ package com.oeims.config
 
 import io.ktor.server.config.MapApplicationConfig
 
+/**
+ * Test-side source of truth for app configuration.
+ *
+ * Route tests and service tests should get their environment from here instead
+ * of rebuilding JWT, frontend URL, database, and heartbeat config by hand.
+ */
 object TestEnvironment {
     private const val NAME = "test"
     private const val API_BASE_PATH = ""
