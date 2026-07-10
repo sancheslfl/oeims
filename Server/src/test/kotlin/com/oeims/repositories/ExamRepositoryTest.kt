@@ -4,50 +4,35 @@ import com.oeims.models.Exams
 import com.oeims.models.UserRole
 import com.oeims.models.Users
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.sql.DriverManager
-import java.util.*
+import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExamRepositoryTest {
-
+    private lateinit var database: TestDatabase
     private lateinit var examRepository: ExamRepository
     private lateinit var professorId: UUID
     private lateinit var otherProfessorId: UUID
-    private var keepAlive: java.sql.Connection? = null
 
     @BeforeEach
     fun setup() = runBlocking {
-        keepAlive = DriverManager.getConnection("jdbc:sqlite:file:testdb?mode=memory&cache=shared")
-        Database.connect(
-            url = "jdbc:sqlite:file:testdb?mode=memory&cache=shared",
-            driver = "org.sqlite.JDBC"
-        )
-        transaction { SchemaUtils.create(Users, Exams) }
+        database = TestDatabase(Users, Exams).also { it.connect() }
 
         val userRepository = UserRepository()
         professorId = userRepository.create("prof1@isel.pt", UserRole.PROFESSOR, "hash1").id
         otherProfessorId = userRepository.create("prof2@isel.pt", UserRole.PROFESSOR, "hash2").id
-
         examRepository = ExamRepository()
     }
 
     @AfterEach
     fun teardown() {
-        transaction { SchemaUtils.drop(Exams, Users) }
-        keepAlive?.close()
-        keepAlive = null
+        database.close()
     }
-
-    // ── create ────────────────────────────────────────────────────────────────
 
     @Test
     fun `create returns record with correct fields`(): Unit = runBlocking {
@@ -76,8 +61,6 @@ class ExamRepositoryTest {
         assertTrue(exam1.id != exam2.id)
     }
 
-    // ── findById ──────────────────────────────────────────────────────────────
-
     @Test
     fun `findById returns exam when id exists`() = runBlocking {
         val created = examRepository.create(professorId, "Algorithms", null, 120)
@@ -95,8 +78,6 @@ class ExamRepositoryTest {
 
         assertNull(result)
     }
-
-    // ── findByTitle ───────────────────────────────────────────────────────────
 
     @Test
     fun `findByTitle returns all exams with that title`() = runBlocking {
@@ -128,8 +109,6 @@ class ExamRepositoryTest {
         assertTrue(results.isEmpty())
     }
 
-    // ── findByProfessor ───────────────────────────────────────────────────────
-
     @Test
     fun `findByProfessor returns only exams belonging to that professor`() = runBlocking {
         examRepository.create(professorId, "Exam A", null, 60)
@@ -148,8 +127,6 @@ class ExamRepositoryTest {
 
         assertTrue(results.isEmpty())
     }
-
-    // ── findAll ───────────────────────────────────────────────────────────────
 
     @Test
     fun `findAll returns all exams regardless of professor`() = runBlocking {

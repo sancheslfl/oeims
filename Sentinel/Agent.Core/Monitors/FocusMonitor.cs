@@ -8,10 +8,10 @@ namespace OEIMS.Sentinel.Agent.Monitors;
 /// </summary>
 /// <remarks>
 /// Focus loss is reported as a warning because it is suspicious, but it does not automatically prove misconduct.
-/// Repeated notifications for the same window title are ignored to avoid flooding the Service.
+/// Repeated notifications for the same window title are ignored to avoid flooding.
 /// </remarks>
 /// <param name="activeWindowSource">
-/// Platform boundary that reports the current foreground window from the student's desktop session.
+/// Platform implementation that offers current foreground window interaction.
 /// </param>
 internal sealed class FocusMonitor(IActiveWindowSource activeWindowSource) : IMonitor
 {

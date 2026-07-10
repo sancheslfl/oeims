@@ -34,7 +34,7 @@ dependencies {
     implementation("io.ktor:ktor-server-rate-limit:${ktorVersion.get()}")
     implementation("io.ktor:ktor-server-status-pages:${ktorVersion.get()}")
     implementation("io.ktor:ktor-server-cors:${ktorVersion.get()}")
-    implementation("io.ktor:ktor-server-sse:${ktorVersion.get()}")               // SSE
+    implementation("io.ktor:ktor-server-sse:${ktorVersion.get()}")
 
     // Exposed ORM
     implementation("org.jetbrains.exposed:exposed-core:${exposedVersion.get()}")
