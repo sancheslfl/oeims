@@ -1,7 +1,7 @@
 namespace OEIMS.Sentinel.Service.Domain.Platform;
 
 /// <summary>
-/// Boundary between process-monitoring logic and the operating system process APIs.
+/// Interface that abstracts process monitoring logic from the operating system process APIs.
 /// </summary>
 /// <remarks>
 /// <see cref="OEIMS.Sentinel.Service.Monitors.ProcessMonitor" /> depends on this abstraction so its policy can be tested

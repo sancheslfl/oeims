@@ -1,8 +1,7 @@
 namespace OEIMS.Sentinel.Service.Domain.Platform;
 
 /// <summary>
-/// Boundary between execution-blocking policy and the operating system mechanism that prevents an
-/// executable from launching.
+/// Interface that abstracts process execution blocking policy from the operating system APIs.
 /// </summary>
 /// <remarks>
 /// <see cref="OEIMS.Sentinel.Service.Mitigators.ProcessBlocker" /> depends on this abstraction so its
