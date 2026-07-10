@@ -30,7 +30,7 @@ internal enum ProcessEvent
 /// </para>
 /// </remarks>
 /// <param name="processSource">
-/// Platform implementation that offers implementation for process related interaction.
+/// Platform implementation that offers process interaction.
 /// </param>
 internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
 {

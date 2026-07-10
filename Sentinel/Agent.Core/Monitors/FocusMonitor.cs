@@ -11,7 +11,7 @@ namespace OEIMS.Sentinel.Agent.Monitors;
 /// Repeated notifications for the same window title are ignored to avoid flooding.
 /// </remarks>
 /// <param name="activeWindowSource">
-/// Platform implementation that offers implementation for current foreground window interaction.
+/// Platform implementation that offers current foreground window interaction.
 /// </param>
 internal sealed class FocusMonitor(IActiveWindowSource activeWindowSource) : IMonitor
 {
