@@ -23,7 +23,6 @@ internal sealed class WinClipboardSource : IClipboardSource
             Name = nameof(WinClipboardSource),
             IsBackground = true
         };
-        _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
 
         ready.Wait();
