@@ -30,7 +30,7 @@ internal enum ProcessEvent
 /// </para>
 /// </remarks>
 /// <param name="processSource">
-/// Platform boundary used to watch process starts and kill matching processes.
+/// Platform implementation that offers implementation for process related interaction.
 /// </param>
 internal sealed class ProcessMonitor(IProcessSource processSource) : IMonitor
 {
