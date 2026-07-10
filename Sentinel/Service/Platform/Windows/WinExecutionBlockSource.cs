@@ -32,23 +32,7 @@ internal sealed class WinExecutionBlockSource : IExecutionBlockSource
         if (string.IsNullOrWhiteSpace(processName))
             return;
 
-        foreach (var location in ScanLocations)
-        {
-            if (!Directory.Exists(location)) continue;
-
-            var options = new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                IgnoreInaccessible = true
-            };
-
-            var files = Directory.GetFiles(location, $"{processName}.exe", options);
-
-            foreach (var file in files)
-            {
-                BlockExecutable(Path.GetFileName(file));
-            }
-        }
+        BlockExecutable($"{processName}.exe");
     }
 
     /// <summary>
