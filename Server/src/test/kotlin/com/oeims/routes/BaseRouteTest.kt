@@ -1,19 +1,28 @@
 package com.oeims.routes
 
-import com.oeims.models.*
+import com.oeims.config.TestEnvironment
+import com.oeims.models.EmailSender
+import com.oeims.models.Events
+import com.oeims.models.Exams
+import com.oeims.models.Participants
+import com.oeims.models.SessionJoins
+import com.oeims.models.SessionSupervisors
+import com.oeims.models.Sessions
+import com.oeims.models.Users
 import com.oeims.models.dto.EmailJoinRequest
 import com.oeims.models.dto.VerifyJoinRequest
 import com.oeims.models.dto.VerifyJoinResponse
 import com.oeims.module
-import com.oeims.routes.BaseRouteTest.Companion.keepAlive
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.server.config.*
-import io.ktor.server.testing.*
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.testing.ApplicationTestBuilder
+import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -24,65 +33,38 @@ import java.nio.charset.StandardCharsets
 import java.sql.DriverManager
 import java.time.Instant
 
+/**
+ * Base class for route tests that boot the real Ktor application.
+ *
+ * It gives each test the boring setup it needs: the same test environment config,
+ * a shared in-memory SQLite database, a clean schema before each test, and a fake
+ * email sender so join-flow tests can grab the verification link without SMTP.
+ */
 abstract class BaseRouteTest {
-
     companion object {
         private const val DB_NAME = "routetest"
+        private const val DB_URL = "file:$DB_NAME?mode=memory&cache=shared"
+        private val testConfig = TestEnvironment.config(databasePath = DB_URL)
 
-        /**
-         * SQLite shared-cache in-memory URL.  Every connection that uses this URL
-         * shares the same in-memory database for the duration of the JVM process.
-         */
-        const val DB_URL = "file:$DB_NAME?mode=memory&cache=shared"
-
-        /**
-         * Keeps the in-memory database alive across many [testApplication] calls.
-         * Without this the DB would be destroyed the moment the first application
-         * instance shuts down between tests.
-         */
         @Suppress("unused")
         private val keepAlive = DriverManager.getConnection("jdbc:sqlite:$DB_URL")
 
         init {
-            // Wire Exposed to the shared in-memory DB once.
-            // Each testApplication call will also call Database.connect() via
-            // configureDatabase(); that is harmless — they all point at the same URL.
             Database.connect("jdbc:sqlite:$DB_URL", "org.sqlite.JDBC")
         }
-
-        /** Configuration shared by all route tests. */
-        val testConfig = MapApplicationConfig(
-            "database.path" to DB_URL,
-            "app.api.base-path" to "",
-            "app.frontend.base-url" to "http://localhost:5173",
-            "jwt.secret" to "test-secret-key-long-enough",
-            "jwt.issuer" to "oeims",
-            "jwt.auth.audience" to "oeims",
-            "jwt.auth.realm" to "oeims",
-            "jwt.auth.expiration-ms" to "3600000",
-            "jwt.email-join.audience" to "oeims:email-join",
-            "jwt.email-join.realm" to "oeims",
-            "jwt.email-join.expiration-ms" to "600000",
-            // Extremely long — ensures the heartbeat sweeper never fires during a test.
-            "heartbeat.interval-ms" to "999999999",
-            "heartbeat.timeout-ms" to "999999999"
-        )
     }
 
-    /**
-     * Drops and recreates every table before each test.
-     * Order matters: child tables (with FK references) must be dropped first.
-     */
+    protected val capturingEmailSender = CapturingEmailSender()
+
     @BeforeEach
     fun resetDatabase() {
+        capturingEmailSender.lastLink = null
+
         transaction {
             SchemaUtils.drop(Events, Participants, SessionJoins, SessionSupervisors, Sessions, Exams, Users)
             SchemaUtils.create(Users, Exams, Sessions, SessionSupervisors, SessionJoins, Participants, Events)
         }
     }
-
-    // Captures the link the join flow would have emailed, so tests can finish the handshake.
-    protected val capturingEmailSender = CapturingEmailSender()
 
     fun routeTest(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
         environment { config = testConfig }
@@ -90,7 +72,6 @@ abstract class BaseRouteTest {
         block()
     }
 
-    // Runs the request → verify join flow and returns the Sentinel token and participant id.
     suspend fun ApplicationTestBuilder.joinAsParticipant(code: String, email: String): JoinedParticipant {
         val http = jsonClient()
 
@@ -124,8 +105,10 @@ abstract class BaseRouteTest {
 }
 
 /**
- * Creates a test HTTP client with JSON serialization pre-configured.
- * Call this inside a [routeTest] block where `this` is [ApplicationTestBuilder].
+ * Small JSON client for route tests.
+ *
+ * Ktor's test client does not automatically know how to send and read our JSON
+ * DTOs, so tests call this instead of repeating the same plugin setup everywhere.
  */
 fun ApplicationTestBuilder.jsonClient(): HttpClient = createClient {
     install(ContentNegotiation) {

@@ -43,7 +43,7 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
             }
         });
 
-        thread.Name = nameof(WinActiveWindowSource);
+        thread.Name = nameof(WinActiveWindowSource);    // TODO: Put blank space dynamically in the middle
         thread.IsBackground = true;
         thread.Start();
 
@@ -201,14 +201,14 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
         User32.PeekMessage(
             out _,
             IntPtr.Zero,
-            WinEventConstants.WM_APP_STOP,
-            WinEventConstants.WM_APP_STOP,
+            WinEventConstants.WM_USER_STOP,
+            WinEventConstants.WM_USER_STOP,
             WinEventConstants.PM_NOREMOVE
         );
 
         using var registration = ct.Register(() =>
         {
-            User32.PostThreadMessage(loopThread, WinEventConstants.WM_APP_STOP, 0, 0);
+            User32.PostThreadMessage(loopThread, WinEventConstants.WM_USER_STOP, 0, 0);
         });
 
         while (true)

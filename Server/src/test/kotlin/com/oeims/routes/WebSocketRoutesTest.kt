@@ -8,9 +8,9 @@ import io.ktor.http.*
 import io.ktor.server.testing.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -19,6 +19,19 @@ class WebSocketRoutesTest : BaseRouteTest() {
     private fun ApplicationTestBuilder.wsClient() = createClient {
         install(WebSockets)
     }
+
+    private fun sentinelFrame(
+        monitorName: String,
+        message: String,
+        severity: String,
+    ): String = Json.encodeToString<SentinelEventMessage>(
+        SentinelEventMessage(
+            monitorName = monitorName,
+            message = message,
+            severity = severity,
+            occurredAt = Instant.now().toString(),
+        )
+    )
 
     private data class Ctx(
         val profToken: String,
@@ -55,8 +68,6 @@ class WebSocketRoutesTest : BaseRouteTest() {
         return Ctx(prof.token, joined.token, session.id, joined.participantId, session.code)
     }
 
-    // ── Daemon channel ────────────────────────────────────────────────────────
-
     @Test
     fun `valid daemon frame is persisted and returned by the events endpoint`() = routeTest {
         val ctx = setup()
@@ -65,7 +76,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "Window lost focus", "Warning")))
+            send(sentinelFrame("FocusMonitor", "Window lost focus", "Warning"))
             delay(50.milliseconds)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
@@ -90,7 +101,7 @@ class WebSocketRoutesTest : BaseRouteTest() {
         }) {
             send("this is not valid json {{{")
             delay(50.milliseconds)
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "valid msg", "Info")))
+            send(sentinelFrame("FocusMonitor", "valid msg", "Info"))
             delay(50.milliseconds)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
@@ -111,9 +122,9 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "msg", "NotARealSeverity")))
+            send(sentinelFrame("FocusMonitor", "msg", "NotARealSeverity"))
             delay(50.milliseconds)
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "valid msg", "Critical")))
+            send(sentinelFrame("FocusMonitor", "valid msg", "Critical"))
             delay(50.milliseconds)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
@@ -134,9 +145,9 @@ class WebSocketRoutesTest : BaseRouteTest() {
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(ctx.studentToken)
         }) {
-            send(Json.encodeToString(SentinelEventMessage("FocusMonitor", "lost focus", "Info")))
-            send(Json.encodeToString(SentinelEventMessage("ClipboardMonitor", "clipboard access", "Warning")))
-            send(Json.encodeToString(SentinelEventMessage("ProcessMonitor", "unknown process", "Critical")))
+            send(sentinelFrame("FocusMonitor", "lost focus", "Info"))
+            send(sentinelFrame("ClipboardMonitor", "clipboard access", "Warning"))
+            send(sentinelFrame("ProcessMonitor", "unknown process", "Critical"))
             delay(50.milliseconds)
             close(CloseReason(CloseReason.Codes.NORMAL, "done"))
         }
@@ -151,15 +162,12 @@ class WebSocketRoutesTest : BaseRouteTest() {
     @Test
     fun `daemon connection is closed with VIOLATED_POLICY when a different student connects`() = routeTest {
         val ctx = setup()
-
         val other = joinAsParticipant(ctx.code, "other@isel.pt")
-
         var receivedCloseReason: CloseReason? = null
 
         wsClient().webSocket("/ws/daemon/${ctx.participantId}", {
             bearerAuth(other.token)
         }) {
-            // Server closes the connection immediately; await the close reason
             receivedCloseReason = closeReason.await()
         }
 
@@ -180,5 +188,4 @@ class WebSocketRoutesTest : BaseRouteTest() {
 
         assertEquals(CloseReason.Codes.VIOLATED_POLICY, receivedCloseReason?.knownReason)
     }
-
 }
