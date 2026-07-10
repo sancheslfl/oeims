@@ -36,9 +36,10 @@ import java.time.Instant
 /**
  * Base class for route tests that boot the real Ktor application.
  *
- * It gives each test the boring setup it needs: the same test environment config,
- * a shared in-memory SQLite database, a clean schema before each test, and a fake
- * email sender so join-flow tests can grab the verification link without SMTP.
+ * It gives each test the following setup:
+ * - the same test environment config;
+ * - a shared in-memory SQLite database and a clean schema before each test;
+ * - a email sender mock so session joining tests can grab the verification link without SMTP.
  */
 abstract class BaseRouteTest {
     companion object {
@@ -93,6 +94,8 @@ abstract class BaseRouteTest {
     }
 
     class CapturingEmailSender : EmailSender {
+        // volatile is required here because email sender needs to be called from a coroutine
+        // and the test reads it from another separate coroutine
         @Volatile
         var lastLink: String? = null
 
@@ -107,8 +110,7 @@ abstract class BaseRouteTest {
 /**
  * Small JSON client for route tests.
  *
- * Ktor's test client does not automatically know how to send and read our JSON
- * DTOs, so tests call this instead of repeating the same plugin setup everywhere.
+ * Use this because Ktor's test client does not know how to send and read the app's JSON DTOs
  */
 fun ApplicationTestBuilder.jsonClient(): HttpClient = createClient {
     install(ContentNegotiation) {
