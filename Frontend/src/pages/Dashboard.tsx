@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { OpenedSession } from "../types";
 import { ClassroomCanvas } from "../components/canvas/ClassroomCanvas";
-import { useAuth } from "../AuthContext";
+import { useAuth } from "../auth.ts";
 import {getCurrentSession} from "../api/sessions.ts";
 import {clearLastSessionId, saveLastSessionId} from "../localStorage.ts";
 import {getExam} from "../api/exams.ts";
