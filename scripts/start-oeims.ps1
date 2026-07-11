@@ -3,6 +3,8 @@ param(
     [ValidateRange(1, 65535)]
     [int]$Port = 5173,
 
+    [string]$PublicUrl,
+
     [switch]$NoBrowser
 )
 
@@ -11,6 +13,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $composeFile = Join-Path $repoRoot "docker-compose.yml"
 $envFile = Join-Path $repoRoot ".env"
+$localUrl = "http://localhost:$Port"
 
 function New-RandomSecret {
     $bytes = New-Object byte[] 32
@@ -76,8 +79,25 @@ elseif (-not (Select-String -LiteralPath $envFile -Pattern '^JWT_SECRET=.+$' -Qu
         -Encoding Ascii
 }
 
+if ([string]::IsNullOrWhiteSpace($PublicUrl)) {
+    $PublicUrl = $localUrl
+}
+
+$publicUri = $null
+if (-not [Uri]::TryCreate($PublicUrl, [UriKind]::Absolute, [ref]$publicUri)) {
+    throw "PublicUrl must be an absolute HTTP or HTTPS URL."
+}
+
+if ($publicUri.Scheme -notin @("http", "https")) {
+    throw "PublicUrl must use HTTP or HTTPS."
+}
+
+$PublicUrl = $publicUri.GetLeftPart([UriPartial]::Authority).TrimEnd("/")
+
 $previousPort = $env:OEIMS_PORT
+$previousPublicUrl = $env:FRONTEND_BASE_URL
 $env:OEIMS_PORT = $Port.ToString()
+$env:FRONTEND_BASE_URL = $PublicUrl
 
 Push-Location $repoRoot
 try {
@@ -96,9 +116,15 @@ finally {
     else {
         $env:OEIMS_PORT = $previousPort
     }
+
+    if ($null -eq $previousPublicUrl) {
+        Remove-Item Env:\FRONTEND_BASE_URL -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:FRONTEND_BASE_URL = $previousPublicUrl
+    }
 }
 
-$localUrl = "http://localhost:$Port"
 $deadline = (Get-Date).AddMinutes(2)
 $ready = $false
 
@@ -115,8 +141,9 @@ while ((Get-Date) -lt $deadline) {
         }
     }
     catch {
-        Start-Sleep -Seconds 2
     }
+
+    Start-Sleep -Seconds 2
 }
 
 if (-not $ready) {
@@ -128,9 +155,10 @@ $lanAddress = Get-LanAddress
 Write-Host ""
 Write-Host "OEIMS is ready." -ForegroundColor Green
 Write-Host "Professor console: $localUrl"
+Write-Host "Public URL:       $PublicUrl"
 
-if ($lanAddress) {
-    Write-Host "Student access:    http://${lanAddress}:$Port"
+if ($lanAddress -and $PublicUrl -eq $localUrl) {
+    Write-Host "Remote students require restarting with -PublicUrl http://${lanAddress}:$Port"
 }
 
 if (-not $NoBrowser) {
