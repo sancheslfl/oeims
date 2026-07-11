@@ -74,13 +74,19 @@ The bootstrap script:
 6. Registers the `oeims` Windows Service and the Agent logon task;
 7. Starts Sentinel and opens the professor console.
 
-To run only the server and frontend:
+To run only the server and frontend on the same machine:
 
 ```powershell
 .\scripts\start-oeims.ps1
 ```
 
-To install Sentinel on another student machine, use the URL printed by the start script:
+For a classroom setup, start the platform with the address that student browsers can reach:
+
+```powershell
+.\scripts\start-oeims.ps1 -PublicUrl "http://<teacher-address>:5173"
+```
+
+Then install Sentinel on each student machine using that same address:
 
 ```powershell
 .\scripts\install-sentinel.ps1 -ServerUrl "http://<teacher-address>:5173"
