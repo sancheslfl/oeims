@@ -21,7 +21,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Agent.Core\Agent.Core.csproj" />
+		<ProjectReference Include="..\Agent\Agent.csproj" />
 		<ProjectReference Include="..\Service\Service.csproj" />
 	</ItemGroup>
 
