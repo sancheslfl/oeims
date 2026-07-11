@@ -5,7 +5,7 @@ import {
     useRef,
 } from "react";
 import type {ExamResponse, OpenedSession, SessionResponse} from "../../types";
-import {useAuth} from "../../AuthContext";
+import {useAuth} from "../../auth.ts";
 import {createSession, joinSessionAsSupervisor} from "../../api/sessions";
 import {getExam} from "../../api/exams";
 import {saveLastSessionId} from "../../localStorage.ts";

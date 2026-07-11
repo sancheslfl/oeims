@@ -5,6 +5,13 @@ type ApiErrorResponse = {
 };
 
 type ApiResponseType = "json" | "blob";
+type AuthErrorHandler = () => void;
+
+let authErrorHandler: AuthErrorHandler | undefined;
+
+export function registerAuthErrorHandler(handler: AuthErrorHandler) {
+  authErrorHandler = handler;
+}
 
 export async function apiFetch<T>(
     endpoint: string,
@@ -24,6 +31,8 @@ export async function apiFetch<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
+  const hasAuthorization = Boolean(token || headers.has("Authorization"));
+
   const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
@@ -31,7 +40,13 @@ export async function apiFetch<T>(
   });
 
   if (!res.ok) {
-    throw new Error(await getApiErrorMessage(res));
+    const message = await getApiErrorMessage(res);
+
+    if (hasAuthorization && isAuthErrorStatus(res.status)) {
+      authErrorHandler?.();
+    }
+
+    throw new Error(message);
   }
 
   if (res.status === 204) {
@@ -81,6 +96,10 @@ function getApiResponseType(res: Response): ApiResponseType {
 
   // in our current API non-JSON responses are downloadable files
   return "blob";
+}
+
+function isAuthErrorStatus(status: number) {
+  return status === 401 || status === 403;
 }
 
 export function createEventSource(eventId: string): EventSource {

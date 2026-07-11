@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../AuthContext";
+import { useAuth } from "../../auth.ts";
 import { IselLogo } from "./IselLogo";
 
 export function TopBar() {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ExamResponse, OpenedSession, SessionResponse } from "../../types";
-import { useAuth } from "../../AuthContext";
+import { useAuth } from "../../auth.ts";
 import { getExams } from "../../api/exams";
 import { getActiveSessions } from "../../api/sessions";
 import { CreateExamForm } from "./CreateExamForm";
