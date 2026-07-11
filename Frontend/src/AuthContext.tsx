@@ -7,6 +7,7 @@ import {
   AUTH_STORAGE_KEY,
   AuthContext,
   type AuthUser,
+  useAuth,
 } from "./auth.ts";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -57,14 +58,4 @@ export function AuthRequire({ children, allowedRole = USER_ROLES.Professor }: { 
   }
 
   return children;
-}
-
-function useAuth() {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider.");
-  }
-
-  return context;
 }
