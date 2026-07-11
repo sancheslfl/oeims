@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../../AuthContext";
+import { useAuth } from "../../auth.ts";
 import type { OpenedSession } from "../../types";
 import { ExamsView } from "./ExamsView";
 import { SettingsView } from "./SettingsView";

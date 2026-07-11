@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { SubmitEventHandler } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
-import { useAuth } from "../AuthContext";
+import { useAuth } from "../auth.ts";
 import { USER_ROLES } from "../types";
 import {IselLogo} from "../components/topbar/IselLogo.tsx";
 
