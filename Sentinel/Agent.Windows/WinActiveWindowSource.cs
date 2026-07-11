@@ -28,8 +28,7 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
         {
             try
             {
-                RegisterHooks(onChanged);
-                RunMessageLoop(ct);
+                RunMessageLoop(ct, () => RegisterHooks(onChanged));
 
                 completion.TrySetResult(true);
             }
@@ -194,7 +193,7 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
         }
     }
 
-    private static void RunMessageLoop(CancellationToken ct)
+    private static void RunMessageLoop(CancellationToken ct,Action onReady)
     {
         var loopThread = Kernel32.GetCurrentThreadId();
 
@@ -205,6 +204,8 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
             WinEventConstants.WM_USER_STOP,
             WinEventConstants.PM_NOREMOVE
         );
+
+        onReady();
 
         using (ct.Register(() =>
             User32.PostThreadMessage(loopThread, WinEventConstants.WM_USER_STOP, 0, 0)   
