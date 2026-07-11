@@ -206,24 +206,24 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
             WinEventConstants.PM_NOREMOVE
         );
 
-        using var registration = ct.Register(() =>
+        using (ct.Register(() =>
+            User32.PostThreadMessage(loopThread, WinEventConstants.WM_USER_STOP, 0, 0)   
+        ))
         {
-            User32.PostThreadMessage(loopThread, WinEventConstants.WM_USER_STOP, 0, 0);
-        });
+            while (true)
+            {
+                var res = User32.GetMessage(out var msg, IntPtr.Zero, 0, 0);
 
-        while (true)
-        {
-            var res = User32.GetMessage(out var msg, IntPtr.Zero, 0, 0);
+                if (res <= 0)   // error or WM_QUIT
+                    break;
 
-            if (res <= 0)   // error or WM_QUIT 
-                break;
+                if (ct.IsCancellationRequested)
+                    break;
 
-            if (ct.IsCancellationRequested)
-                break;
+                User32.TranslateMessage(ref msg);
+                User32.DispatchMessage(ref msg);
 
-            User32.TranslateMessage(ref msg);
-            User32.DispatchMessage(ref msg);
-
+            }
         }
     }
 
