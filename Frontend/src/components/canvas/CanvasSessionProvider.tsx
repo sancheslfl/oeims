@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from "react";
 import type { SessionResponse } from "../../types";
-import { useAuth } from "../../AuthContext";
+import { useAuth } from "../../auth.ts";
 import { endSession, getSessionReport, startSession } from "../../api/sessions";
 import {
     CanvasSessionContext,
@@ -13,9 +13,9 @@ type CanvasSessionProviderProps = {
 };
 
 export function CanvasSessionProvider({
-                                          openedSession,
-                                          children,
-                                      }: CanvasSessionProviderProps) {
+                                           openedSession,
+                                           children,
+                                       }: CanvasSessionProviderProps) {
     const { auth } = useAuth();
 
     const [sessionOverride, setSessionOverride] = useState<SessionResponse | null>(null);
