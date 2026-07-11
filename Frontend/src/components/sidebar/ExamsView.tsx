@@ -27,132 +27,114 @@ export function ExamsView({
 
     const [exams, setExams] = useState<ExamResponse[]>([]);
     const [activeSessions, setActiveSessions] = useState<SessionResponse[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoadingExams, setIsLoadingExams] = useState(false);
     const [error, setError] = useState("");
 
-    const allowedEmailDomain = loadAllowedEmailDomain(auth?.id);
-
-    const professorEventId = auth
-        ? REALTIME_CHANNELS.professor(auth.id)
-        : null;
-
-    const sseMessageHandler = useMemo(
-        () => ({
-            [REALTIME_EVENTS.SessionCreated]: (data: unknown) => {
-                const session = data as SessionResponse;
-
-                setActiveSessions((currentSessions) =>
-                    upsertSession(currentSessions, session),
-                );
-            },
-            [REALTIME_EVENTS.SessionStarted]: (data: unknown) => {
-                const session = data as SessionResponse;
-
-                setActiveSessions((currentSessions) =>
-                    upsertSession(currentSessions, session),
-                );
-            },
-            [REALTIME_EVENTS.SessionEnded]: (data: unknown) => {
-                const session = data as SessionResponse;
-
-                setActiveSessions((currentSessions) =>
-                    currentSessions.filter(
-                        (currentSession) => currentSession.id !== session.id,
-                    ),
-                );
-
-                if (openedSession?.session.id === session.id) {
-                    onCloseSession();
-                }
-            },
-        }),
-        [openedSession, onCloseSession],
-    );
-
-    useEventListener(professorEventId, sseMessageHandler);
+    const allowedEmailDomain = loadAllowedEmailDomain(auth?.id) ?? "";
 
     useEffect(() => {
-        if (!auth) {
-            return;
-        }
+        const token = auth?.token;
+
+        if (!token) return;
 
         let ignore = false;
 
         async function loadData(token: string) {
-            setIsLoading(true);
             setError("");
+            setIsLoadingExams(true);
 
             try {
-                const [exams, activeSessions] = await Promise.all([
+                const [loadedExams, loadedActiveSessions] = await Promise.all([
                     getExams(token),
                     getActiveSessions(token),
                 ]);
 
                 if (!ignore) {
-                    setExams(exams);
-                    setActiveSessions(activeSessions);
+                    setExams(loadedExams);
+                    setActiveSessions(loadedActiveSessions);
                 }
             } catch (error) {
-                if (!ignore) {
-                    setError(
-                        error instanceof Error
-                            ? error.message
-                            : "Could not load exams.",
-                    );
+                if (!ignore && error instanceof Error) {
+                    setError(error.message);
                 }
             } finally {
                 if (!ignore) {
-                    setIsLoading(false);
+                    setIsLoadingExams(false);
                 }
             }
         }
 
-        void loadData(auth.token);
+        void loadData(token);
 
         return () => {
             ignore = true;
         };
-    }, [auth]);
+    }, [auth?.token]);
+
+    const sseHandlers = useMemo(
+        () => ({
+            [REALTIME_EVENTS.SessionCreated]: (data: unknown) => {
+                const session = data as SessionResponse;
+
+                setActiveSessions((current) =>
+                    current.some((s) => s.id === session.id)
+                        ? current
+                        : [...current, session],
+                );
+            },
+
+            [REALTIME_EVENTS.SessionStatusUpdated]: (data: unknown) => {
+                const session = data as SessionResponse;
+
+                setActiveSessions((current) => {
+                    if (session.status === "ENDED") {
+                        return current.filter((s) => s.id !== session.id);
+                    }
+
+                    return current.map((s) =>
+                        s.id === session.id ? session : s,
+                    );
+                });
+
+                if (openedSession?.session.id !== session.id) {
+                    return;
+                }
+
+                if (session.status === "ENDED") {
+                    onCloseSession();
+                    return;
+                }
+
+                onOpenSession({ ...openedSession, session });
+            },
+        }),
+        [openedSession, onOpenSession, onCloseSession],
+    );
+
+    useEventListener(auth ? REALTIME_CHANNELS.sessions : null, sseHandlers);
 
     function handleExamCreated(exam: ExamResponse) {
-        setExams((currentExams) => [exam, ...currentExams]);
+        setExams((current) => [exam, ...current]);
     }
 
     return (
         <>
-            <CreateExamForm onExamCreated={handleExamCreated} />
-
             {error && (
                 <p className="rounded-md border-2 border-isel-red bg-isel-pink px-3 py-2 text-sm font-semibold text-isel-purple">
                     {error}
                 </p>
             )}
 
+            <CreateExamForm onExamCreated={handleExamCreated} />
+
             <SessionList
                 exams={exams}
                 activeSessions={activeSessions}
-                isLoading={isLoading}
+                isLoading={isLoadingExams}
                 openedSession={openedSession}
                 allowedEmailDomain={allowedEmailDomain}
                 onOpenSession={onOpenSession}
             />
         </>
-    );
-}
-
-function upsertSession(
-    sessions: SessionResponse[],
-    session: SessionResponse,
-): SessionResponse[] {
-    const existingSessionIndex = sessions.findIndex(
-        (currentSession) => currentSession.id === session.id,
-    );
-
-    if (existingSessionIndex === -1) {
-        return [session, ...sessions];
-    }
-
-    return sessions.map((currentSession) =>
-        currentSession.id === session.id ? session : currentSession,
     );
 }
