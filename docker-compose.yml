@@ -5,6 +5,7 @@ services:
     environment:
       JWT_SECRET: ${JWT_SECRET}
       DATABASE_PATH: /data/oeims.db
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
     volumes:
       - oeims-data:/data
     expose:
