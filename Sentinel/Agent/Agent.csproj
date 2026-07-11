@@ -4,12 +4,11 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>dotnet-Agent.Windows-4a53fee4-09ce-477d-a684-d59543f9d779</UserSecretsId>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UserSecretsId>dotnet-Agent-9ea3bc6e-d2d0-41d2-bada-aa06bf006f03</UserSecretsId>
 
-    <AssemblyName>Agent</AssemblyName>
-    <RootNamespace>OEIMS.Sentinel.Agent</RootNamespace>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	<UseWindowsForms>true</UseWindowsForms>
+
+	<RootNamespace>OEIMS.Sentinel.Agent</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,5 +22,4 @@
   <ItemGroup>
     <ProjectReference Include="..\Contracts\Contracts.csproj" />
   </ItemGroup>
-
 </Project>

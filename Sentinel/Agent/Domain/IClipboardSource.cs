@@ -1,6 +1,6 @@
 namespace OEIMS.Sentinel.Agent.Domain;
 
-public interface IClipboardSource : IDisposable
+internal interface IClipboardSource : IDisposable
 {
     void Block();
     void Unblock();
