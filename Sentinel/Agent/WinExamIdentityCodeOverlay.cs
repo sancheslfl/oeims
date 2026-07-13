@@ -1,12 +1,8 @@
 ﻿using OEIMS.Sentinel.Agent.Domain;
-using System.Reflection.Emit;
-using System.Drawing;
-using System.Windows.Forms;
-using static System.Net.Mime.MediaTypeNames;
 
-namespace OEIMS.Sentinel.Agent.Platform.Windows;
+namespace OEIMS.Sentinel.Agent;
 
-internal sealed class ExamIdentityCodeOverlay : IExamIdentityCodeOverlay, IDisposable
+internal sealed class WinExamIdentityCodeOverlay : IExamIdentityCodeOverlay, IDisposable
 {
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(5);
 
@@ -14,15 +10,15 @@ internal sealed class ExamIdentityCodeOverlay : IExamIdentityCodeOverlay, IDispo
     private readonly Thread _uiThread;
 
     private SynchronizationContext? _uiContext;
-    private ExamIdentityCodeOverlayForm? _form;
+    private ExamIdentityCodeOverlayWindow? _form;
     private bool _disposed;
 
-    public ExamIdentityCodeOverlay()
+    public WinExamIdentityCodeOverlay()
     {
         _uiThread = new Thread(RunMessageLoop)
         {
             IsBackground = true,
-            Name = "OEIMS Agent Overlay"
+            Name = "OEIMS Overlay"
         };
 
         _uiThread.SetApartmentState(ApartmentState.STA);
@@ -32,12 +28,12 @@ internal sealed class ExamIdentityCodeOverlay : IExamIdentityCodeOverlay, IDispo
             throw new InvalidOperationException("Agent overlay UI thread did not start.");
     }
 
-    public Task ShowAsync(string code, CancellationToken ct = default)
+    public Task DisplayCodeAsync(string code, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
 
         if (_disposed)
-            throw new ObjectDisposedException(nameof(ExamIdentityCodeOverlay));
+            throw new ObjectDisposedException(nameof(WinExamIdentityCodeOverlay));
 
         ct.ThrowIfCancellationRequested();
 
@@ -53,7 +49,7 @@ internal sealed class ExamIdentityCodeOverlay : IExamIdentityCodeOverlay, IDispo
             {
                 if (_form is null || _form.IsDisposed)
                 {
-                    _form = new ExamIdentityCodeOverlayForm(code);
+                    _form = new ExamIdentityCodeOverlayWindow(code);
                     _form.FormClosed += (_, _) => _form = null;
                     _form.Show();
                 }
@@ -102,14 +98,13 @@ internal sealed class ExamIdentityCodeOverlay : IExamIdentityCodeOverlay, IDispo
 }
 
 
-internal sealed class ExamIdentityCodeOverlayForm : Form
+internal sealed class ExamIdentityCodeOverlayWindow : Form
 {
-    internal const string WindowTitle = "OEIMS Exam Code Overlay";
-    internal const string WindowClassName = "OEIMS.ExamIdentityCodeOverlay";
+    internal const string WindowTitle = "OEIMS - Exam Code";
 
     private readonly Label _codeLabel;
 
-    public ExamIdentityCodeOverlayForm(string code)
+    public ExamIdentityCodeOverlayWindow(string code)
     {
         Text = WindowTitle;
         AccessibleName = WindowTitle;
@@ -124,7 +119,7 @@ internal sealed class ExamIdentityCodeOverlayForm : Form
 
         var title = new Label
         {
-            Text = "Exam entry code",
+            Text = "Exam identity code",
             Dock = DockStyle.Fill,
             AutoSize = true,
             Font = new Font(Font.FontFamily, 14, FontStyle.Bold),
@@ -182,15 +177,5 @@ internal sealed class ExamIdentityCodeOverlayForm : Form
     public void SetCode(string code)
     {
         _codeLabel.Text = code;
-    }
-
-    protected override CreateParams CreateParams
-    {
-        get
-        {
-            var parameters = base.CreateParams;
-            parameters.ClassName = WindowClassName;
-            return parameters;
-        }
     }
 }

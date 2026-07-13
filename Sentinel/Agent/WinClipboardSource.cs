@@ -1,7 +1,7 @@
 using OEIMS.Sentinel.Agent.Domain;
-using OEIMS.Sentinel.Agent.Platform.Windows.Native;
+using OEIMS.Sentinel.Agent.Native;
 
-namespace OEIMS.Sentinel.Agent.Platform.Windows;
+namespace OEIMS.Sentinel.Agent;
 
 internal sealed class WinClipboardSource : IClipboardSource
 {
@@ -23,7 +23,6 @@ internal sealed class WinClipboardSource : IClipboardSource
             Name = nameof(WinClipboardSource),
             IsBackground = true
         };
-        _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
 
         ready.Wait();
