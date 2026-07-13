@@ -1,4 +1,4 @@
-﻿namespace OEIMS.Sentinel.Agent.Native;
+﻿namespace OEIMS.Sentinel.Agent.Platform.Windows.Native;
 
 internal static class WinEventConstants
 {

@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace OEIMS.Sentinel.Agent.Native;
+namespace OEIMS.Sentinel.Agent.Platform.Windows.Native;
 
 [StructLayout(LayoutKind.Sequential)]
 internal struct MSG

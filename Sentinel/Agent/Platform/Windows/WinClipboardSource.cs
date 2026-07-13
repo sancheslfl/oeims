@@ -1,7 +1,8 @@
 using OEIMS.Sentinel.Agent.Domain;
 using OEIMS.Sentinel.Agent.Native;
+using OEIMS.Sentinel.Agent.Platform.Windows.Native;
 
-namespace OEIMS.Sentinel.Agent;
+namespace OEIMS.Sentinel.Agent.Platform.Windows;
 
 internal sealed class WinClipboardSource : IClipboardSource
 {
