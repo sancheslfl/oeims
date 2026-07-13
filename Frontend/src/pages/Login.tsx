@@ -61,7 +61,7 @@ export function Login() {
             </div>
 
             <p className="mt-2 font-semibold text-isel-red">
-              Professor Console
+              Professor Dashboard
             </p>
           </header>
 

@@ -1,8 +1,6 @@
-﻿using OEIMS.Sentinel.Agent.Domain;
-using System.Reflection.Emit;
-using System.Drawing;
+﻿using System.Drawing;
 using System.Windows.Forms;
-using static System.Net.Mime.MediaTypeNames;
+using OEIMS.Sentinel.Agent.Domain;
 
 namespace OEIMS.Sentinel.Agent.Platform.Windows;
 

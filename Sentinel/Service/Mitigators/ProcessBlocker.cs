@@ -38,7 +38,7 @@ internal class ProcessBlocker : IMitigator
         Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
     ];
 
-    private readonly List<string> _blockedPaths = new List<string>();
+    private readonly List<string> _blockedPaths = [];
 
     private const string RegistryPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\";
 
