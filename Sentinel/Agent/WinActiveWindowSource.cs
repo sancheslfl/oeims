@@ -1,34 +1,36 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using OEIMS.Sentinel.Agent.Domain;
-using OEIMS.Sentinel.Agent.Platform.Windows.Native;
+using OEIMS.Sentinel.Agent.Native;
 
-namespace OEIMS.Sentinel.Agent.Platform.Windows;
+namespace OEIMS.Sentinel.Agent;
 
 internal sealed class WinActiveWindowSource : IActiveWindowSource
 {
+    private static readonly int CurrentProcessId = Environment.ProcessId;
+
     private IntPtr _foregroundHook = IntPtr.Zero;
     private IntPtr _nameChangeHook = IntPtr.Zero;
 
     private IntPtr _foregroundHwnd = IntPtr.Zero;
-    private string _lastName = string.Empty;
+    private string _lastWindowKey = string.Empty;
 
     private User32.WinEventDelegate? _foregroundCallback;
     private User32.WinEventDelegate? _nameChangeCallback;
 
     public Task StartAsync(Func<ActiveWindowInfo, Task> onChanged, CancellationToken ct)
     {
-        var completion = new TaskCompletionSource(
+        var completion = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
         var thread = new Thread(() =>
         {
             try
             {
-                RegisterHooks(onChanged);
-                RunMessageLoop(ct);
+                RunMessageLoop(ct, () => RegisterHooks(onChanged));
 
-                completion.TrySetResult();
+                completion.TrySetResult(true);
             }
             catch (Exception ex)
             {
@@ -40,9 +42,8 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
             }
         });
 
-        thread.Name = nameof(WinActiveWindowSource);
+        thread.Name = nameof(WinActiveWindowSource);    // TODO: Put blank space dynamically in the middle
         thread.IsBackground = true;
-        thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
 
         return completion.Task;
@@ -97,17 +98,36 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
 
     private void NotifyIfChanged(IntPtr hwnd, Func<ActiveWindowInfo, Task> onChanged)
     {
+        var processId = GetProcessId(hwnd);
+
+        if (processId == 0 || processId == CurrentProcessId)
+            return;
+
         var name = GetWindowName(hwnd);
 
         if (string.IsNullOrWhiteSpace(name))
-            name = "<unknown>";
+            name = "Unknown window";
 
-        if (name == _lastName)
+        var windowKey = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{processId}:{name}");
+
+        if (windowKey == _lastWindowKey)
             return;
 
-        _lastName = name;
+        _lastWindowKey = windowKey;
 
         _ = NotifyAsync(name, onChanged);
+    }
+
+    private static int GetProcessId(IntPtr hwnd)
+    {
+        var threadId = User32.GetWindowThreadProcessId(hwnd, out var processId);
+
+        if (threadId == 0 || processId == 0 || processId > int.MaxValue)
+            return 0;
+
+        return (int)processId;
     }
 
     private static string GetWindowName(IntPtr hwnd)
@@ -141,17 +161,21 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
 
     private static string GetProcessName(IntPtr hwnd)
     {
-        User32.GetWindowThreadProcessId(hwnd, out var processId);
+        var processId = GetProcessId(hwnd);
 
         if (processId == 0)
             return string.Empty;
 
         try
         {
-            using var process = Process.GetProcessById((int)processId);
+            using var process = Process.GetProcessById(processId);
             return process.ProcessName;
         }
-        catch
+        catch (ArgumentException)
+        {
+            return string.Empty;
+        }
+        catch (InvalidOperationException)
         {
             return string.Empty;
         }
@@ -165,22 +189,41 @@ internal sealed class WinActiveWindowSource : IActiveWindowSource
         }
         catch
         {
-            // ignore because the Windows hook thread should not crash because an event consumer failed.
+            // hook thread must not crash because an event consumer failed.
         }
     }
 
-    private static void RunMessageLoop(CancellationToken ct)
+    private static void RunMessageLoop(CancellationToken ct,Action onReady)
     {
-        while (!ct.IsCancellationRequested)
+        var loopThread = Kernel32.GetCurrentThreadId();
+
+        User32.PeekMessage(
+            out _,
+            IntPtr.Zero,
+            WinEventConstants.WM_USER_STOP,
+            WinEventConstants.WM_USER_STOP,
+            WinEventConstants.PM_NOREMOVE
+        );
+
+        onReady();
+
+        using (ct.Register(() =>
+            User32.PostThreadMessage(loopThread, WinEventConstants.WM_USER_STOP, 0, 0)   
+        ))
         {
-            if (User32.PeekMessage(out var msg, IntPtr.Zero, 0, 0, WinEventConstants.PM_REMOVE))
+            while (true)
             {
+                var res = User32.GetMessage(out var msg, IntPtr.Zero, 0, 0);
+
+                if (res <= 0)   // error or WM_QUIT
+                    break;
+
+                if (ct.IsCancellationRequested)
+                    break;
+
                 User32.TranslateMessage(ref msg);
                 User32.DispatchMessage(ref msg);
-            }
-            else
-            {
-                ct.WaitHandle.WaitOne(100);
+
             }
         }
     }
