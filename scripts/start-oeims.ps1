@@ -131,7 +131,7 @@ $ready = $false
 while ((Get-Date) -lt $deadline) {
     try {
         $response = Invoke-WebRequest `
-            -Uri $localUrl `
+            -Uri "$localUrl/api/auth/login" `
             -UseBasicParsing `
             -TimeoutSec 3
 
@@ -141,13 +141,17 @@ while ((Get-Date) -lt $deadline) {
         }
     }
     catch {
+        if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -lt 500) {
+            $ready = $true
+            break
+        }
     }
 
     Start-Sleep -Seconds 2
 }
 
 if (-not $ready) {
-    throw "OEIMS containers started, but the web interface was not ready after two minutes. Run 'docker compose logs' from the repository root."
+    throw "OEIMS containers started, but the API was not ready after two minutes. Run 'docker compose logs' from the repository root."
 }
 
 $professor = @{
