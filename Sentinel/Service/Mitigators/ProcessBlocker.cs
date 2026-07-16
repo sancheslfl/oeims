@@ -1,5 +1,5 @@
 using Contracts;
-using OEIMS.Sentinel.Service.Domain.Platform;
+using Microsoft.Win32;
 
 namespace OEIMS.Sentinel.Service.Mitigators;
 
