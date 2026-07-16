@@ -54,9 +54,9 @@ started from the source repository without preparing a separate release package.
 
 ### Deployment
 
-The complete local presentation setup currently targets Windows. Before starting, provide a working Docker environment
-with the `docker` CLI, a reachable Docker daemon, and Docker Compose, and install the
-[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). Docker Desktop is not required.
+The complete local presentation setup currently targets Windows. Before starting, install and run
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) and install the
+[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 After cloning the repository, open PowerShell as Administrator and run:
 
