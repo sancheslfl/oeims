@@ -9,13 +9,13 @@ param(
     [ValidateSet("win-x64", "win-arm64")]
     [string]$Runtime = "win-x64",
 
-    [string]$ServiceName = "oeims",
     [string]$TaskName = "OEIMS Sentinel Agent",
     [string]$InstallRoot = (Join-Path $env:ProgramFiles "OEIMS\Sentinel"),
     [string]$DataRoot = (Join-Path $env:ProgramData "OEIMS\Sentinel")
 )
 
 $ErrorActionPreference = "Stop"
+$ServiceName = "oeims"
 
 function Assert-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -180,10 +180,10 @@ try {
     New-Service `
         -Name $ServiceName `
         -BinaryPathName ('"{0}"' -f $serviceExecutable) `
-        -DisplayName "OEIMS Sentinel Service" `
+        -DisplayName "Online Exam Integrity Monitoring Service" `
         -StartupType Automatic | Out-Null
 
-    & sc.exe description $ServiceName "OEIMS local exam-integrity monitoring service." | Out-Null
+    & sc.exe description $ServiceName "This service monitors the computer during online exams and reports activity to the teacher." | Out-Null
 
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
     $action = New-ScheduledTaskAction `
