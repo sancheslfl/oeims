@@ -58,17 +58,12 @@ if (-not (Test-Path $composeFile)) {
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    throw "The Docker CLI was not found in PATH."
+    throw "Docker Desktop is required and was not found in PATH."
 }
 
 & docker info *> $null
 if ($LASTEXITCODE -ne 0) {
-    throw "The Docker daemon is not reachable through the current Docker context."
-}
-
-& docker compose version *> $null
-if ($LASTEXITCODE -ne 0) {
-    throw "Docker Compose is required but is not available through 'docker compose'."
+    throw "Docker is installed but is not running. Start Docker Desktop and try again."
 }
 
 if (-not (Test-Path $envFile)) {
