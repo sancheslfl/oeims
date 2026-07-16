@@ -69,7 +69,7 @@ if ($LASTEXITCODE -ne 0 -or -not ($sdkVersions -match '^10\.')) {
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $serviceProject = Join-Path $repoRoot "Sentinel\Service\Service.csproj"
-$agentProject = Join-Path $repoRoot "Sentinel\Agent.Windows\Agent.Windows.csproj"
+$agentProject = Join-Path $repoRoot "Sentinel\Agent\Agent.csproj"
 
 if (-not (Test-Path $serviceProject) -or -not (Test-Path $agentProject)) {
     throw "Sentinel projects were not found. Run this script from the cloned OEIMS repository."
