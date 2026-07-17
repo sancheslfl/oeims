@@ -1,6 +1,6 @@
 ﻿using OEIMS.Sentinel.Agent.Domain;
 
-namespace OEIMS.Sentinel.Agent;
+namespace OEIMS.Sentinel.Agent.Platform.Windows;
 
 internal sealed class WinExamIdentityCodeOverlay : IExamIdentityCodeOverlay, IDisposable
 {

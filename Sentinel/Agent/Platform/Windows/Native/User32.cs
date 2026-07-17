@@ -1,4 +1,5 @@
-﻿using System;
+﻿using OEIMS.Sentinel.Agent.Platform.Windows.Native;
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
