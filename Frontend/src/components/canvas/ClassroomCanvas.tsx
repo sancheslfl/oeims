@@ -1,10 +1,10 @@
 import type { OpenedSession } from "../../types";
-import { useAuth } from "../../AuthContext";
 import {ClassroomSeats} from "./ClassroomSeats.tsx";
 import {useCanvasRealtimeData} from "../../hooks/useCanvasRealtimeData.ts";
 import {CanvasHeader} from "./CanvasHeader.tsx";
 import {CanvasSessionProvider} from "./CanvasSessionProvider.tsx";
 import {useCanvasSession} from "./CanvasSessionContext.ts";
+import {useAuth} from "../../auth.ts";
 
 type ClassroomCanvasProps = {
     openedSession: OpenedSession | null;

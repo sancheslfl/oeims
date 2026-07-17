@@ -1,6 +1,6 @@
 ﻿namespace OEIMS.Sentinel.Agent.Domain;
 
-internal interface IExamIdentityCodeOverlay
+public interface IExamIdentityCodeOverlay
 {
-    Task ShowAsync(string code, CancellationToken ct = default);
+    Task DisplayCodeAsync(string code, CancellationToken ct = default);
 }

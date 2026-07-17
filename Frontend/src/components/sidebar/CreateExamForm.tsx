@@ -1,7 +1,7 @@
 import { type SubmitEventHandler, useState } from "react";
 import type { CreateExamRequest, ExamResponse } from "../../types";
-import { useAuth } from "../../AuthContext";
 import { createExam } from "../../api/exams";
+import {useAuth} from "../../auth.ts";
 
 type CreateExamFormProps = {
     onExamCreated: (exam: ExamResponse) => void;
