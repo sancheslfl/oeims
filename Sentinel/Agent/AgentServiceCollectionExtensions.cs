@@ -14,13 +14,13 @@ public static class AgentServiceCollectionExtensions
     {
         services.AddSingleton<IActiveWindowSource, WinActiveWindowSource>();
         services.AddSingleton<IClipboardSource, WinClipboardSource>();
-        services.AddSingleton<IExamIdentityCodeOverlay, ExamIdentityCodeOverlay>();
+        services.AddSingleton<IExamIdentityCodeOverlay, WinExamIdentityCodeOverlay>();
 
         services.AddSingleton<AgentEventPipeClient>();
         services.AddSingleton<AgentCommandPipeServer>();
 
         services.AddSingleton<IMonitor, FocusMonitor>();
-        // services.AddSingleton<IMitigator, ClipboardBlocker>();
+        services.AddSingleton<IMitigator, ClipboardBlocker>();
 
         services.AddHostedService<Worker>();
 

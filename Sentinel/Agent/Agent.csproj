@@ -8,11 +8,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-Agent-9ea3bc6e-d2d0-41d2-bada-aa06bf006f03</UserSecretsId>
-
-	<UseWindowsForms>true</UseWindowsForms>
-
-	<RootNamespace>OEIMS.Sentinel.Agent</RootNamespace>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>OEIMS.Sentinel.Agent</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
@@ -21,4 +23,5 @@
   <ItemGroup>
     <ProjectReference Include="..\Contracts\Contracts.csproj" />
   </ItemGroup>
+
 </Project>
