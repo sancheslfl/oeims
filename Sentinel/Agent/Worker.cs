@@ -73,8 +73,10 @@ internal sealed class Worker(
         }
         catch (Exception ex)
         {
-            logger.LogCritical(ex, "Component failed: {Name}", name);
-            throw;
+            logger.LogError(
+                "Component failed: {Name}. {Message}",
+                name,
+                ex.Message);
         }
     }
 

@@ -1,6 +1,4 @@
-﻿using System.Drawing;
-using System.Windows.Forms;
-using OEIMS.Sentinel.Agent.Domain;
+﻿using OEIMS.Sentinel.Agent.Domain;
 
 namespace OEIMS.Sentinel.Agent.Platform.Windows;
 

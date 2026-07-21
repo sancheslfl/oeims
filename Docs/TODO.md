@@ -16,6 +16,7 @@
 - [ ] Corrigir o problema em que o serviço não interceta nem termina processos proibidos
 - [ ] Adicionar verificação de que o daemon está ligado (CONNECTED) antes de considerar o estudante pronto na sessão
 - [ ] (NEW) Tornar implementação de monitorização de processos independente da plataforma
+- [ ] (NEW) Analisar os StartAsync e mudar o tipo de retorno da Task
 
 ## Consola do Professor
 
@@ -29,6 +30,7 @@
 ## Documentação
 
 - [ ] Refazer os diagramas com menos ligações e melhor layout
+- [ ] Não focar tanto em código em relação às abstrações do Sentinela e começar por abordar de uma forma geral as abstrações Monitor, Mitigator e as restantes interfaces de plataforma.
 
 ## Dúvidas
 - Para comunicação bidirecional com pipes, devemos usar dois one-way named pipes ou um two-way named pipe?

@@ -47,15 +47,15 @@ internal sealed class AgentEventPipeClient(
             await _writer!.WriteLineAsync(json);
             await _writer.FlushAsync(ct);
         }
-        catch (IOException ex)
+        catch (IOException)
         {
-            logger.LogWarning(ex, "Agent pipe disconnected.");
+            logger.LogWarning("Agent pipe disconnected.");
 
             DisposeConnection();
         }
-        catch (TimeoutException ex)
+        catch (TimeoutException)
         {
-            logger.LogWarning(ex, "Agent pipe connection timed out.");
+            logger.LogWarning("Agent pipe connection timed out.");
 
             DisposeConnection();
         }
